@@ -44,6 +44,7 @@ val sparkdateTimeVersion = "0.0.1"
 libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
   "org.json4s" %% "json4s-jackson" % json4sVersion,
+  "org.json4s" %% "json4s-ext" % json4sVersion,
   "com.github.SparklineData" % "spark-datetime" % sparkdateTimeVersion,
   "org.scalatest" %% "scalatest" % scalatestVersion % "test"
 )

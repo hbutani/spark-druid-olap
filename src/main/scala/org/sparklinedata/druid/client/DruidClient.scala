@@ -11,6 +11,7 @@ import org.apache.spark.Logging
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
+import org.sparklinedata.druid.DruidMetadata
 
 import scala.util.Try
 
@@ -96,13 +97,34 @@ class DruidClient(val host : String, val port : Int) extends Logging {
   @throws(classOf[DruidException])
   def timeBoundary(dataSource : String) : Interval = {
     import org.json4s.JsonDSL._
+    implicit val formats = DefaultFormats
+
     val jR = compact(render(
       ( "queryType" -> "timeBoundary") ~ ("dataSource" -> dataSource)
     ))
     val jV = post(jR)
 
-    val sTime : String = (jV \\ "minTime").values.toString
-    val eTime : String = (jV \\ "maxTime").values.toString
+    val sTime : String = (jV \\ "minTime").extract[String]
+    val eTime : String = (jV \\ "maxTime").extract[String]
     new Interval(DateTime.parse(sTime), DateTime.parse(eTime))
+  }
+
+  @throws(classOf[DruidException])
+  def metadata(dataSource : String) : DruidMetadata = {
+    import org.json4s.JsonDSL._
+    implicit val formats = org.json4s.DefaultFormats ++ org.json4s.ext.JodaTimeSerializers.all
+
+    val i = timeBoundary(dataSource).toString
+
+    val jR = compact(render(
+      ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
+        ("intervals" -> List(i)) ~ ("merge" -> "true")
+    ))
+    val jV = post(jR) transformField {
+      case ("type", x) => ("typ", x)
+    }
+
+    val l = jV.extract[List[MetadataResponse]]
+    DruidMetadata(dataSource, l.head)
   }
 }

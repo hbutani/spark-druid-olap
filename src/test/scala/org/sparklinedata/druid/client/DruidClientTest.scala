@@ -14,4 +14,8 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll {
     println(client.timeBoundary("tpch"))
   }
 
+  test("metaData") {
+    println(client.metadata("tpch"))
+  }
+
 }
