@@ -11,7 +11,7 @@ import org.apache.spark.Logging
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
-import org.sparklinedata.druid.DruidMetadata
+import org.sparklinedata.druid.{QuerySpec, DruidMetadata}
 
 import scala.util.Try
 
@@ -126,5 +126,18 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
     val l = jV.extract[List[MetadataResponse]]
     DruidMetadata(dataSource, l.head)
+  }
+
+  @throws(classOf[DruidException])
+  def executeQuery(qry : QuerySpec) : List[QueryResultRow] = {
+    import org.json4s.JsonDSL._
+    implicit val formats = org.json4s.DefaultFormats +
+      new QueryResultRowSerializer ++ org.json4s.ext.JodaTimeSerializers.all
+
+    val jR = compact(render(Extraction.decompose(qry)))
+    val jV = post(jR)
+
+    jV.extract[List[QueryResultRow]]
+
   }
 }
