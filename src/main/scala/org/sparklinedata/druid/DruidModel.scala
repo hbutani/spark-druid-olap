@@ -39,9 +39,11 @@ case class SearchQueryExtractionFunctionSpec(val `type`: String, val query: Stri
  */
 case class TimeFormatExtractionFunctionSpec(val `type`: String,
                                             val format: String,
-                                            val timeZone: String,
-                                            val locale: String)
-  extends ExtractionFunctionSpec
+                                            val timeZone: Option[String],
+                                            val locale: Option[String])
+  extends ExtractionFunctionSpec {
+  def this(format: String) = this("timeFormat", format, None, None)
+}
 
 case class TimeParsingExtractionFunctionSpec(val `type`: String,
                                              val timeFormat: String,
@@ -80,7 +82,12 @@ case class DefaultDimensionSpec(val `type`: String, val dimension: String,
 case class ExtractionDimensionSpec(val `type`: String,
                                    val dimension: String,
                                    val outputName: String,
-                                   extractionFn: ExtractionFunctionSpec) extends DimensionSpec
+                                   extractionFn: ExtractionFunctionSpec) extends DimensionSpec {
+  def this(dimension: String,
+           outputName: String,
+           extractionFn: ExtractionFunctionSpec) =
+    this("extraction", dimension, outputName, extractionFn)
+}
 
 sealed trait GranularitySpec {
   val `type`: String
@@ -90,7 +97,9 @@ case class DurationGranularitySpec(`type`: String, duration: Long) extends Granu
 
 case class PeriodGranularitySpec(`type`: String, period: String,
                                  timeZone: Option[String],
-                                 origin: Option[String]) extends GranularitySpec
+                                 origin: Option[String]) extends GranularitySpec {
+  def this(period: String) = this("period", period, None, None)
+}
 
 sealed trait FilterSpec {
   val `type`: String
@@ -98,18 +107,19 @@ sealed trait FilterSpec {
 
 case class SelectorFilterSpec(`type`: String,
                               dimension: String,
-                              value: String) extends FilterSpec
+                              value: String) extends FilterSpec {
+  def this(dimension: String,
+           value: String) = this("selector", dimension, value)
+}
 
 case class RegexFilterSpec(`type`: String,
                            dimension: String,
                            pattern: String) extends FilterSpec
 
 case class LogicalFilterSpec(`type`: String,
-                             dimension: String,
                              fields: List[FilterSpec]) extends FilterSpec
 
 case class NotFilterSpec(`type`: String,
-                         dimension: String,
                          field: FilterSpec) extends FilterSpec
 
 /**
@@ -121,7 +131,10 @@ case class NotFilterSpec(`type`: String,
  */
 case class JavascriptFilterSpec(`type`: String,
                                 dimension: String,
-                                function: String) extends FilterSpec
+                                function: String) extends FilterSpec {
+  def this(dimension: String,
+           function: String) = this("javascript", dimension, function)
+}
 
 sealed trait AggregationSpec {
   val `type`: String

@@ -37,13 +37,13 @@ credentials += Credentials(Path.userHome / ".github.cred")
 resolvers += "JitPack.IO" at "https://jitpack.io"
 
 val httpclientVersion = "4.5"
-val json4sVersion = "3.2.11"
+val json4sVersion = "3.2.10"
 val scalatestVersion = "2.2.4"
 val sparkdateTimeVersion = "0.0.1"
 
 libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
-  "org.json4s" %% "json4s-jackson" % json4sVersion,
+  //"org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
   "com.github.SparklineData" % "spark-datetime" % sparkdateTimeVersion,
   "org.scalatest" %% "scalatest" % scalatestVersion % "test"
