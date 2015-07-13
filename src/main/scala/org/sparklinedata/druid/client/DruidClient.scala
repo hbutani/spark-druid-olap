@@ -11,7 +11,8 @@ import org.apache.spark.Logging
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
-import org.sparklinedata.druid.{QuerySpec, DruidMetadata}
+import org.sparklinedata.druid.QuerySpec
+import org.sparklinedata.druid.metadata.DruidMetadata
 
 import scala.util.Try
 

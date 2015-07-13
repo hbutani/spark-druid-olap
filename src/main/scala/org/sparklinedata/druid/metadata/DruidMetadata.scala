@@ -1,7 +1,7 @@
-package org.sparklinedata.druid
+package org.sparklinedata.druid.metadata
 
 import org.joda.time.Interval
-import org.sparklinedata.druid.client.{MetadataResponse, ColumnDetails}
+import org.sparklinedata.druid.client.{ColumnDetails, MetadataResponse}
 
 object DruidDataType extends Enumeration {
   val String = Value("STRING")

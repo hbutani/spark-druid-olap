@@ -5,6 +5,7 @@ import org.json4s.Extraction
 import org.json4s.jackson.JsonMethods._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.sparklinedata.druid._
+import org.sparklinedata.druid.metadata.DruidMetadata
 
 class DruidClientTest extends FunSuite with BeforeAndAfterAll {
 
