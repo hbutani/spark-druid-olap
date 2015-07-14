@@ -12,14 +12,14 @@ case class FunctionalDependency(col1 : String,
 class FunctionalDependencies(val dDS : DruidDataSource,
                               fds : List[FunctionalDependency]) {
 
-  val depGraph = new DependencyGraph(dDS, fds)
+  val depGraph : DependencyGraph = DependencyGraph(dDS, fds)
 
-  class Component(val base : depGraph.Node) {
-    var connectedNodes : List[depGraph.Node] = List()
+  class Component(val base : Int) {
+    var connectedNodes : List[Int] = List()
 
-    def connected(nd : depGraph.Node) : Boolean = {
+    def connected(nd : Int) : Boolean = {
       (base +: connectedNodes).foldLeft(false) { (b, c) =>
-        b || depGraph.closure(c.idx)(nd.idx) != null
+        b || depGraph.closure(c)(nd) != null
       }
     }
   }
@@ -39,8 +39,10 @@ class FunctionalDependencies(val dDS : DruidDataSource,
    * @return
    */
   def estimateCardinality(dimNames : List[String]) : Long = {
-    val oDims : List[depGraph.Node] =
-      dimNames.map(dN => dDS.indexOfDimension(dN)).map(depGraph.nodes(_)) // FIXME.sorted.reverse
+
+    val oDims : List[Int] = dimNames.map(dN => dDS.indexOfDimension(dN)).sortWith { (a,b) =>
+      depGraph.closure(a).size > depGraph.closure(b).size
+    }
 
     var components = List[Component]()
 
@@ -58,32 +60,22 @@ class FunctionalDependencies(val dDS : DruidDataSource,
 
     }
 
-    components.foldLeft(1L)((p, c) => p * c.base.d.cardinality)
+    components.foldLeft(1L)((p, c) => p * dDS.dimensions(c.base).cardinality)
 
   }
 }
 
-/**
- * Capture the FunctionalDependency relations as a Graph.
- * Compute the closure of this relation.
- * @param dDS
- * @param fds
- */
-private[metadata] class DependencyGraph(dDS : DruidDataSource,
-                                        fds : List[FunctionalDependency]) {
+case class DependencyGraph(val closure : Array[Array[FunctionalDependencyType.Value]])
 
-  class Node(val d : DruidDimension, val idx : Int)  extends Ordering[Node] {
+object DependencyGraph {
+
+  class Node(val d : DruidDimension, val idx : Int) {
     var incidentNodes : List[Relation] = List()
 
     def incident(nd : Node, fType : FunctionalDependencyType.Value): Unit = {
       incidentNodes = (incidentNodes :+ Relation(nd, fType))
     }
 
-    override def compare(x: Node, y: Node): Int = {
-      val c = closure(x.idx).size - closure(y.idx).size
-
-      if ( c != 0) 0 else (x.idx - y.idx)
-    }
   }
 
   case class Relation(nd : Node, fType : FunctionalDependencyType.Value) {
@@ -102,40 +94,53 @@ private[metadata] class DependencyGraph(dDS : DruidDataSource,
     }
   }
 
-  var nodes : IndexedSeq[Node] = dDS.dimensions.zipWithIndex.map(t => new Node(t._1, t._2))
+  /**
+   * Capture the FunctionalDependency relations as a Graph.
+   * Compute the closure of this relation.
+   * @param dDS
+   * @param fds
+   */
+  def apply(dDS : DruidDataSource,
+            fds : List[FunctionalDependency]) : DependencyGraph = {
 
-  fds.foreach { fd =>
+    var nodes: IndexedSeq[Node] = dDS.dimensions.zipWithIndex.map(t => new Node(t._1, t._2))
 
-    val nd1 = nodes(dDS.indexOfDimension(fd.col1))
-    val nd2 = nodes(dDS.indexOfDimension(fd.col2))
-
-    nd1.incident(nd2, fd.`type`)
-
-  }
-
-  val closure : Array[Array[Relation]] = {
-
-    val n = dDS.dimensions.size
-
-    val a = new Array[Array[Relation]](n)
-
-    (0 to n).foreach { i =>
-      a(i) = new Array(n)
-
-      nodes(i).incidentNodes.foreach { r =>
-        a(i)(r.nd.idx) = r
-      }
+    fds.foreach { fd =>
+      val nd1 = nodes(dDS.indexOfDimension(fd.col1))
+      val nd2 = nodes(dDS.indexOfDimension(fd.col2))
+      nd1.incident(nd2, fd.`type`)
     }
 
-    for(k <- 0 to (n-1)){
-      for(i <- 0 to (n-1)){
-        for(j <- 0 to (n-1)){
-          a(i)(j) = if ( a(i)(j)  != null ) a(i)(j) else (a(i)(k) && a(k)(j))
+    val closure: Array[Array[FunctionalDependencyType.Value]] = {
+
+      val n = dDS.dimensions.size
+
+      val a = new Array[Array[Relation]](n)
+      val b = new Array[Array[FunctionalDependencyType.Value]](n)
+
+      (0 to n).foreach { i =>
+        a(i) = new Array(n)
+        b(i) = new Array(n)
+
+        nodes(i).incidentNodes.foreach { r =>
+          a(i)(r.nd.idx) = r
+          b(i)(r.nd.idx) = r.fType
         }
       }
+
+      for (k <- 0 to (n - 1)) {
+        for (i <- 0 to (n - 1)) {
+          for (j <- 0 to (n - 1)) {
+            a(i)(j) = if (a(i)(j) != null) a(i)(j) else (a(i)(k) && a(k)(j))
+            b(i)(j) = a(i)(j).fType
+          }
+        }
+      }
+
+      b
     }
 
-    a
+    DependencyGraph(closure)
   }
 
 }
