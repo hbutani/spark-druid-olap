@@ -1,5 +1,7 @@
 package org.sparklinedata.druid.metadata
 
+import scala.collection.mutable.ArrayBuffer
+
 object FunctionalDependencyType extends Enumeration {
   val OneToOne = Value("1-1")
   val ManyToOne = Value("n-1")
@@ -65,7 +67,27 @@ class FunctionalDependencies(val dDS : DruidDataSource,
   }
 }
 
-case class DependencyGraph(val closure : Array[Array[FunctionalDependencyType.Value]])
+case class DependencyGraph(val closure : Array[Array[FunctionalDependencyType.Value]]) {
+
+  def debugString(dDS : DruidDataSource) : String = {
+    val s = ArrayBuffer[String]()
+
+    val n = dDS.dimensions.size
+    (0 until n).foreach { i =>
+      val d = dDS.dimensions(i)
+      val descendants : Array[(String, FunctionalDependencyType.Value)] =
+        closure(i).zipWithIndex.flatMap { t =>
+          val d = t._1
+          val j = t._2
+        if (d != null) List((dDS.dimensions(j).name, d)) else Nil
+      }
+      val des = descendants.mkString(",")
+      s += s"${d.name} -> ${des}"
+    }
+
+    s.mkString("\n")
+  }
+ }
 
 object DependencyGraph {
 
@@ -118,21 +140,29 @@ object DependencyGraph {
       val a = new Array[Array[Relation]](n)
       val b = new Array[Array[FunctionalDependencyType.Value]](n)
 
-      (0 to n).foreach { i =>
+      (0 until n).foreach { i =>
         a(i) = new Array(n)
         b(i) = new Array(n)
+      }
 
+      (0 until n).foreach { i =>
         nodes(i).incidentNodes.foreach { r =>
           a(i)(r.nd.idx) = r
           b(i)(r.nd.idx) = r.fType
+          if ( r.fType == FunctionalDependencyType.OneToOne ) {
+            a(r.nd.idx)(i) = r
+            b(r.nd.idx)(i) = r.fType
+          }
         }
+
       }
 
       for (k <- 0 to (n - 1)) {
         for (i <- 0 to (n - 1)) {
           for (j <- 0 to (n - 1)) {
-            a(i)(j) = if (a(i)(j) != null) a(i)(j) else (a(i)(k) && a(k)(j))
-            b(i)(j) = a(i)(j).fType
+            a(i)(j) =
+              if (a(i)(j) != null) a(i)(j) else if (a(i)(k) == null) null else a(i)(k) && a(k)(j)
+            b(i)(j) = if ( a(i)(j) != null) a(i)(j).fType else null
           }
         }
       }

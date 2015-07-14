@@ -46,7 +46,8 @@ libraryDependencies ++= Seq(
   //"org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
   "com.github.SparklineData" % "spark-datetime" % sparkdateTimeVersion,
-  "org.scalatest" %% "scalatest" % scalatestVersion % "test"
+  "org.scalatest" %% "scalatest" % scalatestVersion % "test",
+  "com.databricks" %% "spark-csv" % "1.1.0" % "test"
 )
 
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)

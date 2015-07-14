@@ -11,6 +11,7 @@ case class DruidClientInfo(host : String, port : Int)
 
 case class DruidRelationInfo(val druidClientInfo : DruidClientInfo,
                          val sourceDFName : String,
+                            val timeDimensionCol : String,
                          val druidDS : DruidDataSource,
                          val sourceToDruidMapping : Map[String, DruidColumn],
                          val fd : FunctionalDependencies,
@@ -26,6 +27,7 @@ object DruidRelationInfo {
   def apply(sourceDFName : String,
              sourceDF : DataFrame,
            dsName : String,
+            timeDimensionCol : String,
              druidHost : String,
              druidPort : Int,
              columnMapping : Map[String, String],
@@ -40,6 +42,7 @@ object DruidRelationInfo {
 
     DruidRelationInfo(DruidClientInfo(druidHost, druidPort),
     sourceDFName,
+    timeDimensionCol,
     druidDS,
     sourceToDruidMapping,
     fd,
