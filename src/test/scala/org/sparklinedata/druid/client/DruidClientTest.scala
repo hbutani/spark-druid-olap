@@ -5,7 +5,7 @@ import org.json4s.Extraction
 import org.json4s.jackson.JsonMethods._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.DruidMetadata
+import org.sparklinedata.druid.metadata.DruidDataSource
 
 class DruidClientTest extends FunSuite with BeforeAndAfterAll {
 
@@ -114,7 +114,7 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll {
       List(
         new DefaultDimensionSpec("l_returnflag"),
         new DefaultDimensionSpec("l_linestatus"),
-      new ExtractionDimensionSpec(DruidMetadata.TIME_COLUMN_NAME,
+      new ExtractionDimensionSpec(DruidDataSource.TIME_COLUMN_NAME,
         "month",
       new TimeFormatExtractionFunctionSpec("yyyy-MMM")
       )

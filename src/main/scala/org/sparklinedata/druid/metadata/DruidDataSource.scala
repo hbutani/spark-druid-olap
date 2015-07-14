@@ -19,7 +19,7 @@ sealed trait DruidColumn {
 object DruidColumn {
 
   def apply(nm : String, c : ColumnDetails) : DruidColumn = {
-    if (nm == DruidMetadata.TIME_COLUMN_NAME) {
+    if (nm == DruidDataSource.TIME_COLUMN_NAME) {
       DruidTimeDimension(nm, DruidDataType.withName(c.typ), c.size)
     } else if ( c.cardinality.isDefined) {
       DruidDimension(nm, DruidDataType.withName(c.typ), c.size, c.cardinality.get)
@@ -42,38 +42,44 @@ case class DruidTimeDimension(name : String,
                        dataType : DruidDataType.Value,
                        size : Long) extends DruidColumn
 
-case class DruidMetadata(name : String,
+case class DruidDataSource(name : String,
                          intervals : List[Interval],
                          columns : Map[String, DruidColumn],
                          size : Long) {
 
-  import DruidMetadata._
+  import DruidDataSource._
 
   lazy val timeDimension = columns.values.find {
     case c if c.name == TIME_COLUMN_NAME => true
   }
 
-  lazy val dimensions = columns.values.filter {
+  lazy val dimensions : IndexedSeq[DruidDimension] = columns.values.filter {
     case d : DruidDimension => true
     case _ => false
-  }
+  }.map(_.asInstanceOf[DruidDimension]).toIndexedSeq
 
   lazy val metrics = columns.values.filter {
     case m : DruidMetric => true
     case _ => false
   }
 
+  def numDimensions = dimensions.size
+
+  def indexOfDimension(d : String) : Int = {
+    dimensions.indexWhere(_.name == d)
+  }
+
 }
 
-object DruidMetadata {
+object DruidDataSource {
 
   val TIME_COLUMN_NAME = "__time"
 
-  def apply(dataSource : String, mr : MetadataResponse) : DruidMetadata = {
+  def apply(dataSource : String, mr : MetadataResponse) : DruidDataSource = {
     val is = mr.intervals.map(Interval.parse(_))
     val columns = mr.columns.map {
       case (n, c) => (n -> DruidColumn(n,c))
     }
-    new DruidMetadata(dataSource, is, columns, mr.size)
+    new DruidDataSource(dataSource, is, columns, mr.size)
   }
 }

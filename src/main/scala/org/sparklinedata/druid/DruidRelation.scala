@@ -4,8 +4,10 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.sources.{TableScan, BaseRelation}
 import org.apache.spark.sql.types.StructType
+import org.sparklinedata.druid.metadata.DruidRelationInfo
 
-class DruidRelation protected[druid] ()(@transient val sqlContext: SQLContext)
+class DruidRelation protected[druid] (val info : DruidRelationInfo)(
+  @transient val sqlContext: SQLContext)
   extends BaseRelation with TableScan {
   /*
    pass in
@@ -15,7 +17,7 @@ class DruidRelation protected[druid] ()(@transient val sqlContext: SQLContext)
    - optionally a  Druid Query
    */
 
-  override def schema: StructType = ???
+  override def schema: StructType = info.sourceDF(sqlContext).schema
 
-  override def buildScan(): RDD[Row] = ???
+  override def buildScan(): RDD[Row] = info.sourceDF(sqlContext).rdd
 }

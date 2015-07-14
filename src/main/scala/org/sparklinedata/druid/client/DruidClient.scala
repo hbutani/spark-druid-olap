@@ -11,15 +11,10 @@ import org.apache.spark.Logging
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
-import org.sparklinedata.druid.QuerySpec
-import org.sparklinedata.druid.metadata.DruidMetadata
+import org.sparklinedata.druid.{DruidDataSourceException, QuerySpec}
+import org.sparklinedata.druid.metadata.DruidDataSource
 
 import scala.util.Try
-
-class DruidException(message: String, cause: Throwable) extends Exception(message, cause) {
-  def this(message : String) = this(message, null)
-}
-
 
 object ConnectionManager {
   val pool = new PoolingHttpClientConnectionManager
@@ -44,7 +39,7 @@ class DruidClient(val host : String, val port : Int) extends Logging {
   private def getRequest(url : String) = new HttpGet(url)
   private def postRequest(url : String) = new HttpPost(url)
 
-  @throws(classOf[DruidException])
+  @throws(classOf[DruidDataSourceException])
   private def perform(reqType : String => HttpRequestBase,
                   payload : String,
                   reqHeaders: Map[String, String]) : JValue =  {
@@ -67,7 +62,7 @@ class DruidClient(val host : String, val port : Int) extends Logging {
         if (status >= 200 && status < 300) {
           IOUtils.toString(r.getEntity.getContent)
         } else {
-          throw new DruidException(s"Unexpected response status: ${r.getStatusLine}")
+          throw new DruidDataSourceException(s"Unexpected response status: ${r.getStatusLine}")
         }
       }
       j <- Try {parse(respStr)}
@@ -75,8 +70,8 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
     release(resp)
     js getOrElse( js.failed.get match {
-      case dE : DruidException => throw dE
-      case x => throw new DruidException("Failed in communication with Druid", x)
+      case dE : DruidDataSourceException => throw dE
+      case x => throw new DruidDataSourceException("Failed in communication with Druid", x)
     })
   }
 
@@ -95,7 +90,7 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     }
   }
 
-  @throws(classOf[DruidException])
+  @throws(classOf[DruidDataSourceException])
   def timeBoundary(dataSource : String) : Interval = {
     import org.json4s.JsonDSL._
     implicit val formats = DefaultFormats
@@ -110,8 +105,8 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     new Interval(DateTime.parse(sTime), DateTime.parse(eTime))
   }
 
-  @throws(classOf[DruidException])
-  def metadata(dataSource : String) : DruidMetadata = {
+  @throws(classOf[DruidDataSourceException])
+  def metadata(dataSource : String) : DruidDataSource = {
     import org.json4s.JsonDSL._
     implicit val formats = org.json4s.DefaultFormats ++ org.json4s.ext.JodaTimeSerializers.all
 
@@ -126,10 +121,10 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     }
 
     val l = jV.extract[List[MetadataResponse]]
-    DruidMetadata(dataSource, l.head)
+    DruidDataSource(dataSource, l.head)
   }
 
-  @throws(classOf[DruidException])
+  @throws(classOf[DruidDataSourceException])
   def executeQuery(qry : QuerySpec) : List[QueryResultRow] = {
     import org.json4s.JsonDSL._
     implicit val formats = org.json4s.DefaultFormats +
