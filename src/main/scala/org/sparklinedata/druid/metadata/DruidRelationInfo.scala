@@ -38,7 +38,8 @@ object DruidRelationInfo {
     val client = new DruidClient(druidHost, druidPort)
     val druidDS = client.metadata(dsName)
     val sourceToDruidMapping = MappingBuilder.buildMapping(columnMapping, sourceDF, druidDS)
-    val fd = new FunctionalDependencies(druidDS, functionalDeps)
+    val fd = new FunctionalDependencies(druidDS, functionalDeps,
+      DependencyGraph(druidDS, functionalDeps))
 
     DruidRelationInfo(DruidClientInfo(druidHost, druidPort),
     sourceDFName,

@@ -1,15 +1,35 @@
 package org.sparklinedata.druid.client
 
-import org.json4s.ext.{EnumNameSerializer}
-import org.scalatest.FunSuite
-
 import org.apache.spark.sql.test.TestSQLContext._
-import org.sparklinedata.druid.metadata.{FunctionalDependencyType, FunctionalDependency}
+import org.json4s.Extraction
+import org.json4s.jackson.JsonMethods._
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.sparklinedata.druid.{DruidQuery, Utils}
+import org.sparklinedata.druid.metadata.{FunctionalDependency, FunctionalDependencyType}
 
-class DataSourceTest extends FunSuite {
+class DataSourceTest extends FunSuite with BeforeAndAfterAll {
 
+  import Utils._
 
-  test("t1") {
+  val colMapping =
+    """{
+      | "l_quantity" : "sum_l_quantity"
+      |}
+    """.stripMargin.replace('\n', ' ')
+
+  val functionalDependencies =
+    """[
+      |  {"col1" : "c_name", "col2" : "c_address", "type" : "1-1"},
+      |  {"col1" : "c_phone", "col2" : "c_address", "type" : "1-1"},
+      |  {"col1" : "c_name", "col2" : "c_mktsegment", "type" : "n-1"},
+      |  {"col1" : "c_name", "col2" : "c_comment", "type" : "1-1"},
+      |  {"col1" : "c_name", "col2" : "c_nation", "type" : "n-1"},
+      |  {"col1" : "c_nation", "col2" : "c_region", "type" : "n-1"}
+      |]
+    """.stripMargin.replace('\n', ' ')
+
+  override def beforeAll() = {
+
     sql(
       s"""CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(o_orderkey integer, o_custkey integer,
       o_orderstatus string, o_totalprice double, o_orderdate string, o_orderpriority string, o_clerk string,
@@ -22,46 +42,80 @@ class DataSourceTest extends FunSuite {
       p_mfgr string, p_brand string, p_type string, p_size integer, p_container string, p_retailprice double,
       p_comment string, c_name string , c_address string , c_phone string , c_acctbal double ,
       c_mktsegment string , c_comment string , c_nation string , c_region string)
-USING com.databricks.spark.csv
-OPTIONS (path "/Users/hbutani/tpch/datascale1/orderLineItemPartSupplierCustomer/", header "false", delimiter "|")"""
+      USING com.databricks.spark.csv
+      OPTIONS (path "/Users/hbutani/tpch/datascale1/orderLineItemPartSupplierCustomer/",
+      header "false", delimiter "|")"""
     )
 
     //sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
-    val colMapping =
-      """{
-        | "l_quantity" : "sum_l_quantity"
-        |}
-      """.stripMargin.replace('\n', ' ')
-
-    val functionalDependencies =
-      """[
-        |  {"col1" : "c_name", "col2" : "c_address", "type" : "1-1"},
-        |  {"col1" : "c_phone", "col2" : "c_address", "type" : "1-1"},
-        |  {"col1" : "c_name", "col2" : "c_mktsegment", "type" : "n-1"},
-        |  {"col1" : "c_name", "col2" : "c_comment", "type" : "1-1"},
-        |  {"col1" : "c_name", "col2" : "c_nation", "type" : "n-1"},
-        |  {"col1" : "c_nation", "col2" : "c_region", "type" : "n-1"}
-        |]
-      """.stripMargin.replace('\n', ' ')
 
     sql(
 
-    s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier
+      s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "orderLineItemPartSupplierBase",
       timeDimensionColumn "l_shipdate",
       druidDatasource "tpch",
       druidHost "localhost",
       druidPort "8082",
-       |columnMapping '$colMapping',
-       |functionalDependencies '$functionalDependencies')""".stripMargin
+      columnMapping '$colMapping',
+      functionalDependencies '$functionalDependencies')""".stripMargin.replace('\n', ' ')
     )
+  }
+
+
+  test("noQuery") {
+
+    sql("select * from orderLineItemPartSupplier").show(10)
+  }
+
+  test("tpchQ1") {
+
+    val dq =
+      compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1))))
+
+    sql(
+
+      s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier2
+      USING org.sparklinedata.druid
+      OPTIONS (sourceDataframe "orderLineItemPartSupplierBase",
+      timeDimensionColumn "l_shipdate",
+      druidDatasource "tpch",
+      druidHost "localhost",
+      druidPort "8082",
+      columnMapping '$colMapping',
+      functionalDependencies '$functionalDependencies',
+      druidQuery '$dq')""".stripMargin.replace('\n', ' ')
+    )
+
+    sql("select * from orderLineItemPartSupplier2").show(10)
+  }
+
+  test("tpchQ1MonthGrain") {
+
+    val dq =
+      compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1MonthGrain))))
+
+    sql(
+
+      s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier2
+      USING org.sparklinedata.druid
+      OPTIONS (sourceDataframe "orderLineItemPartSupplierBase",
+      timeDimensionColumn "l_shipdate",
+      druidDatasource "tpch",
+      druidHost "localhost",
+      druidPort "8082",
+      columnMapping '$colMapping',
+      functionalDependencies '$functionalDependencies',
+      druidQuery '$dq')""".stripMargin.replace('\n', ' ')
+    )
+
+    sql("select * from orderLineItemPartSupplier2").show(10)
   }
 
   test("t2") {
     import org.json4s._
     import org.json4s.jackson.JsonMethods._
-    implicit val formats = DefaultFormats + new EnumNameSerializer(FunctionalDependencyType)
 
     val fd = FunctionalDependency("a", "b", FunctionalDependencyType.OneToOne)
     println(pretty(render(Extraction.decompose(fd))))

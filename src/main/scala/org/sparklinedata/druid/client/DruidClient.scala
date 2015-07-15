@@ -13,6 +13,7 @@ import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.{DruidDataSourceException, QuerySpec}
 import org.sparklinedata.druid.metadata.DruidDataSource
+import org.sparklinedata.druid.Utils
 
 import scala.util.Try
 
@@ -21,6 +22,9 @@ object ConnectionManager {
 }
 
 class DruidClient(val host : String, val port : Int) extends Logging {
+
+  import org.json4s.JsonDSL._
+  import Utils._
 
   @transient val url = s"http://$host:$port/druid/v2/?pretty"
 
@@ -92,8 +96,6 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
   @throws(classOf[DruidDataSourceException])
   def timeBoundary(dataSource : String) : Interval = {
-    import org.json4s.JsonDSL._
-    implicit val formats = DefaultFormats
 
     val jR = compact(render(
       ( "queryType" -> "timeBoundary") ~ ("dataSource" -> dataSource)
@@ -107,9 +109,6 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
   @throws(classOf[DruidDataSourceException])
   def metadata(dataSource : String) : DruidDataSource = {
-    import org.json4s.JsonDSL._
-    implicit val formats = org.json4s.DefaultFormats ++ org.json4s.ext.JodaTimeSerializers.all
-
     val i = timeBoundary(dataSource).toString
 
     val jR = compact(render(
@@ -126,9 +125,6 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
   @throws(classOf[DruidDataSourceException])
   def executeQuery(qry : QuerySpec) : List[QueryResultRow] = {
-    import org.json4s.JsonDSL._
-    implicit val formats = org.json4s.DefaultFormats +
-      new QueryResultRowSerializer ++ org.json4s.ext.JodaTimeSerializers.all
 
     val jR = compact(render(Extraction.decompose(qry)))
     val jV = post(jR)

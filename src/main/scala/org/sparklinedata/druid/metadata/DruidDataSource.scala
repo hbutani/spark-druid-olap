@@ -2,12 +2,22 @@ package org.sparklinedata.druid.metadata
 
 import org.joda.time.Interval
 import org.sparklinedata.druid.client.{ColumnDetails, MetadataResponse}
+import org.apache.spark.sql.types.{DoubleType, LongType, StringType, DataType}
 
 object DruidDataType extends Enumeration {
   val String = Value("STRING")
   val Long = Value("LONG")
   val Float = Value("FLOAT")
   val HyperUnique = Value("HYPERUNIQUE")
+
+  def sparkDataType(t : String) : DataType = sparkDataType(DruidDataType.withName(t))
+
+  def sparkDataType(t : DruidDataType.Value) : DataType = t match {
+    case String => StringType
+    case Long => LongType
+    case Float => DoubleType
+    case HyperUnique => DoubleType
+  }
 }
 
 sealed trait DruidColumn {

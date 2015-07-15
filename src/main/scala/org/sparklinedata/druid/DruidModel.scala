@@ -1,5 +1,10 @@
 package org.sparklinedata.druid
 
+import org.apache.spark.sql.types.{DoubleType, LongType, StringType, DataType}
+import org.joda.time.Interval
+
+import org.sparklinedata.druid.metadata.{DruidDataType, DruidDataSource}
+
 sealed trait ExtractionFunctionSpec {
   val `type`: String
 }
@@ -64,6 +69,8 @@ sealed trait DimensionSpec {
   val `type`: String
   val dimension: String
   val outputName: String
+
+  def sparkDataType(dDS : DruidDataSource) : DataType = StringType
 }
 
 /**
@@ -138,6 +145,10 @@ case class JavascriptFilterSpec(`type`: String,
 
 sealed trait AggregationSpec {
   val `type`: String
+  val name : String
+
+  // TODO: get rid of this method: eventually translation of sql infers DataType
+  def sparkDataType(dDS : DruidDataSource) : DataType
 }
 
 /**
@@ -149,7 +160,12 @@ sealed trait AggregationSpec {
 case class FunctionAggregationSpec(val `type`: String,
                                    val name: String,
                                    val fieldName: String
-                                    ) extends AggregationSpec
+                                    ) extends AggregationSpec {
+  def sparkDataType(dDS : DruidDataSource) : DataType =
+    dDS.metrics.find(_.name == fieldName).map(c =>
+      DruidDataType.sparkDataType(c.dataType)).getOrElse(
+        throw new DruidDataSourceException(s"Unknown field $fieldName"))
+}
 
 /**
  * In SQL a count(distinct dimColumn) is translated to this Spec.
@@ -165,6 +181,8 @@ case class CardinalityAggregationSpec(val `type`: String,
                                        ) extends AggregationSpec {
   def this(name: String,
            fieldNames: List[String]) = this("cardinality", name, fieldNames, true)
+
+  def sparkDataType(dDS : DruidDataSource) : DataType = LongType
 }
 
 /**
@@ -184,7 +202,11 @@ case class JavascriptAggregationSpec(val `type`: String,
                                      val fnAggregate: String,
                                      val fnCombine: String,
                                      val fnReset: String
-                                      ) extends AggregationSpec
+                                      ) extends AggregationSpec {
+
+  // for now assuming it is always Double
+  def sparkDataType(dDS : DruidDataSource) : DataType = DoubleType
+}
 
 /**
  * In SQL this is an aggregation on an If condition. For example
@@ -194,18 +216,28 @@ case class JavascriptAggregationSpec(val `type`: String,
  * @param aggregator
  */
 case class FilteredAggregationSpec(val `type`: String,
+                                   val name: String,
                                    val filter: SelectorFilterSpec,
                                    val aggregator: AggregationSpec
-                                    ) extends AggregationSpec
+                                    ) extends AggregationSpec {
+
+  def sparkDataType(dDS : DruidDataSource) : DataType = aggregator.sparkDataType(dDS)
+}
 
 sealed trait PostAggregationSpec {
   val `type`: String
+  val name: String
+
+  // TODO: get rid of this method: eventually translation of sql infers DataType
+  // for now set them to DoubleType
+  def sparkDataType(dDS : DruidDataSource) : DataType = DoubleType
 }
 
 case class FieldAccessPostAggregationSpec(val `type`: String,
                                           val fieldName: String
                                            ) extends PostAggregationSpec {
   def this(fieldName: String) = this("fieldAccess", fieldName)
+  override val name = fieldName
 }
 
 case class ConstantPostAggregationSpec(val `type`: String,
@@ -214,8 +246,9 @@ case class ConstantPostAggregationSpec(val `type`: String,
                                         ) extends PostAggregationSpec
 
 case class HyperUniqueCardinalityPostAggregationSpec(val `type`: String,
+                                                     val name: String,
                                                      val fieldName: String
-                                                      ) extends AggregationSpec
+                                                      ) extends PostAggregationSpec
 
 /**
  * In SQL this is an expression involving at least 1 aggregation expression
@@ -306,21 +339,28 @@ case class InvertedTopNMetricSpec(
 
 // TODO: look into exposing ContextSpec
 sealed trait QuerySpec {
+  self : Product =>
   val queryType: String
   val dataSource: String
   val intervals: List[String]
+
+  def setInterval(i : Interval) : QuerySpec
+
+  def dimensions : List[DimensionSpec] = Nil
+  def aggregations : List[AggregationSpec] = Nil
+  def postAggregations : Option[List[PostAggregationSpec]] = None
 }
 
 case class GroupByQuerySpec(
                              val queryType: String,
                              val dataSource: String,
-                             val dimensions: List[DimensionSpec],
+                             override val dimensions: List[DimensionSpec],
                              val limitSpec: Option[LimitSpec],
                              val having: Option[HavingSpec],
                              val granularity: Either[String,GranularitySpec],
                              val filter: Option[FilterSpec],
-                             val aggregations: List[AggregationSpec],
-                             val postAggregations: Option[List[PostAggregationSpec]],
+                             override val aggregations: List[AggregationSpec],
+                             override val postAggregations: Option[List[PostAggregationSpec]],
                              val intervals: List[String]
                              ) extends QuerySpec {
   def this(dataSource: String,
@@ -334,6 +374,8 @@ case class GroupByQuerySpec(
            intervals: List[String]) = this("groupBy",
     dataSource, dimensions, limitSpec, having, granularity, filter,
     aggregations, postAggregations, intervals)
+
+  def setInterval(i : Interval) : QuerySpec = this.copy(intervals = List(i.toString))
 }
 
 case class TimeSeriesQuerySpec(
@@ -342,8 +384,8 @@ case class TimeSeriesQuerySpec(
                                 val intervals: List[String],
                                 val granularity: Either[String,GranularitySpec],
                                 val filters: Option[FilterSpec],
-                                val aggregations: List[AggregationSpec],
-                                val postAggregations: Option[List[PostAggregationSpec]]
+                                override val aggregations: List[AggregationSpec],
+                                override val postAggregations: Option[List[PostAggregationSpec]]
                                 ) extends QuerySpec {
   def this(dataSource: String,
            intervals: List[String],
@@ -352,6 +394,8 @@ case class TimeSeriesQuerySpec(
            aggregations: List[AggregationSpec],
            postAggregations: Option[List[PostAggregationSpec]]) = this("timeseries",
     dataSource, intervals, granularity, filters, aggregations, postAggregations)
+
+  def setInterval(i : Interval) = this.copy(intervals = List(i.toString))
 }
 
 case class TopNQuerySpec(
@@ -360,8 +404,8 @@ case class TopNQuerySpec(
                           val intervals: List[String],
                           val granularity: Either[String,GranularitySpec],
                           val filter: Option[FilterSpec],
-                          val aggregations: List[AggregationSpec],
-                          val postAggregations: Option[List[PostAggregationSpec]],
+                          override val aggregations: List[AggregationSpec],
+                          override val postAggregations: Option[List[PostAggregationSpec]],
                           val dimension: DimensionSpec,
                           val threshold: Int,
                           val metric: TopNMetricSpec
@@ -377,4 +421,6 @@ case class TopNQuerySpec(
            metric: TopNMetricSpec) = this("topN", dataSource,
     intervals, granularity, filter, aggregations,
     postAggregations, dimension, threshold, metric)
+
+  def setInterval(i : Interval) = this.copy(intervals = List(i.toString))
 }

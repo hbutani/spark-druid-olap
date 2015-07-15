@@ -11,10 +11,9 @@ case class FunctionalDependency(col1 : String,
                                 col2 : String,
                                 `type` : FunctionalDependencyType.Value)
 
-class FunctionalDependencies(val dDS : DruidDataSource,
-                              fds : List[FunctionalDependency]) {
-
-  val depGraph : DependencyGraph = DependencyGraph(dDS, fds)
+case class FunctionalDependencies(val dDS : DruidDataSource,
+                              fds : List[FunctionalDependency],
+                                  depGraph : DependencyGraph) {
 
   class Component(val base : Int) {
     var connectedNodes : List[Int] = List()

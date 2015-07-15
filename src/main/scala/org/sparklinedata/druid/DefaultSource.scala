@@ -15,7 +15,7 @@ class DefaultSource extends RelationProvider with Logging {
   override def createRelation(sqlContext: SQLContext,
                               parameters: Map[String, String]): BaseRelation = {
 
-    implicit val formats = DefaultFormats + new EnumNameSerializer(FunctionalDependencyType)
+    import Utils._
 
     val sourceDFName = parameters.getOrElse(SOURCE_DF_PARAM,
       throw new DruidDataSourceException(
@@ -68,7 +68,11 @@ class DefaultSource extends RelationProvider with Logging {
 
     logInfo(drI.fd.depGraph.debugString(drI.druidDS))
 
-  new DruidRelation(drI)(sqlContext)
+    val dQuery = parameters.get(DRUID_QUERY).map { s =>
+      parse(s).extract[DruidQuery]
+    }
+
+  new DruidRelation(drI, dQuery)(sqlContext)
   }
 }
 
@@ -116,5 +120,8 @@ object DefaultSource {
 
   val DRUID_PORT_PARAM = "druidPort"
   val DEFAULT_DRUID_PORT = "8082"  // the broker port
+
+  // this is only for test purposes
+  val DRUID_QUERY = "druidQuery"
 
 }
