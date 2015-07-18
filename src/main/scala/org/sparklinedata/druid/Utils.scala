@@ -1,6 +1,6 @@
 package org.sparklinedata.druid
 
-import org.json4s.{FullTypeHints, DefaultFormats}
+import org.json4s.{ShortTypeHints, FullTypeHints, DefaultFormats}
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization
 import org.sparklinedata.druid.client.QueryResultRowSerializer
@@ -9,7 +9,7 @@ import org.sparklinedata.druid.metadata.FunctionalDependencyType
 object Utils {
 
   implicit val jsonFormat = Serialization.formats(
-    FullTypeHints(
+    ShortTypeHints(
       List(
         classOf[AlphaNumericTopNMetricSpec],
         classOf[ArithmeticPostAggregationSpec],

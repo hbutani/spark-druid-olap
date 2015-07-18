@@ -30,8 +30,7 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
 
   override def beforeAll() = {
 
-    sql(
-      s"""CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(o_orderkey integer, o_custkey integer,
+    val cT = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(o_orderkey integer, o_custkey integer,
       o_orderstatus string, o_totalprice double, o_orderdate string, o_orderpriority string, o_clerk string,
       o_shippriority integer, o_comment string, l_partkey integer, l_suppkey integer, l_linenumber integer,
       l_quantity double, l_extendedprice double, l_discount double, l_tax double, l_returnflag string,
@@ -44,14 +43,14 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
       c_mktsegment string , c_comment string , c_nation string , c_region string)
       USING com.databricks.spark.csv
       OPTIONS (path "/Users/hbutani/tpch/datascale1/orderLineItemPartSupplierCustomer/",
-      header "false", delimiter "|")"""
-    )
+      header "false", delimiter "|")""".stripMargin
+
+    println(cT)
+    sql(cT)
 
     //sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
 
-    sql(
-
-      s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier
+    val cTOlap = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "orderLineItemPartSupplierBase",
       timeDimensionColumn "l_shipdate",
@@ -59,8 +58,10 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
       druidHost "localhost",
       druidPort "8082",
       columnMapping '$colMapping',
-      functionalDependencies '$functionalDependencies')""".stripMargin.replace('\n', ' ')
-    )
+      functionalDependencies '$functionalDependencies')""".stripMargin
+
+    println(cTOlap)
+    sql(cTOlap)
   }
 
 
@@ -72,11 +73,9 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
   test("tpchQ1") {
 
     val dq =
-      compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1))))
+      compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1)))).replace('\n', ' ')
 
-    sql(
-
-      s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier2
+    val q = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier2
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "orderLineItemPartSupplierBase",
       timeDimensionColumn "l_shipdate",
@@ -85,8 +84,11 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
       druidPort "8082",
       columnMapping '$colMapping',
       functionalDependencies '$functionalDependencies',
-      druidQuery '$dq')""".stripMargin.replace('\n', ' ')
-    )
+      druidQuery '$dq')""".stripMargin
+
+    println(q)
+
+    sql(q)
 
     sql("select * from orderLineItemPartSupplier2").show(10)
   }
@@ -94,7 +96,8 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
   test("tpchQ1MonthGrain") {
 
     val dq =
-      compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1MonthGrain))))
+      compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1MonthGrain)))
+      ).replace('\n', ' ')
 
     sql(
 
@@ -107,7 +110,7 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
       druidPort "8082",
       columnMapping '$colMapping',
       functionalDependencies '$functionalDependencies',
-      druidQuery '$dq')""".stripMargin.replace('\n', ' ')
+      druidQuery '$dq')""".stripMargin
     )
 
     sql("select * from orderLineItemPartSupplier2").show(10)
