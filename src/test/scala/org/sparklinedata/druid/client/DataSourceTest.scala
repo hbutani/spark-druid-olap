@@ -1,5 +1,7 @@
 package org.sparklinedata.druid.client
 
+import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidStrategy}
+import org.apache.spark.sql.test.TestSQLContext
 import org.apache.spark.sql.test.TestSQLContext._
 import org.json4s.Extraction
 import org.json4s.jackson.JsonMethods._
@@ -29,6 +31,8 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
     """.stripMargin.replace('\n', ' ')
 
   override def beforeAll() = {
+
+    DruidPlanner(TestSQLContext)
 
     val cT = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(o_orderkey integer, o_custkey integer,
       o_orderstatus string, o_totalprice double, o_orderdate string, o_orderpriority string, o_clerk string,
@@ -64,10 +68,19 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
     sql(cTOlap)
   }
 
+  test("baseTable") {
+    sql("select * from orderLineItemPartSupplierBase").show(10)
+  }
 
   test("noQuery") {
-
     sql("select * from orderLineItemPartSupplier").show(10)
+  }
+
+  test("basicAgg") {
+    val df = sql("select l_returnflag, l_linestatus, count(*) " +
+      "from orderLineItemPartSupplier group by l_returnflag, l_linestatus")
+    println(df.queryExecution.analyzed)
+    println(df.queryExecution.sparkPlan)
   }
 
   test("tpchQ1") {
