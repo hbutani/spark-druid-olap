@@ -68,15 +68,19 @@ case class DruidDataSource(name : String,
     case _ => false
   }.map(_.asInstanceOf[DruidDimension]).toIndexedSeq
 
-  lazy val metrics = columns.values.filter {
+  lazy val metrics : Map[String, DruidMetric] = columns.values.filter {
     case m : DruidMetric => true
     case _ => false
-  }
+  }.map(m => (m.name -> m.asInstanceOf[DruidMetric])).toMap
 
   def numDimensions = dimensions.size
 
   def indexOfDimension(d : String) : Int = {
     dimensions.indexWhere(_.name == d)
+  }
+
+  def metric(name : String) : Option[DruidMetric] = {
+    metrics.get(name)
   }
 
 }

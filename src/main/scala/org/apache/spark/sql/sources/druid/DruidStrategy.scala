@@ -10,7 +10,7 @@ private[druid] class DruidStrategy(val planner : DruidPlanner) extends Strategy 
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case l => {
-      val qb = planner.plan(l)
+      val qb = planner.plan(null, l)
       Nil
     }
   }

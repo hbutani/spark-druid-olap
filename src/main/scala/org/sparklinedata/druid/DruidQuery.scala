@@ -162,7 +162,7 @@ case class FunctionAggregationSpec(val `type`: String,
                                    val fieldName: String
                                     ) extends AggregationSpec {
   def sparkDataType(dDS : DruidDataSource) : DataType =
-    dDS.metrics.find(_.name == fieldName).map(c =>
+    dDS.metric(fieldName).map(c =>
       DruidDataType.sparkDataType(c.dataType)).getOrElse(
         throw new DruidDataSourceException(s"Unknown field $fieldName"))
 }

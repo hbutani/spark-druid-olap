@@ -15,7 +15,8 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
 
   val colMapping =
     """{
-      | "l_quantity" : "sum_l_quantity"
+      | "l_quantity" : "sum_l_quantity",
+      | "ps_availqty" : "sum_ps_availqty"
       |}
     """.stripMargin.replace('\n', ' ')
 
@@ -77,7 +78,9 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("basicAgg") {
-    val df = sql("select l_returnflag, l_linestatus, count(*) " +
+    val df = sql("select l_returnflag, l_linestatus, " +
+      "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
+      "sum(l_extendedprice * l_quantity) as t, count(distinct o_orderkey)  " +
       "from orderLineItemPartSupplier group by l_returnflag, l_linestatus")
     println(df.queryExecution.analyzed)
     println(df.queryExecution.sparkPlan)

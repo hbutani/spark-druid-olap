@@ -10,13 +10,15 @@ class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTran
   sqlContext.experimental.extraStrategies =
     (new DruidStrategy(this) +: sqlContext.experimental.extraStrategies)
 
-  val transforms : Seq[Function[LogicalPlan, Option[DruidQueryBuilder]]] = Seq(
-    druidRelationTransform.lift
+  val transforms : Seq[Function[(DruidQueryBuilder,LogicalPlan),
+    Option[Option[DruidQueryBuilder]]]] = Seq(
+    druidRelationTransform.lift,
+    aggregateTransform.lift
   )
 
-  def plan(plan: LogicalPlan): Option[DruidQueryBuilder] = {
-    val iter = transforms.view.flatMap(_(plan)).toIterator
-    if (iter.isEmpty) None else Some(iter.next())
+  def plan(db : DruidQueryBuilder, plan: LogicalPlan): Option[DruidQueryBuilder] = {
+    val iter = transforms.view.flatMap(_(db, plan)).toIterator
+    if (iter.isEmpty) None else iter.next()
   }
 
 }

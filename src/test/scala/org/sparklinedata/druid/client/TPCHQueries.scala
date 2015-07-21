@@ -14,7 +14,7 @@ object TPCHQueries {
     Left("all"),
     None,
     List(
-      FunctionAggregationSpec("longSum", "count", "count"),
+      FunctionAggregationSpec("count", "count", "count"),
       FunctionAggregationSpec("longSum", "sum_quantity", "sum_l_quantity"),
       FunctionAggregationSpec("doubleSum", "sum_base_price", "l_extendedprice"),
       FunctionAggregationSpec("doubleSum", "l_discount", "l_discount"),

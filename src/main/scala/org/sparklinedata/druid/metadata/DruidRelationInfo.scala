@@ -16,7 +16,8 @@ case class DruidRelationInfo(val druidClientInfo : DruidClientInfo,
                          val sourceToDruidMapping : Map[String, DruidColumn],
                          val fd : FunctionalDependencies,
                          val maxCardinality : Long,
-                         val cardinalityPerDruidQuery : Long) {
+                         val cardinalityPerDruidQuery : Long,
+                              val allowCountDistinct : Boolean) {
 
   def sourceDF(sqlContext : SQLContext) = sqlContext.table(sourceDFName)
 
@@ -33,7 +34,8 @@ object DruidRelationInfo {
              columnMapping : Map[String, String],
              functionalDeps : List[FunctionalDependency],
             maxCardinality : Long,
-            cardinalityPerDruidQuery : Long) : DruidRelationInfo = {
+            cardinalityPerDruidQuery : Long,
+             allowCountDistinct : Boolean = true) : DruidRelationInfo = {
 
     val client = new DruidClient(druidHost, druidPort)
     val druidDS = client.metadata(dsName)
@@ -48,7 +50,8 @@ object DruidRelationInfo {
     sourceToDruidMapping,
     fd,
     maxCardinality,
-    cardinalityPerDruidQuery)
+    cardinalityPerDruidQuery,
+    allowCountDistinct)
   }
 
 }

@@ -1,56 +1,52 @@
 package org.sparklinedata.druid
 
+import java.util.concurrent.atomic.AtomicLong
+
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 
-class DruidQueryBuilder(val drInfo : DruidRelationInfo) {
-
-  private var dimensions: List[DimensionSpec] = Nil
-  private var limitSpec: Option[LimitSpec] = None
-  private var havingSpec : Option[HavingSpec] = None
-  private var granularitySpec: Either[String,GranularitySpec] = Left("all")
-  private var filterSpec: Option[FilterSpec] = None
-  private var aggregations: List[AggregationSpec] = Nil
-  private var postAggregations: List[PostAggregationSpec] = Nil
-  private var intervals: List[String] = Nil
+case class DruidQueryBuilder(val drInfo : DruidRelationInfo,
+                             dimensions: List[DimensionSpec] = Nil,
+                             limitSpec: Option[LimitSpec] = None,
+                             havingSpec : Option[HavingSpec] = None,
+                             granularitySpec: Either[String,GranularitySpec] = Left("all"),
+                             filterSpec: Option[FilterSpec] = None,
+                             aggregations: List[AggregationSpec] = Nil,
+                             postAggregations: List[PostAggregationSpec] = Nil,
+                             intervals: List[String] = Nil,
+                             curId : AtomicLong = new AtomicLong(-1)) {
 
   def dimension(d : DimensionSpec) = {
-    dimensions =  (dimensions :+ d)
-    this
+    this.copy(dimensions =  (dimensions :+ d))
   }
 
   def limit(l : LimitSpec) = {
-    limitSpec = Some(l)
-    this
+    this.copy(limitSpec = Some(l))
   }
 
   def having(h : HavingSpec) = {
-    havingSpec = Some(h)
-    this
+    this.copy(havingSpec = Some(h))
   }
 
   def granularity(g : GranularitySpec) = {
-    granularitySpec = Right(g)
-    this
+    this.copy(granularitySpec = Right(g))
   }
 
   def filter( f : FilterSpec) = {
-    filterSpec = Some(f)
-    this
+    this.copy(filterSpec = Some(f))
   }
 
   def aggregate( a : AggregationSpec) = {
-    aggregations = ( aggregations :+ a)
-    this
+    this.copy(aggregations = ( aggregations :+ a))
   }
 
   def postAggregate( p : PostAggregationSpec) = {
-    postAggregations = ( postAggregations :+ p)
-    this
+    this.copy(postAggregations = ( postAggregations :+ p))
   }
 
   def interval(i : String) = {
-    intervals = (i +: intervals)
-    this
+    this.copy(intervals = (i +: intervals))
   }
+
+  def nextAlias : String = s"alias${curId.getAndDecrement()}"
 
 }
