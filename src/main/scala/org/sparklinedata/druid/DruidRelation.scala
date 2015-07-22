@@ -1,32 +1,69 @@
 package org.sparklinedata.druid
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Attribute, ExprId}
 import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.sources.{TableScan, BaseRelation}
-import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.types.{StructField, StructType, DataType}
 import org.joda.time.Interval
 import org.sparklinedata.druid.metadata.{DruidDataType, DruidRelationInfo}
 
-case class DruidQuery(q : QuerySpec, intervalSplits : List[Interval]) {
+/**
+ *
+ * @param q
+ * @param intervalSplits
+ * @param outputAttrSpec attributes to be output from the PhysicalRDD. Each output attribute is
+ *                       based on an Attribute in the originalPlan. The association is based
+ *                       on the ExprId.
+ */
+case class DruidQuery(q : QuerySpec,
+                      intervalSplits : List[Interval],
+                       outputAttrSpec :Option[List[(ExprId, String, DataType)]]
+                       ) {
 
-  def this(q : QuerySpec) = this(q, q.intervals.map(Interval.parse(_)))
+  def this(q : QuerySpec) = this(q, q.intervals.map(Interval.parse(_)), None)
 
-  def schema(dInfo : DruidRelationInfo) : StructType = {
+  private def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType = {
 
     val fields : List[StructField] = q.dimensions.map{d =>
       new StructField(d.outputName, d.sparkDataType(dInfo.druidDS))
     } ++
-    q.aggregations.map {a =>
-      new StructField(a.name, a.sparkDataType(dInfo.druidDS))
-    } ++
-    q.postAggregations.map{ ps =>
-      ps.map {p =>
-        new StructField(p.name, p.sparkDataType(dInfo.druidDS))
-      }
-    }.getOrElse(Nil)
+      q.aggregations.map {a =>
+        new StructField(a.name, a.sparkDataType(dInfo.druidDS))
+      } ++
+      q.postAggregations.map{ ps =>
+        ps.map {p =>
+          new StructField(p.name, p.sparkDataType(dInfo.druidDS))
+        }
+      }.getOrElse(Nil)
 
     StructType(fields)
   }
+
+  private def schemaFromOutputSpec : StructType = {
+    val fields : List[StructField] = outputAttrSpec.get.map {
+      case (eId, nm, dT) => new StructField(nm, dT)
+    }
+    StructType(fields)
+  }
+
+  def schema(dInfo : DruidRelationInfo) : StructType =
+    outputAttrSpec.map(o => schemaFromOutputSpec).getOrElse(schemaFromQuerySpec(dInfo))
+
+  private def outputAttrsFromQuerySpec(dInfo : DruidRelationInfo) : Seq[Attribute] = {
+    schemaFromQuerySpec(dInfo).fields.map { f =>
+      AttributeReference(f.name, f.dataType)()
+    }
+  }
+
+  private def outputAttrsFromOutputSpec : Seq[Attribute] = {
+    outputAttrSpec.get.map {
+      case (eId, nm, dT) => AttributeReference(nm, dT)(eId)
+    }
+  }
+
+  def outputAttrs(dInfo : DruidRelationInfo) : Seq[Attribute] =
+    outputAttrSpec.map(o => outputAttrsFromOutputSpec).getOrElse(outputAttrsFromQuerySpec(dInfo))
 }
 
 case class DruidRelation protected[druid] (val info : DruidRelationInfo,
