@@ -80,10 +80,12 @@ class DataSourceTest extends FunSuite with BeforeAndAfterAll {
   test("basicAgg") {
     val df = sql("select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
-      "sum(l_extendedprice * l_quantity) as t, count(distinct o_orderkey)  " +
+      "count(distinct o_orderkey)  " +
       "from orderLineItemPartSupplier group by l_returnflag, l_linestatus")
     println(df.queryExecution.analyzed)
     println(df.queryExecution.sparkPlan)
+
+    df.show()
   }
 
   test("tpchQ1") {

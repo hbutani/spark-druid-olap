@@ -22,54 +22,78 @@ abstract class DruidTransforms {
   }
 
   val aggregateTransform: DruidTransform = {
-    case (dqb, Aggregate(gEs, aEs, child)) => {
+    case (dqb, agg@Aggregate(gEs, aEs, child)) => {
       plan(dqb, child).flatMap { dqb =>
 
         val dqb1 = gEs.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) { (dqb, e) =>
           dqb.flatMap(groupingExpression(_, e))
         }
 
-        val dqb2 = aEs.filter(a => !gEs.find(_.semanticEquals(a)).isDefined).foldLeft(dqb1) {
-          (dqb, ne) =>
-            dqb.flatMap(aggregateExpression(_, ne))
+        val allAggregates =
+          aEs.flatMap(_ collect { case a: AggregateExpression => a})
+        // Collect all aggregate expressions that can be computed partially.
+        val partialAggregates =
+          aEs.flatMap(_ collect { case p: PartialAggregate => p})
+
+        // Only do partial aggregation if supported by all aggregate expressions.
+        if (allAggregates.size == partialAggregates.size) {
+          val dqb2 = partialAggregates.foldLeft(dqb1) {
+            (dqb, ne) =>
+              dqb.flatMap(aggregateExpression(_, ne))
+          }
+
+          dqb2.map(_.aggregateOp(agg))
+        } else {
+          None
         }
 
-        dqb2
       }
     }
   }
 
 
-  def aggregateExpression(dqb: DruidQueryBuilder, ne: NamedExpression):
-  Option[DruidQueryBuilder] = ne match {
-    case Alias(Count(Literal(1, IntegerType)), a) =>
-      Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")))
-    case e@Alias(c: PartialAggregate, a) => (dqb, c) match {
-      case CountDistinctAggregate(dN) =>
-        Some(dqb.aggregate(new CardinalityAggregationSpec(a, List(dN))))
-      case SumMinMaxAvgAggregate(t) => t._1 match {
-        case "avg" => {
-          val dC : DruidColumn = t._2
-          val aggFunc = dC.dataType match {
-            case DruidDataType.Long => "longSum"
-            case _ => "doubleSum"
-          }
-          val sumAlias = dqb.nextAlias
-          val countAlias = dqb.nextAlias
-
-          Some(
-            dqb.aggregate(FunctionAggregationSpec(aggFunc, sumAlias, dC.name)).
-            aggregate(FunctionAggregationSpec("count", countAlias, "count")).
-            postAggregate(new ArithmeticPostAggregationSpec(a, "/",
-            List(new FieldAccessPostAggregationSpec(sumAlias),
-              new FieldAccessPostAggregationSpec(countAlias)), None))
-          )
-        }
-        case _ => Some(dqb.aggregate(FunctionAggregationSpec(t._1, a, t._2.name)))
-      }
-      case _ => Some(dqb)
+  def aggregateExpression(dqb: DruidQueryBuilder, pa: PartialAggregate):
+  Option[DruidQueryBuilder] = pa match {
+    case Count(Literal(1, IntegerType)) => {
+      val a = dqb.nextAlias
+      Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
+        outputAttribute(a, pa, pa.dataType, LongType))
     }
-    case _ => Some(dqb)
+    case c => {
+      val a = dqb.nextAlias
+      (dqb, c) match {
+        case CountDistinctAggregate(dN) =>
+          Some(dqb.aggregate(new CardinalityAggregationSpec(a, List(dN))).
+            outputAttribute(a, pa, pa.dataType, LongType))
+        case SumMinMaxAvgAggregate(t) => t._1 match {
+          case "avg" => {
+            val dC: DruidColumn = t._2
+            val aggFunc = dC.dataType match {
+              case DruidDataType.Long => "longSum"
+              case _ => "doubleSum"
+            }
+            val sumAlias = dqb.nextAlias
+            val countAlias = dqb.nextAlias
+
+            Some(
+              dqb.aggregate(FunctionAggregationSpec(aggFunc, sumAlias, dC.name)).
+                aggregate(FunctionAggregationSpec("count", countAlias, "count")).
+                postAggregate(new ArithmeticPostAggregationSpec(a, "/",
+                List(new FieldAccessPostAggregationSpec(sumAlias),
+                  new FieldAccessPostAggregationSpec(countAlias)), None)).
+                outputAttribute(a, pa, pa.dataType, DoubleType)
+            )
+          }
+          case _ => {
+            val dC: DruidColumn = t._2
+            Some(dqb.aggregate(FunctionAggregationSpec(t._1, a, dC.name)).
+              outputAttribute(a, pa, pa.dataType, DruidDataType.sparkDataType(dC.dataType))
+            )
+          }
+        }
+        case _ => None
+      }
+    }
   }
 
   private def attributeRef(arg: Expression): Option[String] = arg match {
@@ -137,6 +161,11 @@ abstract class DruidTransforms {
 
   def groupingExpression(dqb: DruidQueryBuilder, ge: Expression):
   Option[DruidQueryBuilder] = ge match {
-    case _ => Some(dqb)
+    case AttributeReference(nm, dT, _, _) => {
+      for(dD <- dqb.drInfo.sourceToDruidMapping.get(nm) if dD.isInstanceOf[DruidDimension] )
+        yield dqb.dimension(new DefaultDimensionSpec(nm, nm)).
+          outputAttribute(nm, ge, ge.dataType, DruidDataType.sparkDataType(dD.dataType))
+    }
+    case _ => None
   }
 }

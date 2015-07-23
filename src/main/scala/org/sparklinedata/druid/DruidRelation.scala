@@ -8,6 +8,8 @@ import org.apache.spark.sql.types.{StructField, StructType, DataType}
 import org.joda.time.Interval
 import org.sparklinedata.druid.metadata.{DruidDataType, DruidRelationInfo}
 
+case class DruidOperatorAttribute(exprId : ExprId, name : String, dataType : DataType)
+
 /**
  *
  * @param q
@@ -18,7 +20,7 @@ import org.sparklinedata.druid.metadata.{DruidDataType, DruidRelationInfo}
  */
 case class DruidQuery(q : QuerySpec,
                       intervalSplits : List[Interval],
-                       outputAttrSpec :Option[List[(ExprId, String, DataType)]]
+                       outputAttrSpec :Option[List[DruidOperatorAttribute]]
                        ) {
 
   def this(q : QuerySpec) = this(q, q.intervals.map(Interval.parse(_)), None)
@@ -42,7 +44,7 @@ case class DruidQuery(q : QuerySpec,
 
   private def schemaFromOutputSpec : StructType = {
     val fields : List[StructField] = outputAttrSpec.get.map {
-      case (eId, nm, dT) => new StructField(nm, dT)
+      case DruidOperatorAttribute(eId, nm, dT) => new StructField(nm, dT)
     }
     StructType(fields)
   }
@@ -58,7 +60,7 @@ case class DruidQuery(q : QuerySpec,
 
   private def outputAttrsFromOutputSpec : Seq[Attribute] = {
     outputAttrSpec.get.map {
-      case (eId, nm, dT) => AttributeReference(nm, dT)(eId)
+      case DruidOperatorAttribute(eId, nm, dT) => AttributeReference(nm, dT)(eId)
     }
   }
 
@@ -66,7 +68,7 @@ case class DruidQuery(q : QuerySpec,
     outputAttrSpec.map(o => outputAttrsFromOutputSpec).getOrElse(outputAttrsFromQuerySpec(dInfo))
 }
 
-case class DruidRelation protected[druid] (val info : DruidRelationInfo,
+case class DruidRelation (val info : DruidRelationInfo,
                                        val dQuery : Option[DruidQuery])(
   @transient val sqlContext: SQLContext)
   extends BaseRelation with TableScan {
