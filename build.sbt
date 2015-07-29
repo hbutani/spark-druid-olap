@@ -39,7 +39,7 @@ resolvers += "JitPack.IO" at "https://jitpack.io"
 val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
 val scalatestVersion = "2.2.4"
-val sparkdateTimeVersion = "0.0.1"
+val sparkdateTimeVersion = "9f6589a01fdd50250a8e155d5710490e1dd353b3"
 
 libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
