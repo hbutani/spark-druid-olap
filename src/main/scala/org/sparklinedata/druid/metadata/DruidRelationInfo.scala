@@ -39,7 +39,8 @@ object DruidRelationInfo {
 
     val client = new DruidClient(druidHost, druidPort)
     val druidDS = client.metadata(dsName)
-    val sourceToDruidMapping = MappingBuilder.buildMapping(columnMapping, sourceDF, druidDS)
+    val sourceToDruidMapping =
+      MappingBuilder.buildMapping(columnMapping, sourceDF, timeDimensionCol, druidDS)
     val fd = new FunctionalDependencies(druidDS, functionalDeps,
       DependencyGraph(druidDS, functionalDeps))
 
@@ -71,6 +72,7 @@ private object MappingBuilder extends Logging {
 
   def buildMapping( nameMapping : Map[String, String],
                             sourceDF : DataFrame,
+                    timeDimensionCol : String,
                             druidDS : DruidDataSource) : Map[String, DruidColumn] = {
 
     val m = MMap[String, DruidColumn]()
@@ -80,6 +82,8 @@ private object MappingBuilder extends Logging {
         val dCol = druidDS.columns.get(nameMapping.getOrElse(f.name, f.name))
         if ( dCol.isDefined) {
           m += (f.name -> dCol.get)
+        } else if (f.name == timeDimensionCol) {
+          m += (f.name -> druidDS.timeDimension.get)
         }
 
       } else {

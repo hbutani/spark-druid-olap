@@ -15,7 +15,7 @@ class DefaultSource extends RelationProvider with Logging {
   override def createRelation(sqlContext: SQLContext,
                               parameters: Map[String, String]): BaseRelation = {
 
-    import Utils._
+    import Utils.jsonFormat
 
     val sourceDFName = parameters.getOrElse(SOURCE_DF_PARAM,
       throw new DruidDataSourceException(

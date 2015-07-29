@@ -61,6 +61,7 @@ case class DruidDataSource(name : String,
 
   lazy val timeDimension = columns.values.find {
     case c if c.name == TIME_COLUMN_NAME => true
+    case _ => false
   }
 
   lazy val dimensions : IndexedSeq[DruidDimension] = columns.values.filter {

@@ -17,8 +17,19 @@ abstract class DruidTransforms {
 
   val druidRelationTransform: DruidTransform = {
     case (_, PhysicalOperation(projectList, filters,
-    l@LogicalRelation(d@DruidRelation(info, None)))) =>
-      Some(new DruidQueryBuilder(info))
+    l@LogicalRelation(d@DruidRelation(info, None)))) => {
+      var dqb : Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
+      dqb = projectList.foldLeft(dqb) { (dqB, e) =>
+        dqB.flatMap(projectExpression(_, e))
+      }
+
+      if ( dqb.isDefined) {
+        val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb.get)
+        filters.foldLeft(dqb) { (dqB, e) =>
+          dqB.flatMap(filterExpression(_, iCE, e))
+        }
+      } else None
+    }
   }
 
   val aggregateTransform: DruidTransform = {
@@ -111,7 +122,7 @@ abstract class DruidTransforms {
       val r = for (c <- pa.children.headOption if (pa.children.size == 1);
                    dNm <- attributeRef(c);
                    dD <-
-                   dqb.drInfo.sourceToDruidMapping.get(dNm) if dD.isInstanceOf[DruidDimension]
+                   dqb.druidColumn(dNm) if dD.isInstanceOf[DruidDimension]
       ) yield (pa, dD)
 
       r flatMap {
@@ -137,7 +148,7 @@ abstract class DruidTransforms {
 
       val r = for (c <- pa.children.headOption if (pa.children.size == 1);
                    mNm <- attributeRef(c);
-                   dM <- dqb.drInfo.sourceToDruidMapping.get(mNm) if dM.isInstanceOf[DruidMetric];
+                   dM <- dqb.druidColumn(mNm) if dM.isInstanceOf[DruidMetric];
                    mDT <- Some(DruidDataType.sparkDataType(dM.dataType));
                    commonType <- HiveTypeCoercion.findTightestCommonType(pa.dataType, mDT)
                    if (commonType == mDT || pa.isInstanceOf[Average])
@@ -162,10 +173,27 @@ abstract class DruidTransforms {
   def groupingExpression(dqb: DruidQueryBuilder, ge: Expression):
   Option[DruidQueryBuilder] = ge match {
     case AttributeReference(nm, dT, _, _) => {
-      for(dD <- dqb.drInfo.sourceToDruidMapping.get(nm) if dD.isInstanceOf[DruidDimension] )
-        yield dqb.dimension(new DefaultDimensionSpec(nm, nm)).
+      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
+        yield dqb.dimension(new DefaultDimensionSpec(dD.name, nm)).
           outputAttribute(nm, ge, ge.dataType, DruidDataType.sparkDataType(dD.dataType))
     }
+    case _ => None
+  }
+
+  def projectExpression(dqb: DruidQueryBuilder, pe: Expression):
+  Option[DruidQueryBuilder] = pe match {
+    case AttributeReference(nm, dT, _, _) if dqb.druidColumn(nm).isDefined
+    => Some(dqb)
+    case Alias(ar@AttributeReference(nm1, dT, _, _), nm) => {
+      for(dqbc <- projectExpression(dqb, ar))
+        yield dqbc.addAlias(nm, nm1)
+    }
+    case _ => None
+  }
+
+  def filterExpression(dqb: DruidQueryBuilder, iCE : IntervalConditionExtractor, fe: Expression):
+  Option[DruidQueryBuilder] = fe match {
+    case iCE(iC) => dqb.interval(iC)
     case _ => None
   }
 }
