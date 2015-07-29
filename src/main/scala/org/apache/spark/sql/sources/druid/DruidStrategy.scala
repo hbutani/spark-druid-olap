@@ -1,5 +1,6 @@
 package org.apache.spark.sql.sources.druid
 
+import org.apache.spark.Logging
 import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -8,7 +9,8 @@ import org.apache.spark.sql.types.DataType
 import org.sparklinedata.druid._
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 
-private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy with PredicateHelper {
+private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
+with PredicateHelper with Logging {
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case l => {
@@ -26,7 +28,7 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy w
           /*
            * 2. Interval is either in the SQL, or use the entire datasource interval
            */
-          val intervals = dqb.intervals.getOrElse(dqb.drInfo.druidDS.intervals)
+          val intervals = dqb.queryIntervals.get
 
           /*
            * 3. Setup GroupByQuerySpec
@@ -46,6 +48,8 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy w
            * 4. Setup DruidRelation
            */
           val dq = DruidQuery(qs, intervals, Some(exprToDruidOutput.values.toList))
+
+          //Utils.logQuery(dq)
 
           val dR: DruidRelation = DruidRelation(dqb.drInfo, Some(dq))(planner.sqlContext)
 

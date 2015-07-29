@@ -2,15 +2,17 @@ package org.sparklinedata.druid
 
 import java.util.concurrent.atomic.AtomicLong
 
+import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExprId}
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.types.DataType
 import org.joda.time.Interval
-import org.sparklinedata.druid.metadata.DruidRelationInfo
+import org.sparklinedata.druid.metadata.{DruidColumn, DruidRelationInfo}
 
 /**
  *
  * @param drInfo
+ * @param queryIntervals
  * @param dimensions
  * @param limitSpec
  * @param havingSpec
@@ -18,13 +20,14 @@ import org.sparklinedata.druid.metadata.DruidRelationInfo
  * @param filterSpec
  * @param aggregations
  * @param postAggregations
- * @param intervals
+ * @param projectionAliasMap map from projected alias name to underlying column name.
  * @param outputAttributeMap list of output Attributes with the ExprId of the Attribute they
  *                           represent, the DataType in the original Plan and the DataType
  *                           from Druid.
  * @param curId
  */
 case class DruidQueryBuilder(val drInfo : DruidRelationInfo,
+                             queryIntervals: QueryIntervals,
                              dimensions: List[DimensionSpec] = Nil,
                              limitSpec: Option[LimitSpec] = None,
                              havingSpec : Option[HavingSpec] = None,
@@ -32,7 +35,7 @@ case class DruidQueryBuilder(val drInfo : DruidRelationInfo,
                              filterSpec: Option[FilterSpec] = None,
                              aggregations: List[AggregationSpec] = Nil,
                              postAggregations: Option[List[PostAggregationSpec]] = None,
-                             intervals: Option[List[Interval]] = None,
+                            projectionAliasMap : Map[String, String] = Map(),
                             outputAttributeMap :
                              Map[String, (Expression, DataType, DataType)] = Map(),
                             aggregateOper : Option[Aggregate] = None,
@@ -67,9 +70,15 @@ case class DruidQueryBuilder(val drInfo : DruidRelationInfo,
     case Some(pAs) => this.copy(postAggregations = Some( pAs :+ p))
   }
 
-  def interval(i : Interval) = intervals match {
-    case None => this.copy(intervals = Some(List(i)))
-    case Some(iS) => this.copy(intervals = Some(i +: iS))
+  def interval(iC : IntervalCondition) : Option[DruidQueryBuilder] = iC.typ match {
+    case IntervalConditionType.LT =>
+      queryIntervals.ltCond(iC.dt).map(qI => this.copy(queryIntervals = qI))
+    case IntervalConditionType.LTE =>
+      queryIntervals.ltECond(iC.dt).map(qI => this.copy(queryIntervals = qI))
+    case IntervalConditionType.GT =>
+      queryIntervals.gtCond(iC.dt).map(qI => this.copy(queryIntervals = qI))
+    case IntervalConditionType.GTE =>
+      queryIntervals.gtECond(iC.dt).map(qI => this.copy(queryIntervals = qI))
   }
 
   def outputAttribute(nm : String, e : Expression, originalDT: DataType, druidDT : DataType) = {
@@ -80,4 +89,18 @@ case class DruidQueryBuilder(val drInfo : DruidRelationInfo,
 
   def nextAlias : String = s"alias${curId.getAndDecrement()}"
 
+  def druidColumn(name : String) : Option[DruidColumn] = {
+    drInfo.sourceToDruidMapping.get(projectionAliasMap.getOrElse(name, name))
+  }
+
+  def addAlias(alias : String, col : String) = {
+    val dColNm = projectionAliasMap.getOrElse(col, col)
+    this.copy(projectionAliasMap = (projectionAliasMap + (alias -> dColNm)))
+  }
+
+}
+
+object DruidQueryBuilder {
+  def apply(drInfo : DruidRelationInfo) =
+    new DruidQueryBuilder(drInfo, new QueryIntervals(drInfo))
 }
