@@ -1,12 +1,14 @@
 package org.sparklinedata.druid
 
-import org.json4s.{ShortTypeHints, FullTypeHints, DefaultFormats}
+import org.apache.spark.Logging
+import org.json4s.jackson.JsonMethods._
+import org.json4s.{Extraction, ShortTypeHints, FullTypeHints, DefaultFormats}
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization
 import org.sparklinedata.druid.client.QueryResultRowSerializer
 import org.sparklinedata.druid.metadata.FunctionalDependencyType
 
-object Utils {
+object Utils extends Logging {
 
   implicit val jsonFormat = Serialization.formats(
     ShortTypeHints(
@@ -55,4 +57,8 @@ object Utils {
   ) +
     new EnumNameSerializer(FunctionalDependencyType) + new QueryResultRowSerializer ++
     org.json4s.ext.JodaTimeSerializers.all
+
+  def logQuery(dq : DruidQuery) : Unit = {
+    log.info(pretty(render(Extraction.decompose(dq))))
+  }
 }
