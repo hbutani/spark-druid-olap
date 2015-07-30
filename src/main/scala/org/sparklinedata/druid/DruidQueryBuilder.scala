@@ -57,8 +57,10 @@ case class DruidQueryBuilder(val drInfo : DruidRelationInfo,
     this.copy(granularitySpec = Right(g))
   }
 
-  def filter( f : FilterSpec) = {
-    this.copy(filterSpec = Some(f))
+  def filter( f : FilterSpec) = filterSpec match {
+    case Some(f1 : FilterSpec) =>
+      this.copy(filterSpec = Some(LogicalFilterSpec("and", List(f1, f))))
+    case None => this.copy(filterSpec = Some(f))
   }
 
   def aggregate( a : AggregationSpec) = {

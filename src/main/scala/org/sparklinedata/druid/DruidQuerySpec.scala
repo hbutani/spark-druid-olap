@@ -141,6 +141,19 @@ case class JavascriptFilterSpec(`type`: String,
                                 function: String) extends FilterSpec {
   def this(dimension: String,
            function: String) = this("javascript", dimension, function)
+
+}
+
+object JavascriptFilterSpec {
+
+  def jsFn(compareOp : String, value : String) : String = {
+     s"function(x) { return(x $compareOp '$value') }"
+  }
+
+  def create(dimension: String,
+           compareOp : String,
+           value : String) = new JavascriptFilterSpec(dimension, jsFn(compareOp, value))
+
 }
 
 sealed trait AggregationSpec {
