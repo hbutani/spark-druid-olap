@@ -25,24 +25,26 @@ case class QueryIntervals(drInfo : DruidRelationInfo,
     case _ => new Interval(i2.start, maxDate(i1.end,i2.end))
   }
 
+  /**
+   * - if this is the first queryInterval, add it.
+   * - if the new Interval overlaps with the current QueryInterval set interval to the overlap.
+   * - otherwise, the interval is an empty Interval.
+   * @param i
+   * @return
+   */
   private def add(i : Interval) : QueryIntervals = {
-    var added : Boolean = false
 
-    val qIs = intervals.map {qI =>
+    if ( intervals.isEmpty) {
+      QueryIntervals(drInfo, List(i))
+    } else {
+      val qI = intervals.head
       if ( qI.overlaps(i)) {
-        added = true
-        combine(qI, i)
+        QueryIntervals(drInfo, List(qI.overlap(i)))
       } else {
-        qI
+        val iI = indexIntervals.head
+        QueryIntervals(drInfo, List(iI.withEnd(iI.start)))
       }
     }
-
-    if (!added) {
-      QueryIntervals(drInfo, qIs :+ i)
-    } else {
-      QueryIntervals(drInfo, qIs)
-    }
-
   }
 
   def gtCond(dT : DateTime) : Option[QueryIntervals] = {

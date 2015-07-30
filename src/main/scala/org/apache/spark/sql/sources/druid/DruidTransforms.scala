@@ -24,6 +24,11 @@ abstract class DruidTransforms {
       }
 
       if ( dqb.isDefined) {
+        /*
+         * Filter Rewrites:
+         * - A conjunct is a predicate on the Time Dimension => rewritten to Interval constraint
+         * - A expression containing comparisons on Dim Columns.
+         */
         val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb.get)
         filters.foldLeft(dqb) { (dqB, e) =>
           dqB.flatMap{b =>
