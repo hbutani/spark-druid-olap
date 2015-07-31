@@ -5,7 +5,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
 import org.apache.spark.sql.sources.LogicalRelation
-import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType}
+import org.apache.spark.sql.types.{StringType, DoubleType, IntegerType, LongType}
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidDimension, DruidDataType, DruidMetric}
 import org.sparklinedata.druid._
 
@@ -45,8 +45,10 @@ abstract class DruidTransforms {
     case (dqb, agg@Aggregate(gEs, aEs, child)) => {
       plan(dqb, child).flatMap { dqb =>
 
+        val timeElemExtractor = new TimeElementExtractor(dqb)
+
         val dqb1 = gEs.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) { (dqb, e) =>
-          dqb.flatMap(groupingExpression(_, e))
+          dqb.flatMap(groupingExpression(_, timeElemExtractor, e))
         }
 
         val allAggregates =
@@ -179,14 +181,35 @@ abstract class DruidTransforms {
 
   }
 
-  def groupingExpression(dqb: DruidQueryBuilder, ge: Expression):
-  Option[DruidQueryBuilder] = ge match {
-    case AttributeReference(nm, dT, _, _) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield dqb.dimension(new DefaultDimensionSpec(dD.name, nm)).
-          outputAttribute(nm, ge, ge.dataType, DruidDataType.sparkDataType(dD.dataType))
+  /**
+   * Match the following as a rewritable Grouping Expression:
+   * - an AttributeReference, these are translated to a [[DefaultDimensionSpec]]
+   * - a [[TimeElementExtractor]] expression, these are translated to [[ExtractionDimensionSpec]]
+   * with a [[TimeFormatExtractionFunctionSpec]]
+   * @param dqb
+   * @param timeElemExtractor
+   * @param ge
+   * @return
+   */
+  def groupingExpression(dqb: DruidQueryBuilder,
+                         timeElemExtractor : TimeElementExtractor,
+                         ge: Expression):
+  Option[DruidQueryBuilder] = {
+    ge match {
+      case AttributeReference(nm, dT, _, _) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield dqb.dimension(new DefaultDimensionSpec(dD.name, nm)).
+            outputAttribute(nm, ge, ge.dataType, DruidDataType.sparkDataType(dD.dataType))
+      }
+      case timeElemExtractor(nm, dC, tzId, fmt) => {
+        Some(
+          dqb.dimension(new ExtractionDimensionSpec(dC.name, nm,
+          new TimeFormatExtractionFunctionSpec(fmt, tzId))).
+          outputAttribute(nm, ge, ge.dataType, StringType)
+        )
+      }
+      case _ => None
     }
-    case _ => None
   }
 
   def projectExpression(dqb: DruidQueryBuilder, pe: Expression):

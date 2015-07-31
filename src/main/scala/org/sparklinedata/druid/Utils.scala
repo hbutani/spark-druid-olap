@@ -59,7 +59,7 @@ object Utils extends Logging {
     org.json4s.ext.JodaTimeSerializers.all
 
   def logQuery(dq : DruidQuery) : Unit = {
-    log.info(pretty(render(Extraction.decompose(dq))))
+    log.info("\nDruid Query:\n" + pretty(render(Extraction.decompose(dq))))
   }
 
   /**

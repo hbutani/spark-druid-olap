@@ -24,6 +24,8 @@ sealed trait DruidColumn {
   val name : String
   val dataType : DruidDataType.Value
   val size : Long // in bytes
+
+  def isDimension(excludeTime : Boolean = false) : Boolean
 }
 
 object DruidColumn {
@@ -42,15 +44,21 @@ object DruidColumn {
 case class DruidDimension(name : String,
                        dataType : DruidDataType.Value,
                        size : Long,
-                       cardinality : Long) extends DruidColumn
+                       cardinality : Long) extends DruidColumn {
+  def isDimension(excludeTime : Boolean = false) = true
+}
 
 case class DruidMetric(name : String,
                           dataType : DruidDataType.Value,
-                          size : Long) extends DruidColumn
+                          size : Long) extends DruidColumn {
+  def isDimension(excludeTime : Boolean = false) = false
+}
 
 case class DruidTimeDimension(name : String,
                        dataType : DruidDataType.Value,
-                       size : Long) extends DruidColumn
+                       size : Long) extends DruidColumn {
+  def isDimension(excludeTime : Boolean = false) = !excludeTime
+}
 
 case class DruidDataSource(name : String,
                          intervals : List[Interval],

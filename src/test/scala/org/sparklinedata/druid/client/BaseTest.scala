@@ -1,11 +1,14 @@
 package org.sparklinedata.druid.client
 
+import org.apache.spark.Logging
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.sql.test.TestSQLContext
 import org.apache.spark.sql.test.TestSQLContext._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
-abstract class BaseTest extends FunSuite with BeforeAndAfterAll {
+abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
 
   val colMapping =
     """{
@@ -61,6 +64,17 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll {
 
     println(cTOlap)
     sql(cTOlap)
+  }
+
+  def sqlAndLog(nm : String, sqlStr : String) : DataFrame = {
+    logInfo(s"\n$nm SQL:\n" + sqlStr)
+    sql(sqlStr)
+  }
+
+  def logPlan(nm : String, df : DataFrame) : Unit = {
+    logInfo(s"\n$nm Plan:")
+    logInfo(s"\nLogical Plan:\n" + df.queryExecution.optimizedPlan.toString)
+    logInfo(s"\nPhysical Plan:\n" + df.queryExecution.sparkPlan.toString)
   }
 
 }

@@ -1,6 +1,7 @@
 package org.sparklinedata.druid
 
 import org.apache.spark.sql.catalyst.expressions.GenericRow
+import org.apache.spark.sql.types.{UTF8String, StringType, StructField}
 import org.apache.spark.{TaskContext, Partition}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
@@ -25,10 +26,23 @@ class DruidRDD(sqlContext: SQLContext,
     val r = client.executeQuery(mQry)
     val schema = dQuery.schema(drInfo)
     r.iterator.map { r =>
-      new GenericRow(schema.fields.map(f => r.event(f.name)))
+      new GenericRow(schema.fields.map(f => sparkValue(f, r.event(f.name))))
     }
   }
 
   override protected def getPartitions: Array[Partition] =
     dQuery.intervalSplits.zipWithIndex.map(t => new DruidPartition(t._2, t._1)).toArray
+
+  /**
+   * conversion from Druid values to Spark values. Most of the conversion cases are handled by
+   * cast expressions in the [[org.apache.spark.sql.execution.Project]] operator above the
+   * DruidRelation Operator; but Strings need to be converted to [[UTF8String]] strings.
+   * @param f
+   * @param druidVal
+   * @return
+   */
+  def sparkValue(f : StructField, druidVal : Any) : Any = f.dataType match {
+    case StringType if druidVal != null => new UTF8String().set(druidVal.toString)
+    case _ => druidVal
+  }
 }

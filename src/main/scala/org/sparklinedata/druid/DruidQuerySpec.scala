@@ -47,7 +47,8 @@ case class TimeFormatExtractionFunctionSpec(val `type`: String,
                                             val timeZone: Option[String],
                                             val locale: Option[String])
   extends ExtractionFunctionSpec {
-  def this(format: String) = this("timeFormat", format, None, None)
+  def this(format: String, timeZone: Option[String] = None) =
+    this("timeFormat", format, timeZone, None)
 }
 
 case class TimeParsingExtractionFunctionSpec(val `type`: String,

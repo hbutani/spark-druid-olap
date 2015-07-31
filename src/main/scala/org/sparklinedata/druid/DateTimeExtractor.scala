@@ -1,9 +1,9 @@
 package org.sparklinedata.druid
 
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, ScalaUdf, Expression, Literal}
 import com.github.nscala_time.time.Imports._
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, Literal, ScalaUdf}
 import org.apache.spark.sql.types.StringType
-import org.sparklinedata.druid.metadata.{DruidDataSource, DruidRelationInfo}
+import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataSource}
 import org.sparklinedata.spark.dateTime.Functions._
 
 object PeriodExtractor {
@@ -75,4 +75,69 @@ class IntervalConditionExtractor(val dqb : DruidQueryBuilder) {
       if fn == dateIsAfterOrEqualFn => Some(IntervalCondition(IntervalConditionType.GTE, dT))
     case _ => None
   }
+}
+
+/**
+ * Extract expressions of the form:
+ * - dateTime(dimCol)
+ * - withZone(dateTime(dimCol))
+ * @param dqb
+ */
+class DateTimeWithZoneExtractor(val dqb : DruidQueryBuilder) {
+
+  val rExtractor = this
+
+  def unapply(e : Expression) : Option[(String, DruidColumn, Option[String])] = e match {
+    case ScalaUdf(fn, _, Seq(AttributeReference(nm, _, _, _)))
+      if fn == dateTimeFn  => {
+      val dC = dqb.druidColumn(nm)
+      dC.filter(_.isDimension()).map((nm, _, None))
+    }
+    case ScalaUdf(fn, _, Seq(rExtractor((nm, dC, None)), Literal(tzId, StringType)))
+      if fn == withZoneFn  => {
+      Some(nm, dC, Some(tzId.toString))
+    }
+    case _ => None
+  }
+}
+
+/**
+ * Extract expressions that extract a dateTime element of a dimColumn that is parsed as Date
+ * For e.g.:
+ * - year(dateTime(dimCol))
+ * - monthOfYearName(withZone(dateTime(dimCol)))
+ *
+ * @param dqb
+ */
+class TimeElementExtractor(val dqb : DruidQueryBuilder) {
+
+  val functionToFormatMap : Map[AnyRef, String] = Map(
+    eraFn -> "GG",
+    centuryOfEraFn -> "CC",
+    yearOfEraFn -> "YYYY",
+    yearOfCenturyFn -> "yy",
+    yearFn -> "yyyy",
+    weekyearFn -> "xxxx",
+    monthOfYearFn -> "MM",
+    monthOfYearNameFn -> "MMMM",
+    weekOfWeekyearFn -> "ww",
+    dayOfYearFn -> "DDD",
+    dayOfMonthFn -> "dd",
+    dayOfWeekFn -> "ee",
+    dayOfWeekNameFn -> "EEEE",
+    hourOfDayFn -> "HH",
+    secondOfMinuteFn -> "ss"
+
+  )
+  val dateTimeWithZoneExtractor = new DateTimeWithZoneExtractor(dqb)
+
+  def unapply(e : Expression) : Option[(String, DruidColumn, Option[String], String)] = e match {
+    case ScalaUdf(fn, _, Seq(dateTimeWithZoneExtractor((nm, dC, tz))))
+      if functionToFormatMap.contains(fn)  => {
+      val fmt = functionToFormatMap(fn)
+      Some(nm, dC, tz, fmt)
+    }
+    case _ => None
+  }
+
 }
