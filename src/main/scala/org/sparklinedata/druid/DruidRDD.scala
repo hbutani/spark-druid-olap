@@ -1,7 +1,7 @@
 package org.sparklinedata.druid
 
 import org.apache.spark.sql.catalyst.expressions.GenericRow
-import org.apache.spark.sql.types.{UTF8String, StringType, StructField}
+import org.apache.spark.sql.types.{LongType, UTF8String, StringType, StructField}
 import org.apache.spark.{TaskContext, Partition}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
@@ -43,6 +43,7 @@ class DruidRDD(sqlContext: SQLContext,
    */
   def sparkValue(f : StructField, druidVal : Any) : Any = f.dataType match {
     case StringType if druidVal != null => new UTF8String().set(druidVal.toString)
+    case LongType if druidVal.isInstanceOf[BigInt] => druidVal.asInstanceOf[BigInt].longValue()
     case _ => druidVal
   }
 }
