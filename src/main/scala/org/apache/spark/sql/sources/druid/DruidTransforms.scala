@@ -86,7 +86,7 @@ abstract class DruidTransforms {
       (dqb, c) match {
         case CountDistinctAggregate(dN) =>
           Some(dqb.aggregate(new CardinalityAggregationSpec(a, List(dN))).
-            outputAttribute(a, pa, pa.dataType, LongType))
+            outputAttribute(a, pa, pa.dataType, DoubleType))
         case SumMinMaxAvgAggregate(t) => t._1 match {
           case "avg" => {
             val dC: DruidColumn = t._2
