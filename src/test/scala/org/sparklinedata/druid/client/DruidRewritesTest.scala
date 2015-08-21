@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.sparklinedata.druid.client
 
 import com.github.nscala_time.time.Imports._
@@ -21,7 +38,7 @@ class DruidRewritesTest extends BaseTest {
       "from orderLineItemPartSupplier group by l_returnflag, l_linestatus")
     logPlan("basicAgg", df)
 
-    //df.show()
+    // df.show()
   }
 
   test("basicAggWithProject") {
@@ -32,7 +49,7 @@ class DruidRewritesTest extends BaseTest {
     logPlan("basicAggWithProject", df)
 
 
-    //df.show()
+    // df.show()
   }
 
   test("dateFilter") {
@@ -54,7 +71,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("dateFilter", df)
 
-    //df.show()
+    // df.show()
   }
 
   test("intervalFilter") {
@@ -77,7 +94,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("intervalFilter", df)
 
-    //df.show()
+    // df.show()
 
   }
 
@@ -100,7 +117,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("intervalFilter2", df)
 
-    //df.show()
+    // df.show()
 
   }
 
@@ -123,7 +140,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("intervalFilter3", df)
 
-    //df.show()
+    // df.show()
 
   }
 
@@ -146,7 +163,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("intervalFilter4", df)
 
-    //df.show()
+    // df.show()
 
   }
 
@@ -171,7 +188,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("dimFilter2", df)
 
-    //df.show()
+    // df.show()
 
   }
 
@@ -196,7 +213,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("dimFilter3", df)
 
-    //df.show()
+    // df.show()
 
   }
 
@@ -219,7 +236,7 @@ class DruidRewritesTest extends BaseTest {
 
     logPlan("dimFilter4", df)
 
-    //df.show()
+    // df.show()
 
   }
 
@@ -252,7 +269,7 @@ class DruidRewritesTest extends BaseTest {
 """)
     logPlan("projFilterAgg", df)
 
-    //df.show()
+    // df.show()
   }
 
   test("ShipDateYearAgg") {
@@ -266,7 +283,7 @@ class DruidRewritesTest extends BaseTest {
       from orderLineItemPartSupplier group by l_returnflag, l_linestatus, $shipDtYrGroup""")
     logPlan("basicAgg", df)
 
-    //df.show()
+    // df.show()
   }
 
   test("OrderDateYearAgg") {
@@ -280,7 +297,7 @@ class DruidRewritesTest extends BaseTest {
       from orderLineItemPartSupplier group by l_returnflag, l_linestatus, $orderDtYrGroup""")
     logPlan("basicAgg", df)
 
-    //df.show()
+    // df.show()
   }
 
 }
