@@ -17,3 +17,14 @@ project/plugins/project/
 # idea
 .idea/
 *.iml
+
+# Mac
+.DS_Store
+
+# emacs
+*.*~
+
+# docs
+docs/*.html
+docs/*.tex
+docs/auto/
