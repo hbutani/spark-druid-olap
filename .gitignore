@@ -28,3 +28,6 @@ project/plugins/project/
 docs/*.html
 docs/*.tex
 docs/auto/
+
+# sbt
+build/sbt-launch-0.13.6.jar
