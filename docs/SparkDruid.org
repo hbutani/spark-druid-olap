@@ -116,10 +116,28 @@ Druid is architected as a group of services:
 
 *** Druid Query Model
 
+Queries are made using an HTTP REST style request. *Group By* queries
+are the most generic type of queries, use them to specify the
+DataSource, the [[http://druid.io/docs/0.8.0/querying/dimensionspecs.html][Dimensions to Group By]], the [[http://druid.io/docs/0.8.0/querying/granularities.html][Time Granularity]], [[http://druid.io/docs/0.8.0/querying/filters.html][Filters
+on Dimensions]], [[http://druid.io/docs/0.8.0/querying/aggregations.html][Aggregations]], [[http://druid.io/docs/0.8.0/querying/limitspec.html][how to order and limit results]], and the
+time intervals for which this query needs to run. [[https://github.com/SparklineData/spark-druid-olap/blob/master/src/test/scala/org/sparklinedata/druid/client/TPCHQueries.scala][Here]] are examples of
+TPCH queries expressed as Druid Queries. *Timeseries* and *TopN* are
+Druid Query types that can be used when certain constraints are met;
+they provide better performance than running the Group-By
+Query. Timeseries are significantly faster than groupBy queries for
+aggregations that don't require grouping over dimensions. For grouping
+and sorting over a single dimension, topN queries are much more
+optimized than groupBys.
+
+
 #+CAPTION: Druid Query
 #+NAME:   fig:DruidQuery
 #+ATTR_LATEX: :float nil
 [[./DruidQueryModel.png]]
+
+We provide a [[https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/sparklinedata/druid/DruidQuerySpec.scala][Query Data model in Scala]] to define queries, and the
+mechanics to interact with Druid to execute these Query Specifications
+and fetch results.
 
 ** Spark
 [[http://spark.apache.org/][Apache Spark]] is an in-memory, general-purpose cluster computing
@@ -337,25 +355,31 @@ setup. Consider a raw transaction log that is based on the
    \begin{lstlisting}[caption={The TPCH denormalized DataFrame},frame=shadowbox, numbers=left]
 CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(
    o_orderkey integer, o_custkey integer,
-   o_orderstatus string, o_totalprice double, o_orderdate string, 
-   o_orderpriority string, o_clerk string,
-   o_shippriority integer, o_comment string, l_partkey integer, 
-   l_suppkey integer, l_linenumber integer,
-   l_quantity double, l_extendedprice double, l_discount double, 
-   l_tax double, l_returnflag string,
-   l_linestatus string, l_shipdate string, l_commitdate string, 
-   l_receiptdate string, l_shipinstruct string,
-   l_shipmode string, l_comment string, order_year string, 
-   ps_partkey integer, ps_suppkey integer,
-   ps_availqty integer, ps_supplycost double, ps_comment string, 
-   s_name string, s_address string,
-   s_phone string, s_acctbal double, s_comment string, 
-   s_nation string, s_region string, p_name string,
-   p_mfgr string, p_brand string, p_type string, p_size integer, 
-   p_container string, p_retailprice double,
-   p_comment string, c_name string , c_address string , 
-   c_phone string , c_acctbal double ,
-   c_mktsegment string , c_comment string , c_nation string , 
+   o_orderstatus string, o_totalprice double, 
+   o_orderdate string, o_orderpriority string, 
+   o_clerk string, o_shippriority integer, 
+   o_comment string, l_partkey integer, 
+   l_suppkey integer, l_linenumber integer, 
+   l_quantity double, l_extendedprice double, 
+   l_discount double, l_tax double, 
+   l_returnflag string,l_linestatus string, 
+   l_shipdate string, l_commitdate string, 
+   l_receiptdate string, l_shipinstruct string, 
+   l__shipmode string, l_comment string, 
+   order_year string, ps_partkey integer, 
+   ps_suppkey integer,ps_availqty integer, 
+   ps_supplycost double, ps_comment string, 
+   s_name string, s_address string, 
+   s_phone string, s_acctbal double, 
+   s_comment string, s_nation string, 
+   s_region string, p_name string, 
+   p_mfgr string, p_brand string, 
+   p_type string, p_size integer, 
+   p_container string, p_retailprice double, 
+   p_comment string, c_name string , 
+   c_address string , c_phone string , 
+   c_acctbal double ,c_mktsegment string , 
+   c_comment string , c_nation string , 
    c_region string)
 USING com.databricks.spark.csv
 OPTIONS (
@@ -442,7 +466,8 @@ cannot be rewritten, then the Plan is not rewritten.
 
 **** Rewrite 2.1: Interval condition rewrite
 
-A predicate of the form =compOp(dateTime(timeDim), literalDateTime)=
+A predicate of the form 
+=compOp(dateTime(timeDim), literalDateTime)=
 is extracted as an /time Interval/ of the Druid Query.
 
 Where 'compOp' can be the following functions: 
@@ -575,6 +600,21 @@ Aggregation that is at a higher grain than the
 granularity in the Druid Index.
 
 * Benchmark
+We ran a benchmark to test a set of queries that contrast performance
+of the scenario of queries being rewritten to use a DruidIndex vs
+running the Queries directly against the *raw event* DataSet. We have
+attempted to make this test as fair as possible: by not taking any
+advantages of preaggregations and column pruning in Druid, by using in
+memory caching when the queries run only in Spark. We ran the 2
+scenarios on the same cluster: for the Druid run we gave the worker
+node resources to Druid History servers, for the Spark run we ran
+Spark Executors on the worker nodes.
+
+We ran the test on  [[http://www.tpc.org/tpch/spec/tpch2.8.0.pdf][TPCH benchmark dataset]], datascale
+10G. *But since we flatten the dataset, the starting size as a raw
+flattened dataset is 46GB.*
+
+** Cluster Details
 The Benchmark was run on a 4 node cluster. Each node is a 2 core,16GB
 memory, 256GB hard drive machine running centos 6.4. The output of the
 =lscpu= and =hdparm= are listed below:
@@ -624,22 +664,28 @@ The machines are setup with [[http://hortonworks.com/hdp/whats-new/][HDP 2.3]] u
 installed and setup  [[http://spark.apache.org/downloads.html][Spark 1.4.1]] to run using the Yarn Resource
 Manager.
 
+** TPCH Flattened Dataset, scale 10
 For the benchmark we used the [[http://www.tpc.org/tpch/spec/tpch2.8.0.pdf][TPCH benchmark dataset]], datascale
 10G. We converted the 10G star schema into a flattened(denormalized)
 transaction dataset using a tool we wrote [[https://github.com/SparklineData/tpch-spark-druid/blob/master/tpchData/src/main/scala/org/sparklinedata/tpch/hadoop/TpchGenFlattenedData.scala][TpchGenFlattenedData]], for
 example we ran it like this:
 \begin{Verbatim}[frame=single]
-spark/bin/spark-submit –num-executors 7 –properties-file spark-druid/spark.properties \
+spark/bin/spark-submit –num-executors 7 \
+–properties-file spark-druid/spark.properties \
 –packages com.databricks:spark-csv2.10:1.1.0 \
-–jars spark-druid/spark-datetime-assembly-0.0.1.jar,spark-druid/spark-druid-olap-assembly-0.0.1.jar \
+–jars spark-druid/spark-datetime-assembly-0.0.1.jar,\
+      spark-druid/spark-druid-olap-assembly-0.0.1.jar \
 –class org.sparklinedata.tpch.hadoop.TpchGenFlattenedData \
-spark-druid/tpchdata-assembly-0.0.1.jar tpchflatorc10 tpchflattened
+spark-druid/tpchdata-assembly-0.0.1.jar \
+tpchflatorc10 tpchflattened
 \end{Verbatim}
 
+** Dataset for Spark Queries
 For spark we further processed the data to setup a Partitioned table,
 stored in Parquet format; the table is partitioned by day. We use the
 [[https://github.com/SparklineData/tpch-spark-druid/blob/master/tpchData/src/main/scala/org/sparklinedata/tpch/hadoop/TpchBuildParquetPartitioned.scala][TpchBuildParquetPartitioned]] to do this. 
 
+** Druid Index for TPCH Flattened Dataset
 The Druid Index was created using the [[http://druid.io/docs/latest/ingestion/batch-ingestion.html][HadoopDruidIndexer]] with the
 following command:
 \begin{Verbatim}[frame=single]
@@ -650,7 +696,20 @@ io.druid.cli.Main index hadoop <spec_file>
 \end{Verbatim}
 
 See [[Druid TPCH Index Specification]] for detailed specification of the
-TPCH index in Druid.
+TPCH index in Druid. Key points of the Index:
+- /l_shipdate/ is chosen as the time dimension. Based on the TPCH
+  Query set, there is a significant number of queries that are time
+  sliced based on the Ship Date.
+- We indexed all the dimensions. The metrics are: ~o_totalprice,
+  l_quantity, l_extendedprice, ps_availqty, ps_supplycost,
+  c_acctbal~. Rest of the columns are modeled as dimensions.
+- *The index is created at the grain of raw events.*
+- The Index time segment is chosen to be month.
+
+Note by choosing to model all dimensions and by choosing to index at
+the grain of events, we have made the Druid Index as big as
+possible. *We are note giving Druid any advantages of preaggregation
+or column pruning.* 
 
 ** DataSource setup
 
@@ -679,7 +738,6 @@ CREATE TEMPORARY TABLE orderLineItemPartSupplier
 
 \end{lstlisting}
 \end{small}
-
 
 ** Queries
 The Queries we ran have the following form:
@@ -781,9 +839,11 @@ sqlCtx.sql(
       count(distinct o_orderkey)
       from
       (
-         select l_returnflag as f, l_linestatus as s, l_shipdate,
+         select l_returnflag as f, l_linestatus as s, 
+         l_shipdate,
          s_region, s_nation, c_nation, p_type,
-         l_extendedprice, ps_supplycost, ps_availqty, o_orderkey
+         l_extendedprice, ps_supplycost, ps_availqty, 
+         o_orderkey
          from orderLineItemPartSupplier
          where p_type = 'ECONOMY ANODIZED STEEL'
       ) t
@@ -814,11 +874,10 @@ sqlCtx.sql("""select l_returnflag, l_linestatus, count(*),
 \end{lstlisting}
 \end{small}
 
-
 ** Running the Benchmark
 
-*** Druid Rewrites
-For the Druid experiment the queries are run on spark using the
+*** Running against Druid Datasource
+For the Druid Datasource experiment the queries are run on spark using the
 [[https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/sparklinedata/druid/tools/TpchBenchMark.scala][Druid TpchBenchMark]] tool. It is run using the following command:
 \begin{small}
    \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
@@ -858,8 +917,28 @@ JAVA_HISTORICAL_OPTIONS="-server \
 The spark shell is run in local mode on one of the nodes, so that
 Spark uses as little cluster resources as possible.
 
-*** Test against native Spark
-For the queries goin against Spark we used the
+*** Running against cached Spark DataFrame
+We compare the rewritten queries against the case of not having a
+Druid Index. In this case we try to give the Spark engine as much
+advantage as we can. 
+
+We give the Spark executors as much of the Yarn cluster
+as possible. The Spark configuration is:
+\begin{Verbatim}[frame=single]
+spark.serializer=org.apache.spark.serializer.KryoSerializer
+#spark.sql.autoBroadcastJoinThreshold=100000000
+spark.sql.autoBroadcastJoinThreshold=-1
+spark.sql.planner.externalSort=true
+
+spark.executor.memory=9g
+spark.driver.memory=2g
+#spark.executor.cores=2
+\end{Verbatim}
+
+*As part of the initialization, the orderLineItemPartSupplier
+DataFrame is cached in memory.*
+
+For the queries going against Spark we used the
 [[https://github.com/SparklineData/tpch-spark-druid/blob/master/tpchData/src/main/scala/org/sparklinedata/tpch/hadoop/TpchParquetBenchmark.scala][Spark TpchBenchmark]] tool. It is run with the following command:
 \begin{small}
    \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
@@ -876,26 +955,85 @@ For the queries goin against Spark we used the
 --num-executors 4 --master yarn-client \
 --class org.sparklinedata.tpch.hadoop.TpchParquetBenchmark \
 sparkjars/tpchdata-assembly-0.0.1.jar \
--t tpchFlattenedData_10/orderLineItemPartSupplierCustomer.parquet.partitioned
+-t tpchFlattenedData_10/\
+orderLineItemPartSupplierCustomer.parquet.partitioned
 \end{lstlisting}
 \end{small}
 
-In this case we give the Spark executors as much of the Yarn cluster
-as possible. The Spark configuration is:
-\begin{Verbatim}[frame=single]
-spark.serializer=org.apache.spark.serializer.KryoSerializer
-#spark.sql.autoBroadcastJoinThreshold=100000000
-spark.sql.autoBroadcastJoinThreshold=-1
-spark.sql.planner.externalSort=true
 
-spark.executor.memory=9g
-spark.driver.memory=2g
-#spark.executor.cores=2
-\end{Verbatim}
 
-As part of the initialization, the orderLineItemPartSupplier DataFrame
-is cached in memory.
 
+
+** Benchmark Results
+
+*Data Sizes:*
+
+| TPCH Flat TSV                      | 46.80GB |
+| Druid Index in HDFS                | 13.27GB |
+| TPCH Flat Parquet Partition by Day | 11.56GB |
+
+As we said the raw dataset size after flattening is 46GB. So the test
+really is for a dataset which is about 50GB. The on-disk size of the
+Druid Index and a Parquet representation is about a 4th of the raw
+size. Parquet has about a 15% smaller footprint.
+
+*Results for Queries, when rewritten to use Druid:*
+
+| Query                                              | Avg. Time | Min. Time | Max. Time |
+|----------------------------------------------------+-----------+-----------+-----------|
+| Basic Aggregation                                  | 17146.000 |     15215 |     19150 |
+| Ship Date Range                                    |  3771.000 |      3196 |      5007 |
+| SubQuery + nation,Type predicates + ShipDate Range |   794.000 |       668 |       993 |
+| TPCH Q1                                            | 15950.000 |     15282 |     17186 |
+
+The numbers are in milliSeconds. Not surprisingly the 3rd query has great performance: it is tailor
+made for Druid: there is a filter on nation, part type and a ship date
+range. The 2nd query: a ship date range query with a aggregation by
+returnFlag and linestatus also show good perform compared to queries
+that have to scan all of the Data. The 1st and 4th queries don't
+leverage the Druid Index's layout: all the data needs to be scanned.
+So such queries ran in 15-17 seconds on our cluster.
+
+*Results for Queries, when running on cached raw event DataFrames:*
+
+| Query                                              |   Avg. Time | Min. Time | Max. Time |
+|----------------------------------------------------+-------------+-----------+-----------|
+| Basic Aggregation                                  |  557037.000 |    118545 |   1458634 |
+| Ship Date Range                                    | 1170102.000 |    700852 |   2012062 |
+| SubQuery + nation,Type predicates + ShipDate Range |  405624.000 |     81559 |    783161 |
+| TPCH Q1                                            |  469534.000 |    123577 |   1002099 |
+
+
+                                             Query Avg. Time Min. Time Max. Time
+                                 Basic Aggregation 111349.000      31902     485166
+                                   Ship Date Range  49840.000      47521      56917
+SubQuery + nation,Type predicates + ShipDate Range  10908.000       9312      13796
+                                           TPCH Q1  33505.000      29582      39674
+
+The runs for running on Spark were not very stable. We
+see periodic Executor failures, which result in tasks being rerun. We
+gave the Spark Executors more memory than the Druid History servers,
+so the resources allocated are comparable. Let's compare the best
+times from this case against the queries being offloaded to Druid. We
+see that the Queries that scan the whole dataset: queries 1 and 4 are
+6-8 times slower. This is surprising: a possible explanation is that
+the aggregation performance of Druid is better; also the in-memory
+representation in Spark maybe the cause of this difference. 
+
+The range
+query(query 2) is about 20 times slower; we tried to nullify any
+advantages in Druid, by partitioning by day, and specifying the date
+predicate in such a way that triggers partition pruning. Inspite of
+this Druid seems to give a boost for such queries. If we consider a
+factor of 8 advantage to Druid (assuming that full scan queries should
+have about the same performance on the 2 systems); even then Druid
+performs 2-2.5 better on this query. 
+
+For the query with a time Slice and Dimension filters, Druid is vastly
+superior. We were expecting Druid to be better, but the difference is
+performance is surprising: Druid is about 100 times faster. In a real
+workload we expect a sizable percentage of queries to be off this
+form. 
 
 
 * Future work
