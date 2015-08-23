@@ -29,7 +29,8 @@ import scala.collection.mutable.ArrayBuffer
 
 case class Config(nameNode : String = "",
                   tpchFlatDir : String = "",
-                  druidBroker : String = "")
+                  druidBroker : String = "",
+                  showResults : Boolean = false)
 
 object TpchBenchMark {
 
@@ -213,30 +214,7 @@ object TpchBenchMark {
     Seq(basicAgg, shipDteRange, projFiltRange, q1)
   }
 
-  def main(args: Array[String]) {
-
-    val parser = new scopt.OptionParser[Config]("tpchBenchmark") {
-      head("tpchBenchmark", "0.1")
-      opt[String]('n', "nameNode") required() valueName("<hostName/ip>") action { (x, c) =>
-        c.copy(nameNode = x) } text("the namenode hostName/ip")
-      opt[String]('t', "tpchFlatDir") required() valueName("<tpchDir>") action { (x, c) =>
-        c.copy(tpchFlatDir = x) } text("the folder containing tpch flattened data")
-      opt[String]('d', "druidBroker") required() valueName("<hostname/ip>") action { (x, c) =>
-        c.copy(druidBroker = x) } text("the druid broker hostName/ip")
-      help("help") text("prints this usage text")
-    }
-
-    val c = parser.parse(args, Config()) match {
-      case Some(config) => config
-      case None => sys.exit(-1)
-    }
-
-    val sc = new SparkContext(new SparkConf().setAppName("TPCHBenchmark").setMaster("local"))
-
-    val sqlCtx = new SQLContext(sc)
-
-    init(sqlCtx, c)
-
+  def run(sqlCtx : SQLContext, c : Config) : Unit = {
     val qs = queries(sqlCtx)
 
     val results : Seq[(String, DataFrame, ArrayBuffer[Long])] =
@@ -265,6 +243,58 @@ object TpchBenchMark {
 
       println(f"$qName%50s $avgTime%10.3f $minTime%10d $maxTime%10d")
     }
+  }
+
+  def runShowResults(sqlCtx : SQLContext, c : Config) : Unit = {
+
+    val qs = queries(sqlCtx)
+
+    val results = ArrayBuffer[(String, String)]()
+
+    qs.foreach { q =>
+      val df: DataFrame = q._2
+      val rows = df.collect()
+      val t = (q._1, rows.mkString("\n"))
+      results += t
+    }
+
+
+    results.foreach { r =>
+      println(r._1)
+      println(r._2)
+    }
+
+  }
+
+  def main(args: Array[String]) {
+
+    val parser = new scopt.OptionParser[Config]("tpchBenchmark") {
+      head("tpchBenchmark", "0.1")
+      opt[String]('n', "nameNode") required() valueName("<hostName/ip>") action { (x, c) =>
+        c.copy(nameNode = x) } text("the namenode hostName/ip")
+      opt[String]('t', "tpchFlatDir") required() valueName("<tpchDir>") action { (x, c) =>
+        c.copy(tpchFlatDir = x) } text("the folder containing tpch flattened data")
+      opt[String]('d', "druidBroker") required() valueName("<hostname/ip>") action { (x, c) =>
+        c.copy(druidBroker = x) } text("the druid broker hostName/ip")
+      opt[Boolean]('r', "showResults") action { (x, c) =>
+        c.copy(showResults = x)
+      } text ("only show results")
+      help("help") text("prints this usage text")
+    }
+
+    val c = parser.parse(args, Config()) match {
+      case Some(config) => config
+      case None => sys.exit(-1)
+    }
+
+    val sc = new SparkContext(new SparkConf().setAppName("TPCHBenchmark").setMaster("local"))
+
+    val sqlCtx = new SQLContext(sc)
+
+    init(sqlCtx, c)
+
+    if (c.showResults) runShowResults(sqlCtx, c) else run(sqlCtx, c)
+
   }
 }
 
