@@ -63,7 +63,7 @@ object IntervalConditionType extends Enumeration {
 
 case class IntervalCondition(typ : IntervalConditionType.Value, dt : DateTime)
 
-class IndexTimeReferenceExtractor(val dqb : DruidQueryBuilder) {
+class TimeReferenceExtractor(val dqb : DruidQueryBuilder, indexColumn : Boolean = true) {
 
   val drInfo = dqb.drInfo
 
@@ -71,7 +71,9 @@ class IndexTimeReferenceExtractor(val dqb : DruidQueryBuilder) {
     case ScalaUdf(fn, _, Seq(AttributeReference(nm, _, _, _)))
       if fn == dateTimeFn  => {
       val dC = dqb.druidColumn(nm)
-      if ( dC.isDefined && dC.get.name == DruidDataSource.TIME_COLUMN_NAME ) Some(nm) else None
+      if ( dC.isDefined && (!indexColumn || dC.get.name == DruidDataSource.TIME_COLUMN_NAME) )
+        Some(nm)
+      else None
     }
     case _ => None
   }
@@ -79,7 +81,7 @@ class IndexTimeReferenceExtractor(val dqb : DruidQueryBuilder) {
 
 class IntervalConditionExtractor(val dqb : DruidQueryBuilder) {
 
-  val timeRefExtractor = new IndexTimeReferenceExtractor(dqb)
+  val timeRefExtractor = new TimeReferenceExtractor(dqb, true)
 
   def unapply(e : Expression) : Option[IntervalCondition] = e match {
     case ScalaUdf(fn, _, Seq(timeRefExtractor(timDm), DateTimeExtractor(dT)))
@@ -90,6 +92,27 @@ class IntervalConditionExtractor(val dqb : DruidQueryBuilder) {
       if fn == dateIsAfterFn => Some(IntervalCondition(IntervalConditionType.GT, dT))
     case ScalaUdf(fn, _, Seq(timeRefExtractor(timDm), DateTimeExtractor(dT)))
       if fn == dateIsAfterOrEqualFn => Some(IntervalCondition(IntervalConditionType.GTE, dT))
+    case _ => None
+  }
+}
+
+/**
+ * Return (DruidColumn, ComparisonOperator, DateTimeValue)
+ * @param dqb
+ */
+class DateTimeConditionExtractor(val dqb : DruidQueryBuilder) {
+
+  val timeRefExtractor = new TimeReferenceExtractor(dqb, false)
+
+  def unapply(e : Expression) : Option[(String, String, String)] = e match {
+    case ScalaUdf(fn, _, Seq(timeRefExtractor(timDm), DateTimeExtractor(dT)))
+      if fn == dateIsBeforeFn => Some((timDm, "<", dT.toString()))
+    case ScalaUdf(fn, _, Seq(timeRefExtractor(timDm), DateTimeExtractor(dT)))
+      if fn == dateIsBeforeOrEqualFn => Some((timDm, "<=", dT.toString()))
+    case ScalaUdf(fn, _, Seq(timeRefExtractor(timDm), DateTimeExtractor(dT)))
+      if fn == dateIsAfterFn => Some((timDm, ">", dT.toString()))
+    case ScalaUdf(fn, _, Seq(timeRefExtractor(timDm), DateTimeExtractor(dT)))
+      if fn == dateIsAfterOrEqualFn => Some((timDm, ">=", dT.toString()))
     case _ => None
   }
 }

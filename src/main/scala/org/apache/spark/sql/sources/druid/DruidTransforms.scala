@@ -248,61 +248,67 @@ abstract class DruidTransforms {
   }
 
   def dimFilterExpression(dqb: DruidQueryBuilder, fe: Expression):
-  Option[FilterSpec] = fe match {
-    case EqualTo(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield new SelectorFilterSpec(dD.name, value.toString)
-    }
-    case EqualTo(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield new SelectorFilterSpec(dD.name, value.toString)
-    }
-    case LessThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, "<", value.toString)
-    }
-    case LessThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, ">", value.toString)
-    }
-    case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, "<=", value.toString)
-    }
-    case LessThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, ">=", value.toString)
-    }
+  Option[FilterSpec] = {
 
-    case GreaterThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, ">", value.toString)
-    }
-    case GreaterThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, "<", value.toString)
-    }
-    case GreaterThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, ">=", value.toString)
-    }
-    case GreaterThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-      for(dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] )
-        yield JavascriptFilterSpec.create(dD.name, "<=", value.toString)
-    }
-      
-    case Or(e1, e2) => {
+    val dtTimeCond = new DateTimeConditionExtractor(dqb)
+
+    fe match {
+      case EqualTo(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield new SelectorFilterSpec(dD.name, value.toString)
+      }
+      case EqualTo(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield new SelectorFilterSpec(dD.name, value.toString)
+      }
+      case LessThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, "<", value.toString)
+      }
+      case LessThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, ">", value.toString)
+      }
+      case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, "<=", value.toString)
+      }
+      case LessThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, ">=", value.toString)
+      }
+
+      case GreaterThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, ">", value.toString)
+      }
+      case GreaterThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, "<", value.toString)
+      }
+      case GreaterThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, ">=", value.toString)
+      }
+      case GreaterThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+          yield JavascriptFilterSpec.create(dD.name, "<=", value.toString)
+      }
+      case dtTimeCond((dCol, op, value)) =>
+        Some(JavascriptFilterSpec.create(dCol, op, value))
+      case Or(e1, e2) => {
         Utils.sequence(
           List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
           LogicalFilterSpec("or", args.toList)
         }
-    }
-    case And(e1, e2) => {
-      Utils.sequence(
-        List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
-        LogicalFilterSpec("and", args.toList)
       }
+      case And(e1, e2) => {
+        Utils.sequence(
+          List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
+          LogicalFilterSpec("and", args.toList)
+        }
+      }
+      case _ => None
     }
-    case _ => None
   }
 }
