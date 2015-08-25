@@ -26,10 +26,12 @@ import org.sparklinedata.spark.dateTime.Functions._
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import scala.collection.mutable.ArrayBuffer
+import scala.language.postfixOps
 
 case class Config(nameNode : String = "",
                   tpchFlatDir : String = "",
                   druidBroker : String = "",
+                 druidDataSource : String = "",
                   showResults : Boolean = false)
 
 object TpchBenchMark {
@@ -114,7 +116,7 @@ object TpchBenchMark {
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "$baseFlatTableName",
       timeDimensionColumn "l_shipdate",
-      druidDatasource "tpch",
+      druidDatasource "${cfg.druidDataSource}",
       druidHost "${cfg.druidBroker}",
       druidPort "8082",
       functionalDependencies '[   {"col1" : "c_name", "col2" : "c_address", "type" : "1-1"},   {"col1" : "c_phone", "col2" : "c_address", "type" : "1-1"},   {"col1" : "c_name", "col2" : "c_mktsegment", "type" : "n-1"},   {"col1" : "c_name", "col2" : "c_comment", "type" : "1-1"},   {"col1" : "c_name", "col2" : "c_nation", "type" : "n-1"},   {"col1" : "c_nation", "col2" : "c_region", "type" : "n-1"} ]     ')
@@ -211,7 +213,88 @@ object TpchBenchMark {
        group by l_returnflag, l_linestatus""")
       )
 
-    Seq(basicAgg, shipDteRange, projFiltRange, q1)
+    val orderDtPredicate = dateTime('o_orderdate) < dateTime("1995-03-15")
+    val shipDtPredicateQ3 = dateTime('l_shipdate) > dateTime("1995-03-15")
+
+    val q3 = ("TPCH Q3 - extendePrice instead of revenue", sqlCtx.sql(date"""
+      select
+      o_orderkey,
+      sum(l_extendedprice) as price, o_orderdate,
+      o_shippriority
+      from
+      orderLineItemPartSupplier where
+      c_mktsegment = 'BUILDING' and $orderDtPredicate and $shipDtPredicateQ3
+      group by o_orderkey,
+      o_orderdate,
+      o_shippriority order by
+      price desc, o_orderdate
+      limit 10
+      """)
+      )
+
+    val orderDtPredicateQ51 = dateTime('o_orderdate) >= dateTime("1994-01-01")
+    val orderDtPredicateQ52 = dateTime('o_orderdate) < (dateTime("1994-01-01") + 1.year)
+
+    val q5 =  ("TPCH Q5 - extendePrice instead of revenue", sqlCtx.sql(date"""
+      select s_nation,
+      sum(l_extendedprice) as extendedPrice
+      from orderLineItemPartSupplier
+      where s_region = 'ASIA'
+      and $orderDtPredicateQ51
+      and $orderDtPredicateQ52
+      group by s_nation
+      order by extendedPrice desc
+      """)
+      )
+
+    val shipDtQ7Year = dateTime('l_shipdate) year
+
+    val q7 = ("TPCH Q7 - price instead of revenue", sqlCtx.sql(date"""
+    select s_nation, c_nation, $shipDtQ7Year as l_year,
+    sum(l_extendedprice) as extendedPrice
+    from orderLineItemPartSupplier
+    where ((s_nation = 'FRANCE' and c_nation = 'GERMANY') or
+           (c_nation = 'FRANCE' and s_nation = 'GERMANY')
+           )
+    group by s_nation, c_nation, $shipDtQ7Year
+    order by s_nation, c_nation, l_year
+    """)
+      )
+
+    val orderDtQ8Year = dateTime('o_orderdate) year
+
+    val dtP1 = dateTime('o_orderdate) >= dateTime("1995-01-01")
+    val dtP2 = dateTime('o_orderdate) <= dateTime("1996-12-31")
+
+    val q8 = ("TPCH Q8 - extendePrice instead of market share",  sqlCtx.sql(date"""
+      select $orderDtQ8Year as o_year,
+      sum(l_extendedprice) as price
+      from orderLineItemPartSupplier
+      where c_region = 'AMERICA' and p_type = 'ECONOMY ANODIZED STEEL' and $dtP1 and $dtP2
+      group by $orderDtQ8Year
+      order by o_year
+      """)
+      )
+
+    val dtP1Q10 = dateTime('o_orderdate) >= dateTime("1993-10-01")
+    val dtP2Q10 = dateTime('o_orderdate) < (dateTime("1993-10-01") + 3.month)
+
+    val q10 = ("TPCH Q10 - extendePrice instead of revenue, no group by on acctBal",
+      sqlCtx.sql(date"""
+    select c_name, c_nation, c_address, c_phone, c_comment,
+           sum(l_extendedprice) as price
+    from orderLineItemPartSupplier
+    where
+      $dtP1Q10 and
+      $dtP2Q10 and
+      l_returnflag = 'R'
+    group by c_name, c_nation, c_address, c_phone, c_comment
+    order by price desc
+    """)
+      )
+
+
+    Seq(basicAgg, shipDteRange, projFiltRange, q1, q3, q5, q7, q8, q10)
   }
 
   def run(sqlCtx : SQLContext, c : Config) : Unit = {
@@ -276,6 +359,8 @@ object TpchBenchMark {
         c.copy(tpchFlatDir = x) } text("the folder containing tpch flattened data")
       opt[String]('d', "druidBroker") required() valueName("<hostname/ip>") action { (x, c) =>
         c.copy(druidBroker = x) } text("the druid broker hostName/ip")
+      opt[String]('d', "druidDataSource") required() valueName("<dataSourceName>") action { (x, c) =>
+        c.copy(druidDataSource = x) } text("the druid dataSource")
       opt[Boolean]('r', "showResults") action { (x, c) =>
         c.copy(showResults = x)
       } text ("only show results")
