@@ -1,0 +1,547 @@
+#+TITLE:    Benchmark Details
+#+LANGUAGE:  en
+#+INFOJS_OPT: view:showall toc:t ltoc:t mouse:underline path:http://orgmode.org/org-info.js
+#+LINK_HOME: http://home.fnal.gov/~neilsen
+#+LINK_UP: http://home.fnal.gov/~neilsen/notebook
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="http://orgmode.org/org-manual.css" />
+
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [pdftex,10pt,a4paper]
+
+#+LaTeX_HEADER: \usepackage{sectsty}
+#+LaTeX_HEADER: \usepackage{fancyvrb}
+
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \usepackage{listings}
+#+LaTeX_HEADER: \usepackage{xyling}
+#+LaTeX_HEADER: \usepackage{ctable}
+
+#+LaTeX_HEADER: \input xy
+#+LaTeX_HEADER: \xyoption{all}
+
+#+EXPORT_SELECT_TAGS: export
+#+EXPORT_EXCLUDE_TAGS: noexport
+#+OPTIONS: H:4 num:nil toc:nil \n:nil @:t ::t |:t ^:{} _:{} *:t TeX:t LaTeX:t
+#+STARTUP: showall
+#+OPTIONS: html-postamble:nil
+
+
+* Queries
+
+*Queries Summary:*
+
+| Query                | Interval          | Filters            | Group By      | Aggregations         |
+|----------------------+-------------------+--------------------+---------------+----------------------|
+| Basic Aggregation.   | None              | None               | ReturnFlag    | Count(*)             |
+|                      |                   |                    | LineStatus    | Sum(exdPrice)        |
+|                      |                   |                    |               | Avg(availQty)        |
+|                      |                   |                    |               |                      |
+| Ship Date Range      | 1995-12 - 1997-09 | None               | ReturnFlag    | Count(*)             |
+|                      |                   |                    | LineStatus    |                      |
+|                      |                   |                    |               |                      |
+| SubQry + nation,type |                   |                    | S_Nation      |                      |
+| predicate + ShipDt   |                   |                    |               |                      |
+| Range                | 1995-12 - 1997-09 | P_Type             |               | Count(*)             |
+|                      |                   | S_Nation, C_Nation |               | Sum(exdPrice)        |
+|                      |                   |                    |               | Max(supplyCost)      |
+|                      |                   |                    |               | Avg(availQty)        |
+|                      |                   |                    |               | Count(Distinct oKey) |
+|                      |                   |                    |               |                      |
+| TPCH Q1              | None              | None               | ReturnFlag    | Count(*)             |
+|                      |                   |                    | LineStatus    | Sum(exdPrice)        |
+|                      |                   |                    |               | Max(supplyCost)      |
+|                      |                   |                    |               | Avg(availQty)        |
+|                      |                   |                    |               | Count(Distinct oKey) |
+|                      |                   |                    |               |                      |
+| TPCH Q3              | 1995-03-15 -      | O_Date             | OKey          | Sum(exdPrice)        |
+|                      |                   | MktSegment         | ODate         |                      |
+|                      |                   |                    | ShipPri       |                      |
+|                      |                   |                    |               |                      |
+| TPCH Q5              | None              | O_Date             | S_Nation      | Sum(exdPrice)        |
+|                      |                   | Region             |               |                      |
+|                      |                   |                    |               |                      |
+| TPCH Q7              | None              | S_Nation, C_Nation | S_Nation      | Sum(exdPrice)        |
+|                      |                   |                    | C_Nation      |                      |
+|                      |                   |                    | ShipDate.Year |                      |
+|                      |                   |                    |               |                      |
+| TPCH Q8              | None              | Region             | ODate.Year    | Sum(exdPrice)        |
+|                      |                   | Type               |               |                      |
+|                      |                   | O_Date             |               |                      | 
+
+** Alterations made to queries
+- Formulas in aggregations have been removed. For
+  e.g. =sum(l_extendedprice*(1-l_discount))= is simply written as
+  =sum(extendedprice)=. This is because we don't have the rewrites to handle
+  aggregation formulas. This has a minor impact on query performance;
+  so the overall benchmark analysis will not change once we can test
+  aggregation formulas.
+- We have removed *order by, limit* clauses. This is because we don't
+  have the order and limit rewrites. Again this shouldn't change the
+  overall benchmark conclusion; in fact once we can push down order
+  and limit to druid, the rewritten query times will reduce,
+  further increasing the rewritten query performance.
+  
+
+** Query Basic Aggregation
+#+begin_example
+SELECT l_returnflag,
+       l_linestatus,
+       Count(*),
+       Sum(l_extendedprice) AS s,
+       Max(ps_supplycost)   AS m,
+       Avg(ps_availqty)     AS a,
+       Count(DISTINCT o_orderkey)
+FROM   orderlineitempartsupplier
+GROUP  BY l_returnflag,
+          l_linestatus
+#+end_example
+
+*** Logical Plan
+#+begin_example
+Aggregate [l_returnflag#69,l_linestatus#70], [l_returnflag#69,l_linestatus#70,COUNT(1) AS c2#109L,SUM(l_extendedprice#66) AS s#106,MAX(ps_supplycost#81) AS m#107,AVG(CAST(ps_availqty#80, LongType)) AS a#108,COUNT(DISTINCT o_orderkey#53) AS c6#110L]
+ Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,l_returnflag#69,l_linestatus#70,ps_availqty#80]
+  Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,...
+
+#+end_example
+
+*** Physical Plan
+#+begin_example
+Project [l_returnflag#69,l_linestatus#70,alias-1#155L AS c2#109L,alias-2#154 AS s#106,alias-3#158 AS m#107,alias-4#156 AS a#108,CAST(alias-7#157, LongType) AS c6#110L]
+ PhysicalRDD [alias-2#154,alias-3#158,alias-7#157,alias-4#156,l_returnflag#69,l_linestatus#70,alias-1#155L], DruidRDD[6] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+
+** Query Ship Date Range
+#+begin_example
+SELECT f,
+       s,
+       Count(*) AS count_order
+FROM   (SELECT l_returnflag AS f,
+               l_linestatus AS s,
+               l_shipdate,
+               s_region,
+               s_nation,
+               c_nation
+        FROM   orderlineitempartsupplier) t
+WHERE  Dateisbeforeorequal(Datetime(`l_shipdate`),
+              Dateminus(Datetime("1997-12-01"), Period("p90d")))
+       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-12-01"))
+GROUP  BY f,
+          s
+#+end_example
+
+*** Logical Plan
+#+begin_example
+Aggregate [f#127,s#128], [f#127,s#128,COUNT(1) AS count_order#120L]
+ Project [l_returnflag#69 AS f#127,l_linestatus#70 AS s#128]
+  Filter (scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(scalaUDF(1997-12-01),scalaUDF(P90D))) && scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(1995-12-01)))
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,....
+
+#+end_example
+*** Physical Plan
+#+begin_example
+Project [f#127,s#128,alias-1#159L AS count_order#120L]
+ PhysicalRDD [f#127,s#128,alias-1#159L], DruidRDD[7] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+
+** Query SubQuery + nation,Type predicates + ShipDate Range
+#+begin_example
+SELECT s_nation,
+       Count(*)             AS count_order,
+       Sum(l_extendedprice) AS s,
+       Max(ps_supplycost)   AS m,
+       Avg(ps_availqty)     AS a,
+       Count(DISTINCT o_orderkey)
+FROM   (SELECT l_returnflag AS f,
+               l_linestatus AS s,
+               l_shipdate,
+               s_region,
+               s_nation,
+               c_nation,
+               p_type,
+               l_extendedprice,
+               ps_supplycost,
+               ps_availqty,
+               o_orderkey
+        FROM   orderlineitempartsupplier
+        WHERE  p_type = 'ECONOMY ANODIZED STEEL') t
+WHERE  Dateisbeforeorequal(Datetime(`l_shipdate`),
+              Dateminus(Datetime("1997-12-01"), Period("p90d")))
+       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-12-01"))
+       AND ( ( s_nation = 'FRANCE'
+               AND c_nation = 'GERMANY' )
+              OR ( c_nation = 'FRANCE'
+                   AND s_nation = 'GERMANY' ) )
+GROUP  BY s_nation
+#+end_example
+
+*** Logical Plan
+#+begin_example
+Aggregate [s_nation#88], [s_nation#88,COUNT(1) AS count_order#129L,SUM(l_extendedprice#66) AS s#130,MAX(ps_supplycost#81) AS m#131,AVG(CAST(ps_availqty#80, LongType)) AS a#132,COUNT(DISTINCT o_orderkey#53) AS c5#141L]
+ Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,s_nation#88,ps_availqty#80]
+  Filter ((p_type#93 = ECONOMY ANODIZED STEEL) && ((scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(scalaUDF(1997-12-01),scalaUDF(P90D))) && scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(1995-12-01))) && (((s_nation#88 = FRANCE) && (c_nation#104 = GERMANY)) || ((c_nation#104 = FRANCE) && (s_nation#88 = GERMANY)))))
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,...
+
+#+end_example
+*** Physical Plan
+#+begin_example
+Project [s_nation#88,alias-1#161L AS count_order#129L,alias-2#160 AS s#130,alias-3#164 AS m#131,alias-4#162 AS a#132,CAST(alias-7#163, LongType) AS c5#141L]
+ PhysicalRDD [alias-2#160,alias-3#164,alias-7#163,alias-4#162,s_nation#88,alias-1#161L], DruidRDD[8] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+** Query TPCH Q1
+#+begin_example
+SELECT l_returnflag,
+       l_linestatus,
+       Count(*),
+       Sum(l_extendedprice) AS s,
+       Max(ps_supplycost)   AS m,
+       Avg(ps_availqty)     AS a,
+       Count(DISTINCT o_orderkey)
+FROM   orderlineitempartsupplier
+GROUP  BY l_returnflag,
+          l_linestatus
+#+end_example
+
+*** Logical Plan
+#+begin_example
+Aggregate [l_returnflag#69,l_linestatus#70], [l_returnflag#69,l_linestatus#70,COUNT(1) AS c2#145L,SUM(l_extendedprice#66) AS s#142,MAX(ps_supplycost#81) AS m#143,AVG(CAST(ps_availqty#80, LongType)) AS a#144,COUNT(DISTINCT o_orderkey#53) AS c6#146L]
+ Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,l_returnflag#69,l_linestatus#70,ps_availqty#80]
+  Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,....
+
+#+end_example
+*** Physical Plan
+#+begin_example
+Project [l_returnflag#69,l_linestatus#70,alias-1#166L AS c2#145L,alias-2#165 AS s#142,alias-3#169 AS m#143,alias-4#167 AS a#144,CAST(alias-7#168, LongType) AS c6#146L]
+ PhysicalRDD [alias-2#165,alias-3#169,alias-7#168,alias-4#167,l_returnflag#69,l_linestatus#70,alias-1#166L], DruidRDD[9] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+** Query TPCH Q3 - extendePrice instead of revenue; order, limit removed
+#+begin_example
+SELECT o_orderkey,
+       Sum(l_extendedprice) AS price,
+       o_orderdate,
+       o_shippriority
+FROM   orderlineitempartsupplier
+WHERE  c_mktsegment = 'BUILDING'
+       AND Dateisbefore(Datetime(`o_orderdate`), Datetime("1995-03-15"))
+       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-03-15"))
+GROUP  BY o_orderkey,
+          o_orderdate,
+          o_shippriority
+#+end_example
+
+*** Logical Plan
+#+begin_example
+Aggregate [o_orderkey#53,o_orderdate#57,o_shippriority#60], [o_orderkey#53,SUM(l_extendedprice#66) AS price#147,o_orderdate#57,o_shippriority#60]
+ Project [o_orderkey#53,o_orderdate#57,o_shippriority#60,l_extendedprice#66]
+  Filter (((c_mktsegment#102 = BUILDING) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1995-03-15))) && scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(1995-03-15)))
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,...
+
+#+end_example
+*** Physical Plan
+#+begin_example
+Project [CAST(o_orderkey#53, IntegerType) AS o_orderkey#53,alias-1#170 AS price#147,o_orderdate#57,CAST(o_shippriority#60, IntegerType) AS o_shippriority#60]
+ PhysicalRDD [o_orderkey#53,o_orderdate#57,o_shippriority#60,alias-1#170], DruidRDD[10] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+** Query TPCH Q5 - extendePrice instead of revenue
+#+begin_example
+SELECT s_nation,
+       Sum(l_extendedprice) AS extendedPrice
+FROM   orderlineitempartsupplier
+WHERE  s_region = 'ASIA'
+       AND Dateisafterorequal(Datetime(`o_orderdate`), Datetime("1994-01-01"))
+       AND Dateisbefore(Datetime(`o_orderdate`),
+           Dateplus(Datetime("1994-01-01"), Period(
+               "p1y")))
+GROUP  BY s_nation
+#+end_example
+
+*** Logical Plan
+#+begin_example
+Aggregate [s_nation#88], [s_nation#88,SUM(l_extendedprice#66) AS extendedPrice#148]
+ Project [s_nation#88,l_extendedprice#66]
+  Filter (((s_region#89 = ASIA) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1994-01-01))) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(scalaUDF(1994-01-01),scalaUDF(P1Y))))
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,....
+
+#+end_example
+*** Physical Plan
+#+begin_example
+Project [s_nation#88,alias-1#171 AS extendedPrice#148]
+ PhysicalRDD [s_nation#88,alias-1#171], DruidRDD[11] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+
+** Query TPCH Q7 - price instead of revenue
+#+begin_example
+SELECT s_nation,
+       c_nation,
+       Year(Datetime( ` l_shipdate ` )) AS l_year,
+       Sum(l_extendedprice)             AS extendedPrice
+FROM   orderlineitempartsupplier
+WHERE  ( ( s_nation = 'FRANCE'
+           AND c_nation = 'GERMANY' )
+          OR ( c_nation = 'FRANCE'
+               AND s_nation = 'GERMANY' ) )
+GROUP  BY s_nation,
+          c_nation,
+          Year(Datetime( ` l_shipdate ` ))
+#+end_example
+
+*** Logical Plan
+#+begin_example
+Aggregate [s_nation#88,c_nation#104,scalaUDF(scalaUDF(l_shipdate#71))], [s_nation#88,c_nation#104,scalaUDF(scalaUDF(l_shipdate#71)) AS l_year#149,SUM(l_extendedprice#66) AS extendedPrice#150]
+ Project [s_nation#88,c_nation#104,l_shipdate#71,l_extendedprice#66]
+  Filter (((s_nation#88 = FRANCE) && (c_nation#104 = GERMANY)) || ((c_nation#104 = FRANCE) && (s_nation#88 = GERMANY)))
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,....
+
+#+end_example
+*** Physical Plan
+#+begin_example
+Project [s_nation#88,c_nation#104,CAST(l_shipdate#172, IntegerType) AS l_year#149,alias-1#173 AS extendedPrice#150]
+ PhysicalRDD [s_nation#88,c_nation#104,l_shipdate#172,alias-1#173], DruidRDD[12] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+
+** Query TPCH Q8 - extendePrice instead of market share
+#+begin_example
+SELECT Year(Datetime(`o_orderdate`)) AS o_year,
+       Sum(l_extendedprice)          AS price
+FROM   orderlineitempartsupplier
+WHERE  c_region = 'AMERICA'
+       AND p_type = 'ECONOMY ANODIZED STEEL'
+       AND Dateisafterorequal(Datetime(`o_orderdate`), Datetime("1995-01-01"))
+       AND Dateisbeforeorequal(Datetime(`o_orderdate`), Datetime("1996-12-31"))
+GROUP  BY Year(Datetime(`o_orderdate`))
+#+end_example
+
+TPCH Q8 - extendePrice instead of market share
+*** Logical Plan
+#+begin_example
+Aggregate [scalaUDF(scalaUDF(o_orderdate#57))], [scalaUDF(scalaUDF(o_orderdate#57)) AS o_year#151,SUM(l_extendedprice#66) AS price#152]
+ Project [o_orderdate#57,l_extendedprice#66]
+  Filter ((((c_region#105 = AMERICA) && (p_type#93 = ECONOMY ANODIZED STEEL)) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1995-01-01))) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1996-12-31)))
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,...
+
+#+end_example
+*** Physical Plan
+#+begin_example
+Project [CAST(o_orderdate#174, IntegerType) AS o_year#151,alias-1#175 AS price#152]
+ PhysicalRDD [o_orderdate#174,alias-1#175], DruidRDD[13] at RDD at DruidRDD.scala:34
+
+#+end_example
+
+
+
+* TPCH BenchMark
+
+** Running against raw event Dataset
+
+** Running against Druid
+
+*** Timing
+#+begin_example
+                                 Basic Aggregation  20324.000      19873      20776
+                                   Ship Date Range   1768.000       1712       1824
+SubQuery + nation,Type predicates + ShipDate Range    244.000        195        294
+                                           TPCH Q1  18340.000      17783      18897
+TPCH Q3 - extendePrice instead of revenue; order, limit removed  10669.000      10345      10994
+         TPCH Q5 - extendePrice instead of revenue  16722.000      16617      16828
+                TPCH Q7 - price instead of revenue    862.000        712       1012
+    TPCH Q8 - extendePrice instead of market share  20429.000      20190      20669
+#+end_example
+
+* TPCHSlice BenchMark
+
+** Running against raw event Dataset
+
+*** Timing
+#+begin_example
+
+                                             Query Avg. Time Min. Time Max. Time
+                                 Basic Aggregation  26890.000       7165     113328
+                                   Ship Date Range  10530.000       8499      16380
+SubQuery + nation,Type predicates + ShipDate Range   4544.000       3626       7625
+                                           TPCH Q1   7993.000       7186      10483
+         TPCH Q3 - extendePrice instead of revenue   6004.000       3727      11246
+         TPCH Q5 - extendePrice instead of revenue   6614.000       5481       8979
+                TPCH Q7 - price instead of revenue   5648.000       4524       7133
+    TPCH Q8 - extendePrice instead of market share   3804.000       3211       4780
+TPCH Q10 - extendePrice instead of revenue, no group by on acctBal  27150.000      23269      35494
+#+end_example
+
+*** Query Results
+#+begin_example
+Basic Aggregation
+[A,F,1478160,5.653926919402009E10,1000.0,4997.955256535151,644914]
+[R,F,1480195,5.6579322994170044E10,1000.0,4997.424184651347,645781]
+[N,F,38767,1.4841356872899961E9,999.96,4990.055330564655,30750]
+[N,O,2998603,1.1461753710263998E11,1000.0,4999.978290890792,768912]
+Ship Date Range
+[N,O,1599288]
+SubQuery + nation,Type predicates + ShipDate Range
+[FRANCE,16,687985.3700000001,933.5,5169.0,16]
+[GERMANY,19,753095.0299999999,994.08,5400.421052631579,19]
+TPCH Q1
+[A,F,1478160,5.653926919402008E10,1000.0,4997.955256535151,644914]
+[R,F,1480195,5.657932299417004E10,1000.0,4997.424184651347,645781]
+[N,F,38767,1.4841356872899961E9,999.96,4990.055330564655,30750]
+[N,O,2998603,1.1461753710263995E11,1000.0,4999.978290890792,768912]
+TPCH Q3 - extendePrice instead of revenue
+[33059171,432867.97000000003,1995-02-16T00:00:00.000Z,0]
+[20524164,431359.91000000003,1995-03-04T00:00:00.000Z,0]
+[1083941,415404.73,1995-02-21T00:00:00.000Z,0]
+[16341859,409805.29,1995-02-25T00:00:00.000Z,0]
+[31374434,409371.3,1995-02-17T00:00:00.000Z,0]
+[34405031,402898.7,1995-03-09T00:00:00.000Z,0]
+[56594855,400094.6,1995-03-13T00:00:00.000Z,0]
+[2452422,394861.0,1995-02-22T00:00:00.000Z,0]
+[32884775,391267.39,1995-02-18T00:00:00.000Z,0]
+[26900320,390404.95999999996,1995-03-12T00:00:00.000Z,0]
+TPCH Q5 - extendePrice instead of revenue
+[INDIA,1.4134655952000005E9]
+[JAPAN,1.4034246889200006E9]
+[VIETNAM,1.3858049337799993E9]
+[CHINA,1.3806778567499995E9]
+[INDONESIA,1.3690848978599997E9]
+TPCH Q7 - price instead of revenue
+[FRANCE,GERMANY,1992,4.873365616E7]
+[FRANCE,GERMANY,1993,5.3386908010000005E7]
+[FRANCE,GERMANY,1994,5.6118161500000015E7]
+[FRANCE,GERMANY,1995,5.6177264720000006E7]
+[FRANCE,GERMANY,1996,5.411796232E7]
+[FRANCE,GERMANY,1997,5.697326894E7]
+[FRANCE,GERMANY,1998,4.195966787E7]
+[GERMANY,FRANCE,1992,4.596645559E7]
+[GERMANY,FRANCE,1993,5.7467286599999994E7]
+[GERMANY,FRANCE,1994,5.9568380260000005E7]
+[GERMANY,FRANCE,1995,5.574328572E7]
+[GERMANY,FRANCE,1996,5.817071533000001E7]
+[GERMANY,FRANCE,1997,5.685662362000001E7]
+[GERMANY,FRANCE,1998,4.0363215349999994E7]
+TPCH Q8 - extendePrice instead of market share
+[1995,4.372841152E7]
+[1996,4.717556235999999E7]
+TPCH Q10 - extendePrice instead of revenue, no group by on acctBal (first 20 rows)
+[Customer#001485241,UNITED KINGDOM,Fq07MLElZBC54DXzVq9YbP2WP,t,33-116-170-5647,al accounts cajole slyly. ironic, fina,698970.45]
+[Customer#001486201,JORDAN,TJhgKueFwrrtXLtenhlw sC2N,23-611-797-4750,ag. deposits along the blithely express instructions w,698431.71]
+[Customer#000663001,RUSSIA,18LlI2l6hGpiVkn,32-998-943-3573,ests nag above the accounts. careful, regular sentiments affix. furiously spec,690467.0]
+[Customer#000361891,SAUDI ARABIA,wKPyClaA8FXzVmOE7OH68Cn ujxyP,30-105-377-1699,y unusual foxes against the deposits affix slyl,680883.32]
+[Customer#000846871,CANADA,qBgCdbbiT0dPMHXaW3ejfzyDhJlf9I3UdrlvG,13-818-536-4472,r, blithe packages among the bold, ironic pla,677859.38]
+[Customer#001477261,ETHIOPIA,Ug4Chh6HgFuFuH4kKuDX,y,15-477-193-2424,ticingly around the furiously unusual foxes. expre,666262.76]
+[Customer#000996901,UNITED STATES,vspZ5Sp5c5 Z5vDpHIqYXj lNylKNYdf,Hn,34-278-198-3024,its. quickly regular packages sleep doggedly along t,650640.94]
+[Customer#000109531,MOROCCO,ctw,V3Lg WsnSF,25-806-287-6640, frets. special packages sleep quickly carefully unusual accounts. carefully final accounts cajole carefully.,645585.34]
+[Customer#000116371,MOROCCO,MnsTThR yJf3 VUGbdh2g7Ls,25-461-687-3461,courts nag quickly across the fluffily bold pinto beans. ideas among the furiously regu,645083.1599999999]
+[Customer#000478261,JORDAN,nleur50a6uwrpHy5M1aUI6YlTJ3GxdvYr,23-344-728-8021, closely among the blithely even ideas. carefully regular re,639697.71]
+[Customer#000822841,KENYA,YegKDa24ghUHejhD9GUgL6GNpToTlaKD8bTBZ,24-127-277-1726, the regular, ironic packages. silent Tiresias wake along the f,638734.97]
+[Customer#000596851,ARGENTINA,a1DTx1D4ltckAM8,11-470-165-2441,es along the furiously even requests sleep carefully against the final, pending foxes. regular pinto ,637459.6]
+[Customer#000225091,IRAN,ESxBAyRn8EwDJKlPkc,DvPHYFsa85MatFyUzscWY,20-157-662-6929,ic, regular ideas sleep. fluffily final accounts under the blithely ironic requests,628848.14]
+[Customer#001080691,UNITED KINGDOM,TbiBgAVDMQhNHKZOb4qwZUN0tIYhTWGDwQTdym,33-375-446-6539,te blithely. carefully express theodolites cajole slyly slyly pending sentiments. blithely special ide,623031.18]
+[Customer#001160881,RUSSIA,ACbaUek4MwaAm QpcQAtEN7PUjw3FBBElZIThrC,32-316-891-6777,odolites cajole regular sentiments-- ironic foxes nag express, regular deposits. furiously bold foxes in,614652.5800000001]
+[Customer#000001711,MOROCCO,Mhg8c9IAFb8G,25-302-946-6337,gle carefully. final, even deposi,614484.8200000001]
+[Customer#001474861,VIETNAM,6cg7FtblHmXnMIjqK11pT47Lsx2,31-595-929-5136,ideas sleep furiously special ,607778.94]
+[Customer#001324291,IRAQ,wajEKFPCC6A8Maf450IkC,21-210-951-6699,le furiously blithely unusual excuses. fu,606138.05]
+[Customer#000977191,GERMANY,o5XL tB NK8AGE95AuOwL0oz,17-184-695-3349,ully furiously unusual deposits. unusual dolphins sleep according to the even packages. slyly e,597378.05]
+[Customer#000850441,ROMANIA,Bq7O5tRkwNHqA37,z1nZ2Ngrg,29-645-452-6044,ickly even theodolites. regular deposits about the care,596343.15]
+#+end_example
+
+
+** Running against Druid
+
+*** Timing
+#+begin_example
+                                             Query Avg. Time Min. Time Max. Time
+                                 Basic Aggregation   3138.000       2327       4142
+                                   Ship Date Range    633.000        474        999
+SubQuery + nation,Type predicates + ShipDate Range    284.000        151        828
+                                           TPCH Q1   2222.000       2005       2429
+         TPCH Q3 - extendePrice instead of revenue   2066.000        910       7176
+         TPCH Q5 - extendePrice instead of revenue   4514.000       4129       5501
+                TPCH Q7 - price instead of revenue    538.000        318       1282
+    TPCH Q8 - extendePrice instead of market share   4922.000       4541       5424
+TPCH Q10 - extendePrice instead of revenue, no group by on acctBal  13765.000      12808      17560
+#+end_example
+
+*** Query Results
+#+begin_example
+Basic Aggregation
+[A,F,1478160,5.6539271168E10,1000.0,4997.955256535151,618896]
+[N,F,38767,1.48413568E9,999.9600219726562,4990.055330564655,31436]
+[N,O,2998581,1.14616795136E11,1000.0,4999.969491236021,754442]
+[R,F,1480195,5.657932288E10,1000.0,4997.424184651347,642387]
+Ship Date Range
+[N,O,1599288]
+SubQuery + nation,Type predicates + ShipDate Range
+[FRANCE,16,687985.3671875,933.5,5169.0,16]
+[GERMANY,19,753095.0,994.0800170898438,5400.421052631579,19]
+TPCH Q1
+[A,F,1478160,5.6539268096E10,1000.0,4997.955256535151,618896]
+[N,F,38767,1.48413568E9,999.9600219726562,4990.055330564655,31436]
+[N,O,2998581,1.14616793088E11,1000.0,4999.969491236021,754442]
+[R,F,1480195,5.6579323904E10,1000.0,4997.424184651347,642387]
+TPCH Q3 - extendePrice instead of revenue
+[33059171,432867.9765625,1995-02-16T00:00:00.000Z,0]
+[20524164,431359.8984375,1995-03-04T00:00:00.000Z,0]
+[1083941,415404.73828125,1995-02-21T00:00:00.000Z,0]
+[16341859,409805.3046875,1995-02-25T00:00:00.000Z,0]
+[31374434,409371.296875,1995-02-17T00:00:00.000Z,0]
+[34405031,402898.6953125,1995-03-09T00:00:00.000Z,0]
+[56594855,400094.60546875,1995-03-13T00:00:00.000Z,0]
+[2452422,394860.984375,1995-02-22T00:00:00.000Z,0]
+[32884775,391267.39453125,1995-02-18T00:00:00.000Z,0]
+[26900320,390404.97265625,1995-03-12T00:00:00.000Z,0]
+TPCH Q5 - extendePrice instead of revenue
+[INDIA,1.413465584E9]
+[JAPAN,1.403424672E9]
+[VIETNAM,1.385804928E9]
+[CHINA,1.380677856E9]
+[INDONESIA,1.369084912E9]
+TPCH Q7 - price instead of revenue
+[FRANCE,GERMANY,1992,4.87336565E7]
+[FRANCE,GERMANY,1993,5.3386908E7]
+[FRANCE,GERMANY,1994,5.6118162E7]
+[FRANCE,GERMANY,1995,5.61772655E7]
+[FRANCE,GERMANY,1996,5.4117962E7]
+[FRANCE,GERMANY,1997,5.6973269E7]
+[FRANCE,GERMANY,1998,4.1959668E7]
+[GERMANY,FRANCE,1992,4.5966456E7]
+[GERMANY,FRANCE,1993,5.7467286E7]
+[GERMANY,FRANCE,1994,5.9568382E7]
+[GERMANY,FRANCE,1995,5.5743286E7]
+[GERMANY,FRANCE,1996,5.8170716E7]
+[GERMANY,FRANCE,1997,5.6856623E7]
+[GERMANY,FRANCE,1998,4.0363216E7]
+TPCH Q8 - extendePrice instead of market share
+[1995,4.3728411E7]
+[1996,4.71755625E7]
+TPCH Q10 - extendePrice instead of revenue, no group by on acctBal (first 20 rows)
+[Customer#001485241,UNITED KINGDOM,Fq07MLElZBC54DXzVq9YbP2WP,t,33-116-170-5647,al accounts cajole slyly. ironic, fina,698970.4375]
+[Customer#001486201,JORDAN,TJhgKueFwrrtXLtenhlw sC2N,23-611-797-4750,ag. deposits along the blithely express instructions w,698431.703125]
+[Customer#000663001,RUSSIA,18LlI2l6hGpiVkn,32-998-943-3573,ests nag above the accounts. careful, regular sentiments affix. furiously spec,690467.0]
+[Customer#000361891,SAUDI ARABIA,wKPyClaA8FXzVmOE7OH68Cn ujxyP,30-105-377-1699,y unusual foxes against the deposits affix slyl,680883.32421875]
+[Customer#000846871,CANADA,qBgCdbbiT0dPMHXaW3ejfzyDhJlf9I3UdrlvG,13-818-536-4472,r, blithe packages among the bold, ironic pla,677859.375]
+[Customer#001477261,ETHIOPIA,Ug4Chh6HgFuFuH4kKuDX,y,15-477-193-2424,ticingly around the furiously unusual foxes. expre,666262.7734375]
+[Customer#000996901,UNITED STATES,vspZ5Sp5c5 Z5vDpHIqYXj lNylKNYdf,Hn,34-278-198-3024,its. quickly regular packages sleep doggedly along t,650640.9375]
+[Customer#000109531,MOROCCO,ctw,V3Lg WsnSF,25-806-287-6640," frets. special packages sleep quickly carefully unusual accounts. carefully final accounts cajole carefully.",645585.349609375]
+[Customer#000116371,MOROCCO,MnsTThR yJf3 VUGbdh2g7Ls,25-461-687-3461,courts nag quickly across the fluffily bold pinto beans. ideas among the furiously regu,645083.1875]
+[Customer#000478261,JORDAN,nleur50a6uwrpHy5M1aUI6YlTJ3GxdvYr,23-344-728-8021," closely among the blithely even ideas. carefully regular re",639697.71875]
+[Customer#000822841,KENYA,YegKDa24ghUHejhD9GUgL6GNpToTlaKD8bTBZ,24-127-277-1726," the regular, ironic packages. silent Tiresias wake along the f",638734.9375]
+[Customer#000596851,ARGENTINA,a1DTx1D4ltckAM8,11-470-165-2441,"es along the furiously even requests sleep carefully against the final, pending foxes. regular pinto ",637459.576171875]
+[Customer#000225091,IRAN,ESxBAyRn8EwDJKlPkc,DvPHYFsa85MatFyUzscWY,20-157-662-6929,ic, regular ideas sleep. fluffily final accounts under the blithely ironic requests,628848.1328125]
+[Customer#001080691,UNITED KINGDOM,TbiBgAVDMQhNHKZOb4qwZUN0tIYhTWGDwQTdym,33-375-446-6539,te blithely. carefully express theodolites cajole slyly slyly pending sentiments. blithely special ide,623031.166015625]
+[Customer#001160881,RUSSIA,ACbaUek4MwaAm QpcQAtEN7PUjw3FBBElZIThrC,32-316-891-6777,odolites cajole regular sentiments-- ironic foxes nag express, regular deposits. furiously bold foxes in,614652.5703125]
+[Customer#000001711,MOROCCO,Mhg8c9IAFb8G,25-302-946-6337,gle carefully. final, even deposi,614484.82421875]
+[Customer#001474861,VIETNAM,6cg7FtblHmXnMIjqK11pT47Lsx2,31-595-929-5136,"ideas sleep furiously special ",607778.9375]
+[Customer#001324291,IRAQ,wajEKFPCC6A8Maf450IkC,21-210-951-6699,le furiously blithely unusual excuses. fu,606138.0625]
+[Customer#000977191,GERMANY,o5XL tB NK8AGE95AuOwL0oz,17-184-695-3349,ully furiously unusual deposits. unusual dolphins sleep according to the even packages. slyly e,597378.06640625]
+[Customer#000850441,ROMANIA,Bq7O5tRkwNHqA37,z1nZ2Ngrg,29-645-452-6044,ickly even theodolites. regular deposits about the care,596343.1484375]
+#+end_example

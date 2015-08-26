@@ -28,6 +28,12 @@ project/plugins/project/
 docs/*.html
 docs/*.tex
 docs/auto/
+docs/SparkDruid-blx.bib
+docs/SparkDruid.bbl
+docs/SparkDruid.blg
+docs/SparkDruid.fdb_latexmk
+docs/SparkDruid.fls
+docs/SparkDruid.run.xml
 
 # sbt
 build/sbt-launch-0.13.6.jar

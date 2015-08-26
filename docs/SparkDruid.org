@@ -17,9 +17,13 @@
 #+LaTeX_HEADER: \usepackage{listings}
 #+LaTeX_HEADER: \usepackage{xyling}
 #+LaTeX_HEADER: \usepackage{ctable}
+#+LaTeX_HEADER: \usepackage{url}
 
 #+LaTeX_HEADER: \input xy
 #+LaTeX_HEADER: \xyoption{all}
+
+#+LaTeX_HEADER: \usepackage[backend=bibtex,sorting=none]{biblatex}
+#+LaTeX_HEADER: \addbibresource{SparkDruid.bib}
 
 #+EXPORT_SELECT_TAGS: export
 #+EXPORT_EXCLUDE_TAGS: noexport
@@ -27,7 +31,7 @@
 #+STARTUP: showall
 #+OPTIONS: html-postamble:nil
 
-Druid was designed to handle the ingest and analysis of large amounts
+Druid \cite{druid} was designed to handle the ingest and analysis of large amounts
 of *Event* data. This is a key capability in the AdTech/Marketing
 and Internet-of-Things(IOT) spaces. In the AdTech arena events
 generated from human activity are analyzed for doing User targeting,
@@ -40,17 +44,18 @@ multi-dimensional Cubes. Druid provides fast slice and dice capability
 on the raw event data by building a multi-dimensional OLAP index that
 is primarily partitioned on Time. OLAP indexes are a technique that is
 used to speed-up slice and dice queries(MDX) on traditional cubes. SAP
-[[http://scn.sap.com/community/bw-accelerator][BW Accelerator]]'s TREX Engine(the precursor to SAP Hana) is an
-example of another OLAP index technology. Druid provides a REST based Query
+BW Accelerator TREX Engine \cite{sapbw}(the precursor to SAP Hana) is an
+example of another OLAP indexing technology. Druid provides a REST based Query
 interface over its Index. This is similar to SQL and there have been
-efforts to provide [[https://github.com/srikalyc/Sql4D][SQL-like]] interfaces on top of Druid; but a full
+efforts to provide SQL-like \cite{sql4d} interfaces on top of Druid; but a full
 fledged SQL interface is missing. 
 
-On the other hand Apache Spark has a very rich LINQ like programming
+On the other hand Apache Spark \cite{sparkSite} has a very rich LINQ
+\cite{linq} like programming
 model for expressing data analysis. It has rich SQL capabilities that
 closely matches Hive SQL: standard join support, datatypes, analytical
 functions, Cubing/Rollup, jdbc/odbc access etc. The
-[[https://databricks.com/blog/2015/01/09/spark-sql-data-sources-api-unified-data-access-for-the-spark-platform.html][DataSources API]] enables federating external Datasets; enabling
+DataSources API \cite{sparkDatasources} enables federating external Datasets; enabling
 bridging data from disparate systems and applying the 
 analytic  capabilities of Spark on all of the data. 
 
@@ -76,7 +81,8 @@ Rewrite techniques. We demonstrate how Querying against *raw event*
 Datasets can be rewritten to use the Druid Index, and that these
 rewritten Plan perform significantly better than the original Plans.
 
-<<Reference Github repo.>>
+We have developed the Spark-Druid package \cite{sparkDruid} which
+contains the DruidDatasource and Rewrite techniques described in this paper.
 
 * Brief Introduction to Spark, Druid
 ** Druid
@@ -162,25 +168,24 @@ access; deeper analytics on the Event data is enabled without having
 to copyof the event data(and more painful manage the copy) . But this is
 not a very useful solution for the following reasons:
 - the DataSource mechanics only allow predicate pushdown and column
-  pruning; so aggregations have to be done in Spark; one of the big
-  strengths of the Druid index is nullified.
-- This treats Druid as the primary source of the data. In fact in most
-  cases this is wrong. The usual Data setup is for raw data to land in
+  pruning; so aggregations have to be done in Spark; *one of the big
+  strengths of the Druid index is nullified.* 
+- *This treats Druid as the primary source of the data. In fact in
+  most cases this is not the case.* The usual Data setup is for raw data to land in
   hdfs or s3, for data to be indexed and possibly aggregated to a
   higher time grain. For example a Druid index may have aggregated
   information up to an  hour or day granularity. 
 
 The fundamental problem with the Datasource only  approach is that it doesn't treat
-Druid as an Index. What we want is to *make it appear that the raw
-event DataSet is being accessed, and where possible to rewrite
+Druid as an Index. What we want is to *make it appear that the raw event DataSet is being accessed, and where possible to rewrite
 Query Plans on this DataSet to use the Druid Index*.  The overall picture is:
 - *raw event* data is landing in hdfs/s3, and a Druid Index is kept upto date.
 - the Event data is exposed in the Spark Analytical platform as
   residing on the Deep Storage layer: hdfs/s3. 
 - We setup a DataSource that wraps(and hence exposes the schema and
   data) of the *raw event* DataSet, but has access to the
-  corresponding Druid Index. A companion Planning component than tries
-  to rewrite Plans on the *raw event* Dataset to utilize the Index
+  corresponding Druid Index. A companion Planning component than 
+   rewrites Plans on the *raw event* Dataset to utilize the Index
   where possible.
 
 #+CAPTION: Spark Druid Overall Picture
@@ -245,7 +250,7 @@ DataFrame. There is a Druid Index on this Dataset called *tpch*, the
 /l_shipdate/ column  is used as the time dimension for the
 index.
 
-When Spark asks the *Druid DataSource* to create the Relation it:
+When Spark asks the *Druid DataSource* to create the Relation: it
 connects to Druid, reads the metadata about the specified Druid
 datasource and sets up a [[https://github.com/SparklineData/spark-druid-olap/blob/f0a3d26307560beea124931148511e4ed894a2e5/src/main/scala/org/sparklinedata/druid/DruidRelation.scala][DruidRelationInfo]] metadata object. It returns a
 [[https://github.com/SparklineData/spark-druid-olap/blob/f0a3d26307560beea124931148511e4ed894a2e5/src/main/scala/org/sparklinedata/druid/DruidRelation.scala][DruidRelation]] a BaseRelation to the Spark engine The basic behavior of
@@ -1250,5 +1255,4 @@ form.
 }
 #+end_src
 
-* References
-- [DRUID01] : [[http://static.druid.io/docs/druid.pdf][A Real-time Analytical Data Store]]
+\printbibliography

@@ -1,0 +1,67 @@
+{
+    "jsonClass" : "GroupByQuerySpec",
+    "queryType" : "groupBy",
+    "dataSource" : "tpch",
+    "dimensions" : [ {
+      "jsonClass" : "DefaultDimensionSpec",
+      "type" : "default",
+      "dimension" : "s_nation",
+      "outputName" : "s_nation"
+    }, {
+      "jsonClass" : "DefaultDimensionSpec",
+      "type" : "default",
+      "dimension" : "c_nation",
+      "outputName" : "c_nation"
+    }, {
+      "jsonClass" : "ExtractionDimensionSpec",
+      "type" : "extraction",
+      "dimension" : "__time",
+      "outputName" : "l_shipdate",
+      "extractionFn" : {
+        "jsonClass" : "TimeFormatExtractionFunctionSpec",
+        "type" : "timeFormat",
+        "format" : "yyyy"
+      }
+    } ],
+    "granularity" : "all",
+    "filter" : {
+      "jsonClass" : "LogicalFilterSpec",
+      "type" : "or",
+      "fields" : [ {
+        "jsonClass" : "LogicalFilterSpec",
+        "type" : "and",
+        "fields" : [ {
+          "jsonClass" : "SelectorFilterSpec",
+          "type" : "selector",
+          "dimension" : "s_nation",
+          "value" : "FRANCE"
+        }, {
+          "jsonClass" : "SelectorFilterSpec",
+          "type" : "selector",
+          "dimension" : "c_nation",
+          "value" : "GERMANY"
+        } ]
+      }, {
+        "jsonClass" : "LogicalFilterSpec",
+        "type" : "and",
+        "fields" : [ {
+          "jsonClass" : "SelectorFilterSpec",
+          "type" : "selector",
+          "dimension" : "c_nation",
+          "value" : "FRANCE"
+        }, {
+          "jsonClass" : "SelectorFilterSpec",
+          "type" : "selector",
+          "dimension" : "s_nation",
+          "value" : "GERMANY"
+        } ]
+      } ]
+    },
+    "aggregations" : [ {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "doubleSum",
+      "name" : "alias-1",
+      "fieldName" : "l_extendedprice"
+    } ],
+    "intervals" : [ "1991-12-31T16:00:00.000-08:00/1998-11-30T16:00:00.000-08:00" ]
+  }

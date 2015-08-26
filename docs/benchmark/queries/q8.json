@@ -1,0 +1,57 @@
+{
+    "jsonClass" : "GroupByQuerySpec",
+    "queryType" : "groupBy",
+    "dataSource" : "tpch",
+    "dimensions" : [ {
+      "jsonClass" : "ExtractionDimensionSpec",
+      "type" : "extraction",
+      "dimension" : "o_orderdate",
+      "outputName" : "o_orderdate",
+      "extractionFn" : {
+        "jsonClass" : "TimeFormatExtractionFunctionSpec",
+        "type" : "timeFormat",
+        "format" : "yyyy"
+      }
+    } ],
+    "granularity" : "all",
+    "filter" : {
+      "jsonClass" : "LogicalFilterSpec",
+      "type" : "and",
+      "fields" : [ {
+        "jsonClass" : "LogicalFilterSpec",
+        "type" : "and",
+        "fields" : [ {
+          "jsonClass" : "LogicalFilterSpec",
+          "type" : "and",
+          "fields" : [ {
+            "jsonClass" : "SelectorFilterSpec",
+            "type" : "selector",
+            "dimension" : "c_region",
+            "value" : "AMERICA"
+          }, {
+            "jsonClass" : "SelectorFilterSpec",
+            "type" : "selector",
+            "dimension" : "p_type",
+            "value" : "ECONOMY ANODIZED STEEL"
+          } ]
+        }, {
+          "jsonClass" : "JavascriptFilterSpec",
+          "type" : "javascript",
+          "dimension" : "o_orderdate",
+          "function" : "function(x) { return(x >= '1995-01-01T08:00:00.000Z') }"
+        } ]
+      }, {
+        "jsonClass" : "JavascriptFilterSpec",
+        "type" : "javascript",
+        "dimension" : "o_orderdate",
+        "function" : "function(x) { return(x <= '1996-12-31T08:00:00.000Z') }"
+      } ]
+    },
+    "aggregations" : [ {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "doubleSum",
+      "name" : "alias-1",
+      "fieldName" : "l_extendedprice"
+    } ],
+    "intervals" : [ "1991-12-31T16:00:00.000-08:00/1998-11-30T16:00:00.000-08:00" ]
+  }
