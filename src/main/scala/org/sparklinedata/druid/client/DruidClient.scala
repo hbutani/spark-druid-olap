@@ -126,7 +126,10 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
   @throws(classOf[DruidDataSourceException])
   def metadata(dataSource : String) : DruidDataSource = {
-    val i = timeBoundary(dataSource).toString
+
+    val in = timeBoundary(dataSource)
+
+    val i = in.withEnd(in.getStart.plusMillis(1)).toString
 
     val jR = compact(render(
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
@@ -137,7 +140,7 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     }
 
     val l = jV.extract[List[MetadataResponse]]
-    DruidDataSource(dataSource, l.head)
+    DruidDataSource(dataSource, l.head, List(in))
   }
 
   @throws(classOf[DruidDataSourceException])

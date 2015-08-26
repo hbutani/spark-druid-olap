@@ -115,8 +115,8 @@ object DruidDataSource {
 
   val TIME_COLUMN_NAME = "__time"
 
-  def apply(dataSource : String, mr : MetadataResponse) : DruidDataSource = {
-    val is = mr.intervals.map(Interval.parse(_))
+  def apply(dataSource : String, mr : MetadataResponse,
+             is : List[Interval]) : DruidDataSource = {
     val columns = mr.columns.map {
       case (n, c) => (n -> DruidColumn(n,c))
     }
