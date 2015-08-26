@@ -31,7 +31,7 @@ import scala.language.postfixOps
 case class Config(nameNode : String = "",
                   tpchFlatDir : String = "",
                   druidBroker : String = "",
-                 druidDataSource : String = "",
+                  druidDataSource : String = "",
                   showResults : Boolean = false)
 
 object TpchBenchMark {
@@ -154,7 +154,7 @@ object TpchBenchMark {
                                   (c_nation = 'FRANCE' and s_nation = 'GERMANY')
                                  )
       group by f,s
-      order by f,s
+
 """)
       )
 
@@ -173,7 +173,7 @@ object TpchBenchMark {
       ) t
       where $shipDtPredicate and $shipDtPredicate2
       group by f,s
-      order by f,s"""
+      """
       )
       )
 
@@ -202,7 +202,6 @@ object TpchBenchMark {
                                   (c_nation = 'FRANCE' and s_nation = 'GERMANY')
                                  )
       group by s_nation
-      order by s_nation
 """))
 
     val q1 = ("TPCH Q1",
@@ -216,7 +215,7 @@ object TpchBenchMark {
     val orderDtPredicate = dateTime('o_orderdate) < dateTime("1995-03-15")
     val shipDtPredicateQ3 = dateTime('l_shipdate) > dateTime("1995-03-15")
 
-    val q3 = ("TPCH Q3 - extendePrice instead of revenue", sqlCtx.sql(date"""
+    val q3 = ("TPCH Q3 - extendePrice instead of revenue; order, limit removed", sqlCtx.sql(date"""
       select
       o_orderkey,
       sum(l_extendedprice) as price, o_orderdate,
@@ -226,9 +225,7 @@ object TpchBenchMark {
       c_mktsegment = 'BUILDING' and $orderDtPredicate and $shipDtPredicateQ3
       group by o_orderkey,
       o_orderdate,
-      o_shippriority order by
-      price desc, o_orderdate
-      limit 10
+      o_shippriority
       """)
       )
 
@@ -243,7 +240,6 @@ object TpchBenchMark {
       and $orderDtPredicateQ51
       and $orderDtPredicateQ52
       group by s_nation
-      order by extendedPrice desc
       """)
       )
 
@@ -257,7 +253,6 @@ object TpchBenchMark {
            (c_nation = 'FRANCE' and s_nation = 'GERMANY')
            )
     group by s_nation, c_nation, $shipDtQ7Year
-    order by s_nation, c_nation, l_year
     """)
       )
 
@@ -272,7 +267,6 @@ object TpchBenchMark {
       from orderLineItemPartSupplier
       where c_region = 'AMERICA' and p_type = 'ECONOMY ANODIZED STEEL' and $dtP1 and $dtP2
       group by $orderDtQ8Year
-      order by o_year
       """)
       )
 
@@ -289,12 +283,11 @@ object TpchBenchMark {
       $dtP2Q10 and
       l_returnflag = 'R'
     group by c_name, c_nation, c_address, c_phone, c_comment
-    order by price desc
     """)
       )
 
 
-    Seq(basicAgg, shipDteRange, projFiltRange, q1, q3, q5, q7, q8, q10)
+    Seq(basicAgg, shipDteRange, projFiltRange, q1, q3, q5, q7, q8/*, q10*/)
   }
 
   def run(sqlCtx : SQLContext, c : Config) : Unit = {
@@ -346,6 +339,7 @@ object TpchBenchMark {
       println(r._1)
       println(r._2)
     }
+
 
   }
 
