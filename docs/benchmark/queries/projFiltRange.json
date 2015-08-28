@@ -1,0 +1,102 @@
+{
+    "jsonClass" : "GroupByQuerySpec",
+    "queryType" : "groupBy",
+    "dataSource" : "tpch",
+    "dimensions" : [ {
+      "jsonClass" : "DefaultDimensionSpec",
+      "type" : "default",
+      "dimension" : "s_nation",
+      "outputName" : "s_nation"
+    } ],
+    "granularity" : "all",
+    "filter" : {
+      "jsonClass" : "LogicalFilterSpec",
+      "type" : "and",
+      "fields" : [ {
+        "jsonClass" : "SelectorFilterSpec",
+        "type" : "selector",
+        "dimension" : "p_type",
+        "value" : "ECONOMY ANODIZED STEEL"
+      }, {
+        "jsonClass" : "LogicalFilterSpec",
+        "type" : "or",
+        "fields" : [ {
+          "jsonClass" : "LogicalFilterSpec",
+          "type" : "and",
+          "fields" : [ {
+            "jsonClass" : "SelectorFilterSpec",
+            "type" : "selector",
+            "dimension" : "s_nation",
+            "value" : "FRANCE"
+          }, {
+            "jsonClass" : "SelectorFilterSpec",
+            "type" : "selector",
+            "dimension" : "c_nation",
+            "value" : "GERMANY"
+          } ]
+        }, {
+          "jsonClass" : "LogicalFilterSpec",
+          "type" : "and",
+          "fields" : [ {
+            "jsonClass" : "SelectorFilterSpec",
+            "type" : "selector",
+            "dimension" : "c_nation",
+            "value" : "FRANCE"
+          }, {
+            "jsonClass" : "SelectorFilterSpec",
+            "type" : "selector",
+            "dimension" : "s_nation",
+            "value" : "GERMANY"
+          } ]
+        } ]
+      } ]
+    },
+    "aggregations" : [ {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "count",
+      "name" : "alias-1",
+      "fieldName" : "count"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "doubleSum",
+      "name" : "alias-2",
+      "fieldName" : "l_extendedprice"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "doubleMax",
+      "name" : "alias-3",
+      "fieldName" : "ps_supplycost"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "longSum",
+      "name" : "alias-5",
+      "fieldName" : "ps_availqty"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "count",
+      "name" : "alias-6",
+      "fieldName" : "count"
+    }, {
+      "jsonClass" : "CardinalityAggregationSpec",
+      "type" : "cardinality",
+      "name" : "alias-7",
+      "fieldNames" : [ "o_orderkey" ],
+      "byRow" : true
+    } ],
+    "postAggregations" : [ {
+      "jsonClass" : "ArithmeticPostAggregationSpec",
+      "type" : "arithmetic",
+      "name" : "alias-4",
+      "fn" : "/",
+      "fields" : [ {
+        "jsonClass" : "FieldAccessPostAggregationSpec",
+        "type" : "fieldAccess",
+        "fieldName" : "alias-5"
+      }, {
+        "jsonClass" : "FieldAccessPostAggregationSpec",
+        "type" : "fieldAccess",
+        "fieldName" : "alias-6"
+      } ]
+    } ],
+    "intervals" : [ "1995-12-01T08:00:00.001Z/1997-09-02T08:00:00.001Z" ]
+  }

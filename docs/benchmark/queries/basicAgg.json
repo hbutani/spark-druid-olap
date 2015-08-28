@@ -1,0 +1,65 @@
+{
+    "jsonClass" : "GroupByQuerySpec",
+    "queryType" : "groupBy",
+    "dataSource" : "tpch",
+    "dimensions" : [ {
+      "jsonClass" : "DefaultDimensionSpec",
+      "type" : "default",
+      "dimension" : "l_returnflag",
+      "outputName" : "l_returnflag"
+    }, {
+      "jsonClass" : "DefaultDimensionSpec",
+      "type" : "default",
+      "dimension" : "l_linestatus",
+      "outputName" : "l_linestatus"
+    } ],
+    "granularity" : "all",
+    "aggregations" : [ {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "count",
+      "name" : "alias-1",
+      "fieldName" : "count"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "doubleSum",
+      "name" : "alias-2",
+      "fieldName" : "l_extendedprice"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "doubleMax",
+      "name" : "alias-3",
+      "fieldName" : "ps_supplycost"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "longSum",
+      "name" : "alias-5",
+      "fieldName" : "ps_availqty"
+    }, {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "count",
+      "name" : "alias-6",
+      "fieldName" : "count"
+    }, {
+      "jsonClass" : "CardinalityAggregationSpec",
+      "type" : "cardinality",
+      "name" : "alias-7",
+      "fieldNames" : [ "o_orderkey" ],
+      "byRow" : true
+    } ],
+    "postAggregations" : [ {
+      "jsonClass" : "ArithmeticPostAggregationSpec",
+      "type" : "arithmetic",
+      "name" : "alias-4",
+      "fn" : "/",
+      "fields" : [ {
+        "jsonClass" : "FieldAccessPostAggregationSpec",
+        "type" : "fieldAccess",
+        "fieldName" : "alias-5"
+      }, {
+        "jsonClass" : "FieldAccessPostAggregationSpec",
+        "type" : "fieldAccess",
+        "fieldName" : "alias-6"
+      } ]
+    } ],
+    "intervals" : [ "1991-12-31T16:00:00.000-08:00/1998-12-01T00:00:00.000Z" ]
+}

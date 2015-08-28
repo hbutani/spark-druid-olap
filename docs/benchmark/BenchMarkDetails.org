@@ -1,4 +1,6 @@
-#+TITLE:    Benchmark Details
+#+TITLE:    TPCH Benchmark
+#+AUTHOR:    Harish Butani
+#+EMAIL:     hbutani@apache.org
 #+LANGUAGE:  en
 #+INFOJS_OPT: view:showall toc:t ltoc:t mouse:underline path:http://orgmode.org/org-info.js
 #+LINK_HOME: http://home.fnal.gov/~neilsen
@@ -15,9 +17,13 @@
 #+LaTeX_HEADER: \usepackage{listings}
 #+LaTeX_HEADER: \usepackage{xyling}
 #+LaTeX_HEADER: \usepackage{ctable}
+#+LaTeX_HEADER: \usepackage{url}
 
 #+LaTeX_HEADER: \input xy
 #+LaTeX_HEADER: \xyoption{all}
+
+#+LaTeX_HEADER: \usepackage[backend=bibtex,sorting=none]{biblatex}
+#+LaTeX_HEADER: \addbibresource{SparkDruid.bib}
 
 #+EXPORT_SELECT_TAGS: export
 #+EXPORT_EXCLUDE_TAGS: noexport
@@ -25,8 +31,183 @@
 #+STARTUP: showall
 #+OPTIONS: html-postamble:nil
 
+We ran a benchmark to test a set of queries that contrast performance
+of the scenario of queries being rewritten to use a DruidIndex vs
+running the Queries directly against the *raw event* DataSet. We have
+attempted to make this test as fair as possible: *by not taking any advantages of preaggregations and column pruning in Druid, by using in
+memory caching when the queries run only in Spark*. We ran the 2
+scenarios on the same cluster: for the Druid run we gave the worker
+node resources to Druid History servers, for the Spark run we ran
+Spark Executors on the worker nodes.
+
+For the benchmark we used the [[http://www.tpc.org/tpch/spec/tpch2.8.0.pdf][TPCH benchmark dataset]], datascale
+10G. We converted the 10G star schema into a flattened(denormalized)
+transaction dataset. For spark we further processed the data to setup
+a Partitioned table,  stored in Parquet format; the table is
+partitioned by month. The Druid 
+Index was created using the [[http://druid.io/docs/latest/ingestion/batch-ingestion.html][HadoopDruidIndexer]]. 
+
+The dataset sizes are:
+
+| TPCH Flat TSV                      | 46.80GB |
+| Druid Index in HDFS                | 13.27GB |
+| TPCH Flat Parquet                  | 11.38GB |
+| TPCH Flat Parquet Partition by Day | 11.56GB |
+
+
+* Benchmark Environment
+** Cluster Details
+The Benchmark was run on a 4 node cluster. Each node is a 2 core,16GB
+memory, 256GB hard drive machine running centos 6.4. The output of the
+=lscpu= and =hdparm= are listed below:
+
+\begin{small}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=BASH, showspaces=false, showstringspaces=false}
+  \label{mcDetails}
+   \begin{lstlisting}[caption={Machine Details},frame=shadowbox, numbers=left]
+
+lscpu
+
+Architecture:          x86_64
+CPU op-mode(s):        32-bit, 64-bit
+Byte Order:            Little Endian
+CPU(s):                2
+On-line CPU(s) list:   0,1
+Thread(s) per core:    1
+Core(s) per socket:    1
+Socket(s):             2
+NUMA node(s):          1
+Vendor ID:             GenuineIntel
+CPU family:            6
+Model:                 42
+Stepping:              1
+CPU MHz:               1999.999
+BogoMIPS:              3999.99
+Virtualization:        VT-x
+Hypervisor vendor:     KVM
+Virtualization type:   full
+L1d cache:             32K
+L1i cache:             32K
+L2 cache:              4096K
+NUMA node0 CPU(s):     0,1
+
+sudo hdparm -tT /dev/vdb
+
+/dev/vdb:
+ Timing cached reads:   12798 MB in  2.00 seconds = 6408.97 MB/sec
+ Timing buffered disk reads: 540 MB in  3.00 seconds = 179.98 MB/sec
+
+\end{lstlisting}
+\end{small}
+
+The machines are setup with [[http://hortonworks.com/hdp/whats-new/][HDP 2.3]] using  [[https://cwiki.apache.org/confluence/display/AMBARI/Quick+Start+Guide][Ambari]]. Also installed
+[[http://static.druid.io/artifacts/releases/druid-0.8.0-bin.tar.gz][Druid 0.8]] on the machines. The cluster is configured to use Yarn; we
+installed and setup  [[http://spark.apache.org/downloads.html][Spark 1.4.1]] to run using the Yarn Resource
+Manager.
+
+
+
+** TPCH Flattened Dataset, scale 10
+For the benchmark we used the [[http://www.tpc.org/tpch/spec/tpch2.8.0.pdf][TPCH benchmark dataset]], datascale
+10G. We converted the 10G star schema into a flattened(denormalized)
+transaction dataset using a tool we wrote [[https://github.com/SparklineData/tpch-spark-druid/blob/master/tpchData/src/main/scala/org/sparklinedata/tpch/hadoop/TpchGenFlattenedData.scala][TpchGenFlattenedData]], for
+example we ran it like this:
+\begin{Verbatim}[frame=single]
+spark/bin/spark-submit –num-executors 7 \
+–properties-file spark-druid/spark.properties \
+–packages com.databricks:spark-csv2.10:1.1.0 \
+–jars spark-druid/spark-datetime-assembly-0.0.1.jar,\
+      spark-druid/spark-druid-olap-assembly-0.0.1.jar \
+–class org.sparklinedata.tpch.hadoop.TpchGenFlattenedData \
+spark-druid/tpchdata-assembly-0.0.1.jar \
+tpchflatorc10 tpchflattened
+\end{Verbatim}
+
+** Dataset for Spark Queries
+For spark we further processed the data to setup a Partitioned table,
+stored in Parquet format; the table is partitioned by month. We use the
+[[https://github.com/SparklineData/tpch-spark-druid/blob/master/tpchData/src/main/scala/org/sparklinedata/tpch/hadoop/TpchBuildParquetPartitioned.scala][TpchBuildParquetPartitioned]] to do this. 
+
+** Druid Index for TPCH Flattened Dataset
+The Druid Index was created using the [[http://druid.io/docs/latest/ingestion/batch-ingestion.html][HadoopDruidIndexer]] with the
+following command:
+\begin{Verbatim}[frame=single]
+java -Xmx256m -Dhdp.version=2.3.0.0-2557 -Duser.timezone=UTC \
+-Dfile.encoding=UTF-8 -classpath \
+$DIR/config/_common:$HADOOP_CONF_DIR:$DIR/lib/* \
+io.druid.cli.Main index hadoop <spec_file>
+\end{Verbatim}
+
+See [[Druid TPCH Index Specification]] for detailed specification of the
+TPCH index in Druid. Key points of the Index:
+- /l_shipdate/ is chosen as the time dimension. Based on the TPCH
+  Query set, there is a significant number of queries that are time
+  sliced based on the Ship Date.
+- We indexed all the dimensions. The metrics are: ~o_totalprice,
+  l_quantity, l_extendedprice, ps_availqty, ps_supplycost,
+  c_acctbal~. Rest of the columns are modeled as dimensions.
+- *The index is created at the grain of raw events.*
+- The Index time segment is chosen to be month.
+
+Note by choosing to model all dimensions and by choosing to index at
+the grain of events, we have made the Druid Index as big as
+possible. *We are note giving Druid any advantages of preaggregation
+or column pruning.* 
+
+** DataSource setup
+
+The raw event DataSource and Druid datasource are defined in the
+following way:
+
+\begin{small}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+  \label{rawEvntDS}
+   \begin{lstlisting}[caption={Raw Event DataSource},frame=shadowbox, numbers=left]
+
+// parquet based partitioned table
+val df = sqlCtx.read.parquet(cfg.tpchFlatDir)
+df.cache()
+df.registerTempTable("orderLineItemPartSupplier")
+
+// Druid Datasource
+CREATE TEMPORARY TABLE orderLineItemPartSupplier
+      USING org.sparklinedata.druid
+      OPTIONS (sourceDataframe "$baseFlatTableName",
+      timeDimensionColumn "l_shipdate",
+      druidDatasource "tpch",
+      druidHost "${cfg.druidBroker}",
+      druidPort "8082");
+
+\end{lstlisting}
+\end{small}
+
 
 * Queries
+
+We chose the queries to test the performance differences for /time
+intervals/, /dimension filters/, /time slice aggregation/, and
+/dimensional aggregations/. We have tested for TPCH queries Q1, Q3,
+Q5, Q7 and Q8. These queries have been altered so that they can be
+rewritten as Druid queries. As explained below, these don't change
+overall benchmark conclusion, if anything the numbers will skew
+further in favor of Druid once we start to push Sorts and Limits to
+Druid.  
+
+
+** Alterations made to queries
+- Formulas in aggregations have been removed. For
+  e.g. =sum(l_extendedprice*(1-l_discount))= is simply written as
+  =sum(extendedprice)=. This is because we don't have the rewrites to handle
+  aggregation formulas. This has a minor impact on query performance;
+  so the overall benchmark analysis will not change once we can test
+  aggregation formulas.
+- We have removed *order by, limit* clauses. This is because we don't
+  have the order and limit rewrites. Again this shouldn't change the
+  overall benchmark conclusion; in fact once we can push down order
+  and limit to druid, the rewritten query times will reduce,
+  further increasing the rewritten query performance.
 
 *Queries Summary:*
 
@@ -68,20 +249,168 @@
 |                      |                   | Type               |               |                      |
 |                      |                   | O_Date             |               |                      | 
 
-** Alterations made to queries
-- Formulas in aggregations have been removed. For
-  e.g. =sum(l_extendedprice*(1-l_discount))= is simply written as
-  =sum(extendedprice)=. This is because we don't have the rewrites to handle
-  aggregation formulas. This has a minor impact on query performance;
-  so the overall benchmark analysis will not change once we can test
-  aggregation formulas.
-- We have removed *order by, limit* clauses. This is because we don't
-  have the order and limit rewrites. Again this shouldn't change the
-  overall benchmark conclusion; in fact once we can push down order
-  and limit to druid, the rewritten query times will reduce,
-  further increasing the rewritten query performance.
+
   
 
+* Running the Benchmark
+*** Running against Druid Datasource
+For the Druid Datasource experiment the queries are run on spark using the
+[[https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/sparklinedata/druid/tools/TpchBenchMark.scala][Druid TpchBenchMark]] tool. It is run using the following command:
+\begin{small}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=bash, showspaces=false, showstringspaces=false}
+  \label{tpchDruidBmark}
+   \begin{lstlisting}[caption={Running Tpchbenchmark on Druid Datasource},frame=shadowbox, numbers=left]
+
+~/spark-1.4.1-bin-hadoop2.6/bin/spark-submit \
+--properties-file spark.properties \
+--packages com.databricks:spark-csv_2.10:1.1.0 \
+--jars sparkjars/spark-datetime-assembly-0.0.1.jar  \
+--class org.sparklinedata.druid.tools.TpchBenchMark \
+sparkjars/spark-druid-olap-assembly-0.0.1.jar \
+-n hb-1.openstacklocal \
+-t tpchFlattenedData_10/orderLineItemPartSupplierCustomer \
+-d hb-1.openstacklocal
+\end{lstlisting}
+\end{small}
+
+The cluster is setup to run a historical server on each node. Each
+historical server is configure with 8GB of memory:
+\begin{Verbatim}[frame=single]
+JAVA_HISTORICAL_OPTIONS="-server \
+ -Xmx8g \
+ -Xms8g \
+ -XX:NewSize=1g \
+ -XX:MaxNewSize=1g \
+ -XX:MaxDirectMemorySize=10g \
+ -XX:+UseConcMarkSweepGC \
+ -XX:+PrintGCDetails \
+ -XX:+PrintGCTimeStamps \
+ -XX:+HeapDumpOnOutOfMemoryError \
+ -Duser.timezone=UTC \
+ -Dfile.encoding=UTF-8"
+\end{Verbatim}
+
+The spark shell is run in local mode on one of the nodes, so that
+Spark uses as little cluster resources as possible.
+
+*** Running against cached Spark DataFrame
+We compare the rewritten queries against the case of not having a
+Druid Index. In this case we try to give the Spark engine as much
+advantage as we can. 
+
+We give the Spark executors as much of the Yarn cluster
+as possible. The Spark configuration is:
+\begin{Verbatim}[frame=single]
+spark.serializer=org.apache.spark.serializer.KryoSerializer
+#spark.sql.autoBroadcastJoinThreshold=100000000
+spark.sql.autoBroadcastJoinThreshold=-1
+spark.sql.planner.externalSort=true
+
+spark.executor.memory=9g
+spark.driver.memory=2g
+#spark.executor.cores=2
+\end{Verbatim}
+
+*As part of the initialization, the orderLineItemPartSupplier
+DataFrame is cached in memory.*
+
+For the queries going against Spark we used the
+[[https://github.com/SparklineData/tpch-spark-druid/blob/master/tpchData/src/main/scala/org/sparklinedata/tpch/hadoop/TpchParquetBenchmark.scala][Spark TpchBenchmark]] tool. It is run with the following command:
+\begin{small}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=bash, showspaces=false, showstringspaces=false}
+  \label{raweBmark}
+   \begin{lstlisting}[caption={Running the Benchmark, on the Raw Event DataFrame},frame=shadowbox, numbers=left]
+
+~/spark-1.4.1-bin-hadoop2.6/bin/spark-submit \
+--properties-file spark.properties \
+--packages com.databricks:spark-csv_2.10:1.1.0 \
+--jars sparkjars/spark-datetime-assembly-0.0.1.jar,\
+       sparkjars/spark-druid-olap-assembly-0.0.1.jar,\
+       sparkjars/tpchdata-assembly-0.0.1.jar   \
+--num-executors 4 --master yarn-client \
+--class org.sparklinedata.tpch.hadoop.TpchParquetBenchmark \
+sparkjars/tpchdata-assembly-0.0.1.jar \
+-t tpchFlattenedData_10/\
+orderLineItemPartSupplierCustomer.parquet.partitioned
+\end{lstlisting}
+\end{small}
+
+
+
+* Benchmark Results
+
+** TPCH 10G dataset
+*Running against raw event Dataset:*
+
+
+| Query                                                           |  Avg. Time | Min. Time | Max. Time |
+|-----------------------------------------------------------------+------------+-----------+-----------|
+| Basic Aggregation                                               | 273371.000 |     78884 |    681879 |
+| Ship Date Range                                                 | 221933.000 |     65074 |    503307 |
+| SubQuery + nation,Type predicates + ShipDate Range              |  86999.000 |     13762 |    417972 |
+| TPCH Q1                                                         | 183568.000 |     61652 |    380407 |
+| TPCH Q3 - extendePrice instead of revenue; order, limit removed | 270054.000 |     30141 |    522393 |
+| TPCH Q5 - extendePrice instead of revenue                       | 172155.000 |     50255 |    292185 |
+| TPCH Q7 - price instead of revenue                              |  70663.000 |     17134 |    300033 |
+| TPCH Q8 - extendePrice instead of market share                  |  19823.000 |     12287 |     38247 |
+|                                                                 |            |           |           |
+
+
+
+*Running against Druid:*
+
+| Query                                                           | Avg. Time | Min. Time | Max. Time |
+|-----------------------------------------------------------------+-----------+-----------+-----------|
+| Basic Aggregation                                               | 20324.000 |     19873 |     20776 |
+| Ship Date Range                                                 |  1768.000 |      1712 |      1824 |
+| SubQuery + nation,Type predicates + ShipDate Range              |   244.000 |       195 |       294 |
+| TPCH Q1                                                         | 18340.000 |     17783 |     18897 |
+| TPCH Q3 - extendePrice instead of revenue; order, limit removed | 10669.000 |     10345 |     10994 |
+| TPCH Q5 - extendePrice instead of revenue                       | 16722.000 |     16617 |     16828 |
+| TPCH Q7 - price instead of revenue                              |   862.000 |       712 |      1012 |
+| TPCH Q8 - extendePrice instead of market share                  | 20429.000 |     20190 |     20669 |
+
+
+** TPCH Slice dataset
+
+*Running against raw event Dataset:*
+
+| Query                                                              | Avg. Time | Min. Time | Max. Time |
+|--------------------------------------------------------------------+-----------+-----------+-----------|
+| Basic Aggregation                                                  | 26890.000 |      7165 |    113328 |
+| Ship Date Range                                                    | 10530.000 |      8499 |     16380 |
+| SubQuery + nation,Type predicates + ShipDate Range                 |  4544.000 |      3626 |      7625 |
+| TPCH Q1                                                            |  7993.000 |      7186 |     10483 |
+| TPCH Q3 - extendePrice instead of revenue                          |  6004.000 |      3727 |     11246 |
+| TPCH Q5 - extendePrice instead of revenue                          |  6614.000 |      5481 |      8979 |
+| TPCH Q7 - price instead of revenue                                 |  5648.000 |      4524 |      7133 |
+| TPCH Q8 - extendePrice instead of market share                     |  3804.000 |      3211 |      4780 |
+| TPCH Q10 - extendePrice instead of revenue, no group by on acctBal | 27150.000 |     23269 |     35494 |
+|                                                                    |           |           |           |
+
+
+
+*Running against Druid:*
+
+| Query                                                              | Avg. Time | Min. Time | Max. Time |
+|--------------------------------------------------------------------+-----------+-----------+-----------|
+| Basic Aggregation                                                  |  3138.000 |      2327 |      4142 |
+| Ship Date Range                                                    |   633.000 |       474 |       999 |
+| SubQuery + nation,Type predicates + ShipDate Range                 |   284.000 |       151 |       828 |
+| TPCH Q1                                                            |  2222.000 |      2005 |      2429 |
+| TPCH Q3 - extendePrice instead of revenue                          |  2066.000 |       910 |      7176 |
+| TPCH Q5 - extendePrice instead of revenue                          |  4514.000 |      4129 |      5501 |
+| TPCH Q7 - price instead of revenue                                 |   538.000 |       318 |      1282 |
+| TPCH Q8 - extendePrice instead of market share                     |  4922.000 |      4541 |      5424 |
+| TPCH Q10 - extendePrice instead of revenue, no group by on acctBal | 13765.000 |     12808 |     17560 |
+|                                                                    |           |           |           |
+
+
+
+
+* Appendix A: Query Details
 ** Query Basic Aggregation
 #+begin_example
 SELECT l_returnflag,
@@ -110,7 +439,6 @@ Project [l_returnflag#69,l_linestatus#70,alias-1#155L AS c2#109L,alias-2#154 AS 
  PhysicalRDD [alias-2#154,alias-3#158,alias-7#157,alias-4#156,l_returnflag#69,l_linestatus#70,alias-1#155L], DruidRDD[6] at RDD at DruidRDD.scala:34
 
 #+end_example
-
 
 ** Query Ship Date Range
 #+begin_example
@@ -341,45 +669,221 @@ Project [CAST(o_orderdate#174, IntegerType) AS o_year#151,alias-1#175 AS price#1
 #+end_example
 
 
+* Appendix B: Druid TPCH Index Specification
+#+begin_src json
+{
+  "dataSchema": {
+    "dataSource": "tpch",
+    "parser": {
+      "type": "string",
+      "parseSpec": {
+        "format": "tsv",
+        "timestampSpec": {
+          "column": "l_shipdate",
+          "format": "iso"
+        },
+        "columns": [
+          "o_orderkey",
+          "o_custkey",
+          "o_orderstatus",
+          "o_totalprice",
+          "o_orderdate",
+          "o_orderpriority",
+          "o_clerk",
+          "o_shippriority",
+          "o_comment",
+          "l_partkey",
+          "l_suppkey",
+          "l_linenumber",
+          "l_quantity",
+          "l_extendedprice",
+          "l_discount",
+          "l_tax",
+          "l_returnflag",
+          "l_linestatus",
+          "l_shipdate",
+          "l_commitdate",
+          "l_receiptdate",
+          "l_shipinstruct",
+          "l_shipmode",
+          "l_comment",
+          "order_year",
+          "ps_partkey",
+          "ps_suppkey",
+          "ps_availqty",
+          "ps_supplycost",
+          "ps_comment",
+          "s_name",
+          "s_address",
+          "s_phone",
+          "s_acctbal",
+          "s_comment",
+          "s_nation",
+          "s_region",
+          "p_name",
+          "p_mfgr",
+          "p_brand",
+          "p_type",
+          "p_size",
+          "p_container",
+          "p_retailprice",
+          "p_comment",
+          "c_name",
+          "c_address",
+          "c_phone",
+          "c_acctbal",
+          "c_mktsegment",
+          "c_comment",
+          "c_nation",
+          "c_region"
+        ],
+        "delimiter": "|",
+        "dimensionsSpec": {
+          "dimension": [
+            "o_orderkey",
+            "o_orderdate",
+            "o_orderstatus",
+            "o_orderpriority",
+            "o_clerk",
+            "o_shippriority",
+            "o_comment",
+            "l_returnflag",
+            "l_linestatus",
+            "l_commitdate",
+            "l_receiptdate",
+            "l_shipinstruct",
+            "l_shipmode",
+            "l_comment",
+            "ps_comment",
+            "s_name",
+            "s_address",
+            "s_phone",
+            "s_comment",
+            "s_nation",
+            "s_region",
+            "p_name",
+            "p_mfgr",
+            "p_brand",
+            "p_type",
+            "p_size",
+            "p_container",
+            "p_retailprice",
+            "p_comment",
+            "c_name",
+            "c_address",
+            "c_phone",
+            "c_mktsegment",
+            "c_comment",
+            "c_nation",
+            "c_region"
+          ],
+          "dimensionExclusions": [],
+          "spatialDimensions": []
+        }
+      }
+    },
+    "metricsSpec": [
+      {
+        "type": "count",
+        "name": "count"
+      },
+      {
+        "type": "doubleSum",
+        "name": "o_totalprice",
+        "fieldName": "o_totalprice"
+      },
+      {
+        "type": "longSum",
+        "name": "l_quantity",
+        "fieldName": "l_quantity"
+      },
+      {
+        "type": "doubleSum",
+        "name": "l_extendedprice",
+        "fieldName": "l_extendedprice"
+      },
+      {
+        "type": "javascript",
+        "name": "l_tax",
+        "fieldNames": [
+          "l_extendedprice",
+          "l_discount",
+          "l_tax"
+        ],
+        "fnAggregate": "function(current, l_extendedprice, l_discount, l_tax) { return current + (l_extendedprice *(1 - l_discount) * l_tax); }",
+        "fnCombine": "function(partialA, partialB) { return partialA + partialB; }",
+        "fnReset": "function()                   { return 0; }"
+      },
+      {
+        "type": "javascript",
+        "name": "l_discount",
+        "fieldNames": [
+          "l_extendedprice",
+          "l_discount"
+        ],
+        "fnAggregate": "function(current, l_extendedprice, l_discount) { return current + (l_extendedprice * l_discount); }",
+        "fnCombine": "function(partialA, partialB) { return partialA + partialB; }",
+        "fnReset": "function()                   { return 0; }"
+      },
+      {
+        "type": "longSum",
+        "name": "ps_availqty",
+        "fieldName": "ps_availqty"
+      },
+      {
+        "type": "doubleSum",
+        "name": "ps_supplycost",
+        "fieldName": "ps_supplycost"
+      },
+      {
+        "type": "doubleSum",
+        "name": "c_acctbal",
+        "fieldName": "c_acctbal"
+      }
+    ],
+    "granularitySpec": {
+      "type": "uniform",
+      "segmentGranularity": "MONTH",
+      "queryGranularity": "NONE",
+      "intervals": [
+        "1993-01-01/1997-12-31"
+      ]
+    }
+  },
+  "ioConfig": {
+    "type": "hadoop",
+    "inputSpec": {
+      "type": "static",
+      "paths": "hdfs://hb-1.openstacklocal/user/hive/tpchFlattenedData_10/orderLineItemPartSupplierCustomer"
+    },
+    "metadataUpdateSpec": {
+      "type": "mysql",
+      "connectURI": "jdbc:mysql://hb-2.openstacklocal:3306/druid",
+      "password": "diurd",
+      "segmentTable": "druid_segments",
+      "user": "druid"
+    },
+    "segmentOutputPath": "hdfs://hb-1.openstacklocal/user/hive/druidStorage"
+  },
+  "tuningConfig": {
+    "type": "hadoop",
+    "workingPath": "/tmp",
+    "partitionsSpec": {
+      "type": "hashed",
+      "targetPartitionSize": 10000000
+    },
+    "leaveIntermediate": false,
+    "cleanupOnFailure": true,
+    "overwriteFiles": false,
+    "ignoreInvalidRows": false
+  }
+}
+#+end_src
 
-* TPCH BenchMark
+\printbibliography
+* Appendix C: Query Results
 
-** Running against raw event Dataset
-
-** Running against Druid
-
-*** Timing
-#+begin_example
-                                 Basic Aggregation  20324.000      19873      20776
-                                   Ship Date Range   1768.000       1712       1824
-SubQuery + nation,Type predicates + ShipDate Range    244.000        195        294
-                                           TPCH Q1  18340.000      17783      18897
-TPCH Q3 - extendePrice instead of revenue; order, limit removed  10669.000      10345      10994
-         TPCH Q5 - extendePrice instead of revenue  16722.000      16617      16828
-                TPCH Q7 - price instead of revenue    862.000        712       1012
-    TPCH Q8 - extendePrice instead of market share  20429.000      20190      20669
-#+end_example
-
-* TPCHSlice BenchMark
-
-** Running against raw event Dataset
-
-*** Timing
-#+begin_example
-
-                                             Query Avg. Time Min. Time Max. Time
-                                 Basic Aggregation  26890.000       7165     113328
-                                   Ship Date Range  10530.000       8499      16380
-SubQuery + nation,Type predicates + ShipDate Range   4544.000       3626       7625
-                                           TPCH Q1   7993.000       7186      10483
-         TPCH Q3 - extendePrice instead of revenue   6004.000       3727      11246
-         TPCH Q5 - extendePrice instead of revenue   6614.000       5481       8979
-                TPCH Q7 - price instead of revenue   5648.000       4524       7133
-    TPCH Q8 - extendePrice instead of market share   3804.000       3211       4780
-TPCH Q10 - extendePrice instead of revenue, no group by on acctBal  27150.000      23269      35494
-#+end_example
-
-*** Query Results
+** Raw Event Dataset Query Results
 #+begin_example
 Basic Aggregation
 [A,F,1478160,5.653926919402009E10,1000.0,4997.955256535151,644914]
@@ -454,24 +958,7 @@ TPCH Q10 - extendePrice instead of revenue, no group by on acctBal (first 20 row
 [Customer#000850441,ROMANIA,Bq7O5tRkwNHqA37,z1nZ2Ngrg,29-645-452-6044,ickly even theodolites. regular deposits about the care,596343.15]
 #+end_example
 
-
-** Running against Druid
-
-*** Timing
-#+begin_example
-                                             Query Avg. Time Min. Time Max. Time
-                                 Basic Aggregation   3138.000       2327       4142
-                                   Ship Date Range    633.000        474        999
-SubQuery + nation,Type predicates + ShipDate Range    284.000        151        828
-                                           TPCH Q1   2222.000       2005       2429
-         TPCH Q3 - extendePrice instead of revenue   2066.000        910       7176
-         TPCH Q5 - extendePrice instead of revenue   4514.000       4129       5501
-                TPCH Q7 - price instead of revenue    538.000        318       1282
-    TPCH Q8 - extendePrice instead of market share   4922.000       4541       5424
-TPCH Q10 - extendePrice instead of revenue, no group by on acctBal  13765.000      12808      17560
-#+end_example
-
-*** Query Results
+** Druid Query Results
 #+begin_example
 Basic Aggregation
 [A,F,1478160,5.6539271168E10,1000.0,4997.955256535151,618896]

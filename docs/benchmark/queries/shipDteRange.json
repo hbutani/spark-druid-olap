@@ -1,0 +1,24 @@
+{
+    "jsonClass" : "GroupByQuerySpec",
+    "queryType" : "groupBy",
+    "dataSource" : "tpch",
+    "dimensions" : [ {
+      "jsonClass" : "DefaultDimensionSpec",
+      "type" : "default",
+      "dimension" : "l_returnflag",
+      "outputName" : "f"
+    }, {
+      "jsonClass" : "DefaultDimensionSpec",
+      "type" : "default",
+      "dimension" : "l_linestatus",
+      "outputName" : "s"
+    } ],
+    "granularity" : "all",
+    "aggregations" : [ {
+      "jsonClass" : "FunctionAggregationSpec",
+      "type" : "count",
+      "name" : "alias-1",
+      "fieldName" : "count"
+    } ],
+    "intervals" : [ "1995-12-01T08:00:00.001Z/1997-09-02T08:00:00.001Z" ]
+}

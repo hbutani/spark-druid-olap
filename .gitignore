@@ -34,6 +34,7 @@ docs/auto/
 *.fdb_latexmk
 *.fls
 *.xml
+*.tex
 docs/benchmark/*.html
 
 # sbt
