@@ -79,6 +79,8 @@ object Utils extends Logging {
     log.info("\nDruid Query:\n" + pretty(render(Extraction.decompose(dq))))
   }
 
+  def queryToString(dq : DruidQuery) : String = pretty(render(Extraction.decompose(dq)))
+
   /**
    * from fpinscala book
    * @param a
