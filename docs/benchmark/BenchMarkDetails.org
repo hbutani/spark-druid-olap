@@ -31,37 +31,580 @@
 #+STARTUP: showall
 #+OPTIONS: html-postamble:nil
 
-We ran a benchmark to test a set of queries that contrast performance
-of the scenario of queries being rewritten to use a DruidIndex vs
+We ran a benchmark on a set of representative queries that contrast performance
+ of queries being rewritten to use a DruidIndex vs.
 running the Queries directly against the *raw event* DataSet. We have
-attempted to make this test as fair as possible: *by not taking any advantages of preaggregations and column pruning in Druid, by using in
+attempted to make this test as fair as possible: *by not taking any advantages of preaggregations and column pruning in Druid, and by using in
 memory caching when the queries run only in Spark*. We ran the 2
-scenarios on the same cluster: for the Druid run we gave the worker
+scenarios on the same cluster: for the Druid run we gave the cluster
 node resources to Druid History servers, for the Spark run we ran
 Spark Executors on the worker nodes.
 
 For the benchmark we used the [[http://www.tpc.org/tpch/spec/tpch2.8.0.pdf][TPCH benchmark dataset]], datascale
 10G. We converted the 10G star schema into a flattened(denormalized)
-transaction dataset. For spark we further processed the data to setup
+transaction dataset. For Spark we further processed the data to setup
 a Partitioned table,  stored in Parquet format; the table is
 partitioned by month. The Druid 
 Index was created using the [[http://druid.io/docs/latest/ingestion/batch-ingestion.html][HadoopDruidIndexer]]. 
 
 The dataset sizes are:
 
-| TPCH Flat TSV                      | 46.80GB |
-| Druid Index in HDFS                | 13.27GB |
-| TPCH Flat Parquet                  | 11.38GB |
-| TPCH Flat Parquet Partition by Day | 11.56GB |
+| TPCH Flat TSV                        | 46.80GB |
+| Druid Index in HDFS                  | 17.04GB |
+| TPCH Flat Parquet                    | 11.38GB |
+| TPCH Flat Parquet Partition by Month | 11.56GB |
+
+* Queries
+
+We chose the queries to test the performance differences for /time
+intervals/, /dimension filters/, /time slice aggregation/, and
+/dimensional aggregations/. We have tested for TPCH queries Q1, Q3,
+Q5, Q7 and Q8. These queries have been altered so that they can be
+rewritten as Druid queries. As explained below, these don't change
+overall benchmark conclusion, if anything the numbers will skew
+further in favor of Druid once we start to push Sorts and Limits to
+Druid.  
 
 
-* Benchmark Environment
+*Alterations made to queries:*
+- Formulas in aggregations have been removed. For
+  e.g. =sum(l_extendedprice*(1-l_discount))= is simply written as
+  =sum(extendedprice)=. This is because we haven't implemented the rewrite to handle
+  aggregation formulas. This has a minor impact on query performance;
+  so the overall benchmark analysis will not change.
+- Since we haven't implemented the rewrites, we have removed *order
+  by, limit* clauses from the queries. Again this shouldn't change the
+  overall benchmark conclusion; in fact once we can push down order
+  and limit to Druid, the rewritten query times will reduce.
+
+We have summarized the Query forms below. [[Appendix A: Query Details]]
+describes the Queries in detail.
+
+** Query Summary:
+#+attr_latex: align=|l|l|l|l|l|
+|-----------------+-----------------+------------+---------------+----------------|
+| *Query*         | *Interval*      | *Filters*  | *Group By*    | *Aggregations* |
+|-----------------+-----------------+------------+---------------+----------------|
+| Basic           | None            | None       | ReturnFlag    | Count(*)       |
+| Aggregation.    |                 |            | LineStatus    | Sum(exdPrice)  |
+|                 |                 |            |               | Avg(avlQty)    |
+|-----------------+-----------------+------------+---------------+----------------|
+| Ship Date Range | 1995-12/1997-09 | None       | ReturnFlag    | Count(*)       |
+|                 |                 |            | LineStatus    |                |
+|-----------------+-----------------+------------+---------------+----------------|
+| SubQry          |                 |            | S_Nation      |                |
+| nation, pType   |                 |            |               |                |
+| ShpDt Range     | 1995-12/1997-09 | P_Type     |               | Count(*)       |
+|                 |                 | S_Nation + |               | Sum(exdPrice)  |
+|                 |                 | C_Nation   |               | Max(sCost)     |
+|                 |                 |            |               | Avg(avlQty)    |
+|                 |                 |            |               | Count(         |
+|                 |                 |            |               | Distinct oKey) |
+|-----------------+-----------------+------------+---------------+----------------|
+| TPCH Q1         | None            | None       | ReturnFlag    | Count(*)       |
+|                 |                 |            | LineStatus    | Sum(exdPrice)  |
+|                 |                 |            |               | Max(sCost)     |
+|                 |                 |            |               | Avg(avlQty)    |
+|                 |                 |            |               | Count(         |
+|                 |                 |            |               | Distinct oKey) |
+|-----------------+-----------------+------------+---------------+----------------|
+| TPCH Q3         | 1995-03-15-     | O_Date     | OKey          | Sum(exdPrice)  |
+|                 |                 | MktSegment | ODate         |                |
+|                 |                 |            | ShipPri       |                |
+|-----------------+-----------------+------------+---------------+----------------|
+| TPCH Q5         | None            | O_Date     | S_Nation      | Sum(exdPrice)  |
+|                 |                 | Region     |               |                |
+|-----------------+-----------------+------------+---------------+----------------|
+| TPCH Q7         | None            | S_Nation + | S_Nation      | Sum(exdPrice)  |
+|                 |                 | C_Nation   | C_Nation      |                |
+|                 |                 |            | ShipDate.Year |                |
+|-----------------+-----------------+------------+---------------+----------------|
+| TPCH Q8         | None            | Region     | ODate.Year    | Sum(exdPrice)  |
+|                 |                 | Type       |               |                |
+|                 |                 | O_Date     |               |                |
+|-----------------+-----------------+------------+---------------+----------------|
+
+The Queries are described in detail in the  [[Appendix A: Query Details][Query Details]] section.
+  
+
+* Benchmark Results
+
+[[Appendix B: Benchmark Environment]] and
+ [[Appendix C: Running the Benchmark]] describe in detail where and how
+ the Benchmark was run. In this section we present present our findings.
+
+** TPCH 10G dataset
+*Running against raw event Dataset:*
+
+
+| Query                            |  Avg. Time | Min. Time | Max. Time |
+|----------------------------------+------------+-----------+-----------|
+| Basic Aggregation                | 273371.000 |     78884 |    681879 |
+| Ship Date Range                  | 221933.000 |     65074 |    503307 |
+| SubQuery + filters + ShpDt Range |  86999.000 |     13762 |    417972 |
+| TPCH Q1                          | 183568.000 |     61652 |    380407 |
+| TPCH Q3                          | 270054.000 |     30141 |    522393 |
+| TPCH Q5                          | 172155.000 |     50255 |    292185 |
+| TPCH Q7                          |  70663.000 |     17134 |    300033 |
+| TPCH Q8                          |  19823.000 |     12287 |     38247 |
+|                                  |            |           |           |
+
+*Running against Druid:*
+
+| Query                            | Avg. Time | Min. Time | Max. Time |
+|----------------------------------+-----------+-----------+-----------|
+| Basic Aggregation                | 20324.000 |     19873 |     20776 |
+| Ship Date Range                  |  1768.000 |      1712 |      1824 |
+| SubQuery + filters + ShpDt Range |   244.000 |       195 |       294 |
+| TPCH Q1                          | 18340.000 |     17783 |     18897 |
+| TPCH Q3                          | 10669.000 |     10345 |     10994 |
+| TPCH Q5                          | 16722.000 |     16617 |     16828 |
+| TPCH Q7                          |   862.000 |       712 |      1012 |
+| TPCH Q8                          | 20429.000 |     20190 |     20669 |
+
+** Observations about the performance:
+- The /SubQuery + filters + ShpDt Range/  query gives the most benefit
+  when rewritten to Druid. This is not surprising, as this Query is
+  tailor-made for Druid. The *Interval* and *Dimension* predicates
+  fully leverage the Segment pruning and inverted index layout of
+  Druid. 
+- The /Ship Date Range/ query also shows a significant boost when run
+  on Druid. This is surprising since Spark partition pruning should
+  have nullified the segment pruning Druid will do. We ensure that
+  Spark is doing partition pruning, by explicitly adding /shipYear/
+  predicates to Spark. Is this attributable to aggregations being
+  quicker in Druid, or is this the overhead of predicate evaluation
+  that Spark has to do for each row? Another aspect maybe that we didn't enable the [[https://databricks.com/blog/2015/04/13/deep-dive-into-spark-sqls-catalyst-optimizer.html][Code Generation]] option for
+  Catalyst expressions, doing so may bridge this gap.
+- /TPCH Q7/ shows a significant performance boost when running on Druid:
+  milliSeconds vs. 10s of seconds. The difference is in applying the
+  filter to each row when running on Spark vs. using the inverted
+  index to quickly find what values to aggregate. The *year* level
+  aggregation should have the same optimizations in play: Map side
+  aggregation in the case of Spark, should significantly reduce the
+  amount of rows being shuffled; and in the case of Druid the amount of data shipped to
+  the Broker is small, because only year level aggregations are being
+  shipped. *So queries with just dimensional predicates, and small
+  output cardinality also get a significant boost when rewritten as Druid queries*.  
+- For /TPCH Q3/, /TPCH Q5/ and /TPCH Q8/ there is an improvement, but nowhere close to the boost
+  for *Q7*. *This is because the OrderDate predicate is translated to
+  a JavascriptFilter*. We need to look into ways of translating such
+  predicates to  a native java function.
+- Queries /Basic Agg./ and /TPCH Q1/ show some improvement. The
+  Count-Distinct is translated to a [[http://druid.io/docs/0.8.0/querying/aggregations.html][Cardinality Aggregator]] which is an
+  approximate count. This is definitely an advantage for Druid, for
+  large cardinality dimensions. We need to test against Spark using
+  the HyperLogLog aggregator.
+
+We have tried to make the comparisons as fair as possible: by indexing
+at the lowest grain, and making the Druid index contain all
+columns. We also partitioned and cached the Spark DataFrame. Inspite
+of these steps, we find that a *Basic Aggregation* computation( even
+with the Count-Distinct removed) is faster in Druid. Part of the issue
+is that Spark needs more memory and compute resources then Druid; several Query
+runs had failures, causing Executors to crash and hence tasks to be
+redone. But the differences are not all explained by this, even if we
+consider minimum times from the Spark runs, Druid still performs
+better. They could be explained by the fact that we didn't run with 
+ [[https://databricks.com/blog/2015/04/13/deep-dive-into-spark-sqls-catalyst-optimizer.html][Code Generation]] enabled. We plan to run a followup test with [[https://databricks.com/blog/2015/04/13/deep-dive-into-spark-sqls-catalyst-optimizer.html][Code Generation]]
+turned on. 
+We expect that for /Basic Agg./ and /TPCH Q1/  Spark to
+perform as well as Druid. But for Queries involving *Dimensional* and
+*Interval* slices, Druid is still an order of magnitude faster(a
+seconds vs. 10 seconds). Building native functions in Druid will
+expand the queries that gain this kind of performance boost. Queries
+that have *Interval* and *Dimensional* predicates are very common in
+OLAP, as analysts browse the Cube applying filters, Drilling Down
+and Up.
+
+
+** TPCH Slice dataset
+
+*Running against raw event Dataset:*
+
+| Query                            | Avg. Time | Min. Time | Max. Time |
+|----------------------------------+-----------+-----------+-----------|
+| Basic Aggregation                | 26890.000 |      7165 |    113328 |
+| Ship Date Range                  | 10530.000 |      8499 |     16380 |
+| SubQuery + filters + ShpDt Range |  4544.000 |      3626 |      7625 |
+| TPCH Q1                          |  7993.000 |      7186 |     10483 |
+| TPCH Q3                          |  6004.000 |      3727 |     11246 |
+| TPCH Q5                          |  6614.000 |      5481 |      8979 |
+| TPCH Q7                          |  5648.000 |      4524 |      7133 |
+| TPCH Q8                          |  3804.000 |      3211 |      4780 |
+| TPCH Q10                         | 27150.000 |     23269 |     35494 |
+|                                  |           |           |           |
+
+
+
+*Running against Druid:*
+
+| Query                            | Avg. Time | Min. Time | Max. Time |
+|----------------------------------+-----------+-----------+-----------|
+| Basic Aggregation                |  3138.000 |      2327 |      4142 |
+| Ship Date Range                  |   633.000 |       474 |       999 |
+| SubQuery + filters + ShpDt Range |   284.000 |       151 |       828 |
+| TPCH Q1                          |  2222.000 |      2005 |      2429 |
+| TPCH Q3                          |  2066.000 |       910 |      7176 |
+| TPCH Q5                          |  4514.000 |      4129 |      5501 |
+| TPCH Q7                          |   538.000 |       318 |      1282 |
+| TPCH Q8                          |  4922.000 |      4541 |      5424 |
+| TPCH Q10                         | 13765.000 |     12808 |     17560 |
+|                                  |           |           |           |
+
+
+* Appendix A: Query Details
+** Query Basic Aggregation
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+SELECT l_returnflag,
+       l_linestatus,
+       Count(*),
+       Sum(l_extendedprice) AS s,
+       Max(ps_supplycost)   AS m,
+       Avg(ps_availqty)     AS a,
+       Count(DISTINCT o_orderkey)
+FROM   orderlineitempartsupplier
+GROUP  BY l_returnflag,
+          l_linestatus
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [l_returnflag#69,l_linestatus#70], [l_returnflag#69,l_linestatus#70,...
+ Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,l_returnflag#69,...
+  Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,...
+\end{lstlisting}
+\end{tiny}
+
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [l_returnflag#69,l_linestatus#70,alias-1#155L AS c2#109L,alias-2#154 AS s#106,...
+ PhysicalRDD [alias-2#154,alias-3#158,alias-7#157,..], DruidRDD[6] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/basicAgg.json][here]]
+
+** Query Ship Date Range
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+
+SELECT f,
+       s,
+       Count(*) AS count_order
+FROM   (SELECT l_returnflag AS f,
+               l_linestatus AS s,
+               l_shipdate,
+               s_region,
+               s_nation,
+               c_nation
+        FROM   orderlineitempartsupplier) t
+WHERE  Dateisbeforeorequal(Datetime(`l_shipdate`),
+              Dateminus(Datetime("1997-12-01"), Period("p90d")))
+       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-12-01"))
+GROUP  BY f,
+          s
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [f#127,s#128], [f#127,s#128,COUNT(1) AS count_order#120L]
+ Project [l_returnflag#69 AS f#127,l_linestatus#70 AS s#128]
+  Filter (scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(scalaUDF(1997-12-01),scalaUDF(P90D)))...
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,...
+\end{lstlisting}
+\end{tiny}
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [f#127,s#128,alias-1#159L AS count_order#120L]
+ PhysicalRDD [f#127,s#128,alias-1#159L], DruidRDD[7] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+
+
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/shipDteRange.json][here]]
+** Query SubQuery + nation,Type predicates + ShipDate Range
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+SELECT s_nation,
+       Count(*)             AS count_order,
+       Sum(l_extendedprice) AS s,
+       Max(ps_supplycost)   AS m,
+       Avg(ps_availqty)     AS a,
+       Count(DISTINCT o_orderkey)
+FROM   (SELECT l_returnflag AS f,
+               l_linestatus AS s,
+               l_shipdate,
+               s_region,
+               s_nation,
+               c_nation,
+               p_type,
+               l_extendedprice,
+               ps_supplycost,
+               ps_availqty,
+               o_orderkey
+        FROM   orderlineitempartsupplier
+        WHERE  p_type = 'ECONOMY ANODIZED STEEL') t
+WHERE  Dateisbeforeorequal(Datetime(`l_shipdate`),
+              Dateminus(Datetime("1997-12-01"), Period("p90d")))
+       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-12-01"))
+       AND ( ( s_nation = 'FRANCE'
+               AND c_nation = 'GERMANY' )
+              OR ( c_nation = 'FRANCE'
+                   AND s_nation = 'GERMANY' ) )
+GROUP  BY s_nation
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [s_nation#88], [s_nation#88,COUNT(1) AS count_order#129L,SUM(l_extendedprice#66) AS ...
+ Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,s_nation#88,ps_availqty#80]
+  Filter ((p_type#93 = ECONOMY ANODIZED STEEL) && ((scalaUDF(scalaUDF(l_shipdate#71),...
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,...
+\end{lstlisting}
+\end{tiny}
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [s_nation#88,alias-1#161L AS count_order#129L,alias-2#160 AS s#130,...
+ PhysicalRDD [alias-2#160,alias-3#164,...], DruidRDD[8] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+
+
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/projFiltRange.json][here]]
+** Query TPCH Q1
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+SELECT l_returnflag,
+       l_linestatus,
+       Count(*),
+       Sum(l_extendedprice) AS s,
+       Max(ps_supplycost)   AS m,
+       Avg(ps_availqty)     AS a,
+       Count(DISTINCT o_orderkey)
+FROM   orderlineitempartsupplier
+GROUP  BY l_returnflag,
+          l_linestatus
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [l_returnflag#69,l_linestatus#70], [l_returnflag#69,l_linestatus#70,COUNT(1) AS c2#145L,...
+ Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,l_returnflag#69,l_linestatus#70,...
+  Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,....
+\end{lstlisting}
+\end{tiny}
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [l_returnflag#69,l_linestatus#70,alias-1#166L AS c2#145L,alias-2#165 AS s#142,...
+ PhysicalRDD [alias-2#165,alias-3#169,...], DruidRDD[9] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/q1.json][here]]
+** Query TPCH Q3 - extendePrice instead of revenue; order, limit removed
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+SELECT o_orderkey,
+       Sum(l_extendedprice) AS price,
+       o_orderdate,
+       o_shippriority
+FROM   orderlineitempartsupplier
+WHERE  c_mktsegment = 'BUILDING'
+       AND Dateisbefore(Datetime(`o_orderdate`), Datetime("1995-03-15"))
+       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-03-15"))
+GROUP  BY o_orderkey,
+          o_orderdate,
+          o_shippriority
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [o_orderkey#53,o_orderdate#57,o_shippriority#60], [o_orderkey#53,...
+ Project [o_orderkey#53,o_orderdate#57,o_shippriority#60,l_extendedprice#66]
+  Filter (((c_mktsegment#102 = BUILDING) && scalaUDF(scalaUDF(o_orderdate#57),...
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,...
+\end{lstlisting}
+\end{tiny}
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [CAST(o_orderkey#53, IntegerType) AS o_orderkey#53,alias-1#170 AS ...
+ PhysicalRDD [o_orderkey#53,...], DruidRDD[10] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/q3.json][here]]
+** Query TPCH Q5 - extendePrice instead of revenue
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+SELECT s_nation,
+       Sum(l_extendedprice) AS extendedPrice
+FROM   orderlineitempartsupplier
+WHERE  s_region = 'ASIA'
+       AND Dateisafterorequal(Datetime(`o_orderdate`), Datetime("1994-01-01"))
+       AND Dateisbefore(Datetime(`o_orderdate`),
+           Dateplus(Datetime("1994-01-01"), Period(
+               "p1y")))
+GROUP  BY s_nation
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [s_nation#88], [s_nation#88,SUM(l_extendedprice#66) AS extendedPrice#148]
+ Project [s_nation#88,l_extendedprice#66]
+  Filter (((s_region#89 = ASIA) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1994-01-01))) ...
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,....
+\end{lstlisting}
+\end{tiny}
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [s_nation#88,alias-1#171 AS extendedPrice#148]
+ PhysicalRDD [s_nation#88,alias-1#171], DruidRDD[11] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/q5.json][here]]
+
+** Query TPCH Q7 - price instead of revenue
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+SELECT s_nation,
+       c_nation,
+       Year(Datetime( ` l_shipdate ` )) AS l_year,
+       Sum(l_extendedprice)             AS extendedPrice
+FROM   orderlineitempartsupplier
+WHERE  ( ( s_nation = 'FRANCE'
+           AND c_nation = 'GERMANY' )
+          OR ( c_nation = 'FRANCE'
+               AND s_nation = 'GERMANY' ) )
+GROUP  BY s_nation,
+          c_nation,
+          Year(Datetime( ` l_shipdate ` ))
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [s_nation#88,c_nation#104,scalaUDF(scalaUDF(l_shipdate#71))], ...
+ Project [s_nation#88,c_nation#104,l_shipdate#71,l_extendedprice#66]
+  Filter (((s_nation#88 = FRANCE) && (c_nation#104 = GERMANY)) || ...
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,....
+\end{lstlisting}
+\end{tiny}
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [s_nation#88,c_nation#104,CAST(l_shipdate#172, IntegerType) AS...
+ PhysicalRDD [s_nation#88,...], DruidRDD[12] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/q7.json][here]]
+
+** Query TPCH Q8 - extendedPrice instead of market share
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+SELECT Year(Datetime(`o_orderdate`)) AS o_year,
+       Sum(l_extendedprice)          AS price
+FROM   orderlineitempartsupplier
+WHERE  c_region = 'AMERICA'
+       AND p_type = 'ECONOMY ANODIZED STEEL'
+       AND Dateisafterorequal(Datetime(`o_orderdate`), Datetime("1995-01-01"))
+       AND Dateisbeforeorequal(Datetime(`o_orderdate`), Datetime("1996-12-31"))
+GROUP  BY Year(Datetime(`o_orderdate`))
+\end{lstlisting}
+\end{tiny}
+
+*** Logical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Aggregate [scalaUDF(scalaUDF(o_orderdate#57))], [scalaUDF(scalaUDF(o_orderdate#57)) AS ...
+ Project [o_orderdate#57,l_extendedprice#66]
+  Filter ((((c_region#105 = AMERICA) && (p_type#93 = ECONOMY ANODIZED STEEL)) && ...
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,...
+\end{lstlisting}
+\end{tiny}
+*** Physical Plan
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+   \begin{lstlisting}[frame=shadowbox, numbers=left]
+Project [CAST(o_orderdate#174, IntegerType) AS o_year#151,alias-1#175 AS price#152]
+ PhysicalRDD [o_orderdate#174,alias-1#175], DruidRDD[13] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+The Druid Query for this query is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/q8.json][here]]
+
+
+* Appendix B: Benchmark Environment
 ** Cluster Details
 The Benchmark was run on a 4 node cluster. Each node is a 2 core,16GB
 memory, 256GB hard drive machine running centos 6.4. The output of the
 =lscpu= and =hdparm= are listed below:
 
-\begin{small}
+\begin{tiny}
    \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
      language=BASH, showspaces=false, showstringspaces=false}
   \label{mcDetails}
@@ -99,7 +642,7 @@ sudo hdparm -tT /dev/vdb
  Timing buffered disk reads: 540 MB in  3.00 seconds = 179.98 MB/sec
 
 \end{lstlisting}
-\end{small}
+\end{tiny}
 
 The machines are setup with [[http://hortonworks.com/hdp/whats-new/][HDP 2.3]] using  [[https://cwiki.apache.org/confluence/display/AMBARI/Quick+Start+Guide][Ambari]]. Also installed
 [[http://static.druid.io/artifacts/releases/druid-0.8.0-bin.tar.gz][Druid 0.8]] on the machines. The cluster is configured to use Yarn; we
@@ -139,13 +682,13 @@ $DIR/config/_common:$HADOOP_CONF_DIR:$DIR/lib/* \
 io.druid.cli.Main index hadoop <spec_file>
 \end{Verbatim}
 
-See [[Druid TPCH Index Specification]] for detailed specification of the
+See [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/tpch_index.json][Druid TPCH Index Specification]] for detailed specification of the
 TPCH index in Druid. Key points of the Index:
 - /l_shipdate/ is chosen as the time dimension. Based on the TPCH
   Query set, there is a significant number of queries that are time
   sliced based on the Ship Date.
-- We indexed all the dimensions. The metrics are: ~o_totalprice,
-  l_quantity, l_extendedprice, ps_availqty, ps_supplycost,
+- We indexed all the dimensions. The metrics are: ~o_totalprice,~
+  ~l_quantity, l_extendedprice, ps_availqty, ps_supplycost,
   c_acctbal~. Rest of the columns are modeled as dimensions.
 - *The index is created at the grain of raw events.*
 - The Index time segment is chosen to be month.
@@ -160,7 +703,7 @@ or column pruning.*
 The raw event DataSource and Druid datasource are defined in the
 following way:
 
-\begin{small}
+\begin{tiny}
    \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
      language=SQL, showspaces=false, showstringspaces=false}
   \label{rawEvntDS}
@@ -181,82 +724,14 @@ CREATE TEMPORARY TABLE orderLineItemPartSupplier
       druidPort "8082");
 
 \end{lstlisting}
-\end{small}
+\end{tiny}
 
 
-* Queries
-
-We chose the queries to test the performance differences for /time
-intervals/, /dimension filters/, /time slice aggregation/, and
-/dimensional aggregations/. We have tested for TPCH queries Q1, Q3,
-Q5, Q7 and Q8. These queries have been altered so that they can be
-rewritten as Druid queries. As explained below, these don't change
-overall benchmark conclusion, if anything the numbers will skew
-further in favor of Druid once we start to push Sorts and Limits to
-Druid.  
-
-
-** Alterations made to queries
-- Formulas in aggregations have been removed. For
-  e.g. =sum(l_extendedprice*(1-l_discount))= is simply written as
-  =sum(extendedprice)=. This is because we don't have the rewrites to handle
-  aggregation formulas. This has a minor impact on query performance;
-  so the overall benchmark analysis will not change once we can test
-  aggregation formulas.
-- We have removed *order by, limit* clauses. This is because we don't
-  have the order and limit rewrites. Again this shouldn't change the
-  overall benchmark conclusion; in fact once we can push down order
-  and limit to druid, the rewritten query times will reduce,
-  further increasing the rewritten query performance.
-
-*Queries Summary:*
-
-| Query                | Interval          | Filters            | Group By      | Aggregations         |
-|----------------------+-------------------+--------------------+---------------+----------------------|
-| Basic Aggregation.   | None              | None               | ReturnFlag    | Count(*)             |
-|                      |                   |                    | LineStatus    | Sum(exdPrice)        |
-|                      |                   |                    |               | Avg(availQty)        |
-|                      |                   |                    |               |                      |
-| Ship Date Range      | 1995-12 - 1997-09 | None               | ReturnFlag    | Count(*)             |
-|                      |                   |                    | LineStatus    |                      |
-|                      |                   |                    |               |                      |
-| SubQry + nation,type |                   |                    | S_Nation      |                      |
-| predicate + ShipDt   |                   |                    |               |                      |
-| Range                | 1995-12 - 1997-09 | P_Type             |               | Count(*)             |
-|                      |                   | S_Nation, C_Nation |               | Sum(exdPrice)        |
-|                      |                   |                    |               | Max(supplyCost)      |
-|                      |                   |                    |               | Avg(availQty)        |
-|                      |                   |                    |               | Count(Distinct oKey) |
-|                      |                   |                    |               |                      |
-| TPCH Q1              | None              | None               | ReturnFlag    | Count(*)             |
-|                      |                   |                    | LineStatus    | Sum(exdPrice)        |
-|                      |                   |                    |               | Max(supplyCost)      |
-|                      |                   |                    |               | Avg(availQty)        |
-|                      |                   |                    |               | Count(Distinct oKey) |
-|                      |                   |                    |               |                      |
-| TPCH Q3              | 1995-03-15 -      | O_Date             | OKey          | Sum(exdPrice)        |
-|                      |                   | MktSegment         | ODate         |                      |
-|                      |                   |                    | ShipPri       |                      |
-|                      |                   |                    |               |                      |
-| TPCH Q5              | None              | O_Date             | S_Nation      | Sum(exdPrice)        |
-|                      |                   | Region             |               |                      |
-|                      |                   |                    |               |                      |
-| TPCH Q7              | None              | S_Nation, C_Nation | S_Nation      | Sum(exdPrice)        |
-|                      |                   |                    | C_Nation      |                      |
-|                      |                   |                    | ShipDate.Year |                      |
-|                      |                   |                    |               |                      |
-| TPCH Q8              | None              | Region             | ODate.Year    | Sum(exdPrice)        |
-|                      |                   | Type               |               |                      |
-|                      |                   | O_Date             |               |                      | 
-
-
-  
-
-* Running the Benchmark
+* Appendix C: Running the Benchmark
 *** Running against Druid Datasource
 For the Druid Datasource experiment the queries are run on spark using the
 [[https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/sparklinedata/druid/tools/TpchBenchMark.scala][Druid TpchBenchMark]] tool. It is run using the following command:
-\begin{small}
+\begin{tiny}
    \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
      language=bash, showspaces=false, showstringspaces=false}
   \label{tpchDruidBmark}
@@ -272,7 +747,7 @@ sparkjars/spark-druid-olap-assembly-0.0.1.jar \
 -t tpchFlattenedData_10/orderLineItemPartSupplierCustomer \
 -d hb-1.openstacklocal
 \end{lstlisting}
-\end{small}
+\end{tiny}
 
 The cluster is setup to run a historical server on each node. Each
 historical server is configure with 8GB of memory:
@@ -317,7 +792,7 @@ DataFrame is cached in memory.*
 
 For the queries going against Spark we used the
 [[https://github.com/SparklineData/tpch-spark-druid/blob/master/tpchData/src/main/scala/org/sparklinedata/tpch/hadoop/TpchParquetBenchmark.scala][Spark TpchBenchmark]] tool. It is run with the following command:
-\begin{small}
+\begin{tiny}
    \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
      language=bash, showspaces=false, showstringspaces=false}
   \label{raweBmark}
@@ -335,553 +810,9 @@ sparkjars/tpchdata-assembly-0.0.1.jar \
 -t tpchFlattenedData_10/\
 orderLineItemPartSupplierCustomer.parquet.partitioned
 \end{lstlisting}
-\end{small}
+\end{tiny}
 
-
-
-* Benchmark Results
-
-** TPCH 10G dataset
-*Running against raw event Dataset:*
-
-
-| Query                                                           |  Avg. Time | Min. Time | Max. Time |
-|-----------------------------------------------------------------+------------+-----------+-----------|
-| Basic Aggregation                                               | 273371.000 |     78884 |    681879 |
-| Ship Date Range                                                 | 221933.000 |     65074 |    503307 |
-| SubQuery + nation,Type predicates + ShipDate Range              |  86999.000 |     13762 |    417972 |
-| TPCH Q1                                                         | 183568.000 |     61652 |    380407 |
-| TPCH Q3 - extendePrice instead of revenue; order, limit removed | 270054.000 |     30141 |    522393 |
-| TPCH Q5 - extendePrice instead of revenue                       | 172155.000 |     50255 |    292185 |
-| TPCH Q7 - price instead of revenue                              |  70663.000 |     17134 |    300033 |
-| TPCH Q8 - extendePrice instead of market share                  |  19823.000 |     12287 |     38247 |
-|                                                                 |            |           |           |
-
-
-
-*Running against Druid:*
-
-| Query                                                           | Avg. Time | Min. Time | Max. Time |
-|-----------------------------------------------------------------+-----------+-----------+-----------|
-| Basic Aggregation                                               | 20324.000 |     19873 |     20776 |
-| Ship Date Range                                                 |  1768.000 |      1712 |      1824 |
-| SubQuery + nation,Type predicates + ShipDate Range              |   244.000 |       195 |       294 |
-| TPCH Q1                                                         | 18340.000 |     17783 |     18897 |
-| TPCH Q3 - extendePrice instead of revenue; order, limit removed | 10669.000 |     10345 |     10994 |
-| TPCH Q5 - extendePrice instead of revenue                       | 16722.000 |     16617 |     16828 |
-| TPCH Q7 - price instead of revenue                              |   862.000 |       712 |      1012 |
-| TPCH Q8 - extendePrice instead of market share                  | 20429.000 |     20190 |     20669 |
-
-
-** TPCH Slice dataset
-
-*Running against raw event Dataset:*
-
-| Query                                                              | Avg. Time | Min. Time | Max. Time |
-|--------------------------------------------------------------------+-----------+-----------+-----------|
-| Basic Aggregation                                                  | 26890.000 |      7165 |    113328 |
-| Ship Date Range                                                    | 10530.000 |      8499 |     16380 |
-| SubQuery + nation,Type predicates + ShipDate Range                 |  4544.000 |      3626 |      7625 |
-| TPCH Q1                                                            |  7993.000 |      7186 |     10483 |
-| TPCH Q3 - extendePrice instead of revenue                          |  6004.000 |      3727 |     11246 |
-| TPCH Q5 - extendePrice instead of revenue                          |  6614.000 |      5481 |      8979 |
-| TPCH Q7 - price instead of revenue                                 |  5648.000 |      4524 |      7133 |
-| TPCH Q8 - extendePrice instead of market share                     |  3804.000 |      3211 |      4780 |
-| TPCH Q10 - extendePrice instead of revenue, no group by on acctBal | 27150.000 |     23269 |     35494 |
-|                                                                    |           |           |           |
-
-
-
-*Running against Druid:*
-
-| Query                                                              | Avg. Time | Min. Time | Max. Time |
-|--------------------------------------------------------------------+-----------+-----------+-----------|
-| Basic Aggregation                                                  |  3138.000 |      2327 |      4142 |
-| Ship Date Range                                                    |   633.000 |       474 |       999 |
-| SubQuery + nation,Type predicates + ShipDate Range                 |   284.000 |       151 |       828 |
-| TPCH Q1                                                            |  2222.000 |      2005 |      2429 |
-| TPCH Q3 - extendePrice instead of revenue                          |  2066.000 |       910 |      7176 |
-| TPCH Q5 - extendePrice instead of revenue                          |  4514.000 |      4129 |      5501 |
-| TPCH Q7 - price instead of revenue                                 |   538.000 |       318 |      1282 |
-| TPCH Q8 - extendePrice instead of market share                     |  4922.000 |      4541 |      5424 |
-| TPCH Q10 - extendePrice instead of revenue, no group by on acctBal | 13765.000 |     12808 |     17560 |
-|                                                                    |           |           |           |
-
-
-
-
-* Appendix A: Query Details
-** Query Basic Aggregation
-#+begin_example
-SELECT l_returnflag,
-       l_linestatus,
-       Count(*),
-       Sum(l_extendedprice) AS s,
-       Max(ps_supplycost)   AS m,
-       Avg(ps_availqty)     AS a,
-       Count(DISTINCT o_orderkey)
-FROM   orderlineitempartsupplier
-GROUP  BY l_returnflag,
-          l_linestatus
-#+end_example
-
-*** Logical Plan
-#+begin_example
-Aggregate [l_returnflag#69,l_linestatus#70], [l_returnflag#69,l_linestatus#70,COUNT(1) AS c2#109L,SUM(l_extendedprice#66) AS s#106,MAX(ps_supplycost#81) AS m#107,AVG(CAST(ps_availqty#80, LongType)) AS a#108,COUNT(DISTINCT o_orderkey#53) AS c6#110L]
- Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,l_returnflag#69,l_linestatus#70,ps_availqty#80]
-  Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,...
-
-#+end_example
-
-*** Physical Plan
-#+begin_example
-Project [l_returnflag#69,l_linestatus#70,alias-1#155L AS c2#109L,alias-2#154 AS s#106,alias-3#158 AS m#107,alias-4#156 AS a#108,CAST(alias-7#157, LongType) AS c6#110L]
- PhysicalRDD [alias-2#154,alias-3#158,alias-7#157,alias-4#156,l_returnflag#69,l_linestatus#70,alias-1#155L], DruidRDD[6] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-** Query Ship Date Range
-#+begin_example
-SELECT f,
-       s,
-       Count(*) AS count_order
-FROM   (SELECT l_returnflag AS f,
-               l_linestatus AS s,
-               l_shipdate,
-               s_region,
-               s_nation,
-               c_nation
-        FROM   orderlineitempartsupplier) t
-WHERE  Dateisbeforeorequal(Datetime(`l_shipdate`),
-              Dateminus(Datetime("1997-12-01"), Period("p90d")))
-       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-12-01"))
-GROUP  BY f,
-          s
-#+end_example
-
-*** Logical Plan
-#+begin_example
-Aggregate [f#127,s#128], [f#127,s#128,COUNT(1) AS count_order#120L]
- Project [l_returnflag#69 AS f#127,l_linestatus#70 AS s#128]
-  Filter (scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(scalaUDF(1997-12-01),scalaUDF(P90D))) && scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(1995-12-01)))
-   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,....
-
-#+end_example
-*** Physical Plan
-#+begin_example
-Project [f#127,s#128,alias-1#159L AS count_order#120L]
- PhysicalRDD [f#127,s#128,alias-1#159L], DruidRDD[7] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-
-** Query SubQuery + nation,Type predicates + ShipDate Range
-#+begin_example
-SELECT s_nation,
-       Count(*)             AS count_order,
-       Sum(l_extendedprice) AS s,
-       Max(ps_supplycost)   AS m,
-       Avg(ps_availqty)     AS a,
-       Count(DISTINCT o_orderkey)
-FROM   (SELECT l_returnflag AS f,
-               l_linestatus AS s,
-               l_shipdate,
-               s_region,
-               s_nation,
-               c_nation,
-               p_type,
-               l_extendedprice,
-               ps_supplycost,
-               ps_availqty,
-               o_orderkey
-        FROM   orderlineitempartsupplier
-        WHERE  p_type = 'ECONOMY ANODIZED STEEL') t
-WHERE  Dateisbeforeorequal(Datetime(`l_shipdate`),
-              Dateminus(Datetime("1997-12-01"), Period("p90d")))
-       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-12-01"))
-       AND ( ( s_nation = 'FRANCE'
-               AND c_nation = 'GERMANY' )
-              OR ( c_nation = 'FRANCE'
-                   AND s_nation = 'GERMANY' ) )
-GROUP  BY s_nation
-#+end_example
-
-*** Logical Plan
-#+begin_example
-Aggregate [s_nation#88], [s_nation#88,COUNT(1) AS count_order#129L,SUM(l_extendedprice#66) AS s#130,MAX(ps_supplycost#81) AS m#131,AVG(CAST(ps_availqty#80, LongType)) AS a#132,COUNT(DISTINCT o_orderkey#53) AS c5#141L]
- Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,s_nation#88,ps_availqty#80]
-  Filter ((p_type#93 = ECONOMY ANODIZED STEEL) && ((scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(scalaUDF(1997-12-01),scalaUDF(P90D))) && scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(1995-12-01))) && (((s_nation#88 = FRANCE) && (c_nation#104 = GERMANY)) || ((c_nation#104 = FRANCE) && (s_nation#88 = GERMANY)))))
-   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,...
-
-#+end_example
-*** Physical Plan
-#+begin_example
-Project [s_nation#88,alias-1#161L AS count_order#129L,alias-2#160 AS s#130,alias-3#164 AS m#131,alias-4#162 AS a#132,CAST(alias-7#163, LongType) AS c5#141L]
- PhysicalRDD [alias-2#160,alias-3#164,alias-7#163,alias-4#162,s_nation#88,alias-1#161L], DruidRDD[8] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-** Query TPCH Q1
-#+begin_example
-SELECT l_returnflag,
-       l_linestatus,
-       Count(*),
-       Sum(l_extendedprice) AS s,
-       Max(ps_supplycost)   AS m,
-       Avg(ps_availqty)     AS a,
-       Count(DISTINCT o_orderkey)
-FROM   orderlineitempartsupplier
-GROUP  BY l_returnflag,
-          l_linestatus
-#+end_example
-
-*** Logical Plan
-#+begin_example
-Aggregate [l_returnflag#69,l_linestatus#70], [l_returnflag#69,l_linestatus#70,COUNT(1) AS c2#145L,SUM(l_extendedprice#66) AS s#142,MAX(ps_supplycost#81) AS m#143,AVG(CAST(ps_availqty#80, LongType)) AS a#144,COUNT(DISTINCT o_orderkey#53) AS c6#146L]
- Project [l_extendedprice#66,o_orderkey#53,ps_supplycost#81,l_returnflag#69,l_linestatus#70,ps_availqty#80]
-  Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,....
-
-#+end_example
-*** Physical Plan
-#+begin_example
-Project [l_returnflag#69,l_linestatus#70,alias-1#166L AS c2#145L,alias-2#165 AS s#142,alias-3#169 AS m#143,alias-4#167 AS a#144,CAST(alias-7#168, LongType) AS c6#146L]
- PhysicalRDD [alias-2#165,alias-3#169,alias-7#168,alias-4#167,l_returnflag#69,l_linestatus#70,alias-1#166L], DruidRDD[9] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-** Query TPCH Q3 - extendePrice instead of revenue; order, limit removed
-#+begin_example
-SELECT o_orderkey,
-       Sum(l_extendedprice) AS price,
-       o_orderdate,
-       o_shippriority
-FROM   orderlineitempartsupplier
-WHERE  c_mktsegment = 'BUILDING'
-       AND Dateisbefore(Datetime(`o_orderdate`), Datetime("1995-03-15"))
-       AND Dateisafter(Datetime(`l_shipdate`), Datetime("1995-03-15"))
-GROUP  BY o_orderkey,
-          o_orderdate,
-          o_shippriority
-#+end_example
-
-*** Logical Plan
-#+begin_example
-Aggregate [o_orderkey#53,o_orderdate#57,o_shippriority#60], [o_orderkey#53,SUM(l_extendedprice#66) AS price#147,o_orderdate#57,o_shippriority#60]
- Project [o_orderkey#53,o_orderdate#57,o_shippriority#60,l_extendedprice#66]
-  Filter (((c_mktsegment#102 = BUILDING) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1995-03-15))) && scalaUDF(scalaUDF(l_shipdate#71),scalaUDF(1995-03-15)))
-   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,...
-
-#+end_example
-*** Physical Plan
-#+begin_example
-Project [CAST(o_orderkey#53, IntegerType) AS o_orderkey#53,alias-1#170 AS price#147,o_orderdate#57,CAST(o_shippriority#60, IntegerType) AS o_shippriority#60]
- PhysicalRDD [o_orderkey#53,o_orderdate#57,o_shippriority#60,alias-1#170], DruidRDD[10] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-** Query TPCH Q5 - extendePrice instead of revenue
-#+begin_example
-SELECT s_nation,
-       Sum(l_extendedprice) AS extendedPrice
-FROM   orderlineitempartsupplier
-WHERE  s_region = 'ASIA'
-       AND Dateisafterorequal(Datetime(`o_orderdate`), Datetime("1994-01-01"))
-       AND Dateisbefore(Datetime(`o_orderdate`),
-           Dateplus(Datetime("1994-01-01"), Period(
-               "p1y")))
-GROUP  BY s_nation
-#+end_example
-
-*** Logical Plan
-#+begin_example
-Aggregate [s_nation#88], [s_nation#88,SUM(l_extendedprice#66) AS extendedPrice#148]
- Project [s_nation#88,l_extendedprice#66]
-  Filter (((s_region#89 = ASIA) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1994-01-01))) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(scalaUDF(1994-01-01),scalaUDF(P1Y))))
-   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,....
-
-#+end_example
-*** Physical Plan
-#+begin_example
-Project [s_nation#88,alias-1#171 AS extendedPrice#148]
- PhysicalRDD [s_nation#88,alias-1#171], DruidRDD[11] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-
-** Query TPCH Q7 - price instead of revenue
-#+begin_example
-SELECT s_nation,
-       c_nation,
-       Year(Datetime( ` l_shipdate ` )) AS l_year,
-       Sum(l_extendedprice)             AS extendedPrice
-FROM   orderlineitempartsupplier
-WHERE  ( ( s_nation = 'FRANCE'
-           AND c_nation = 'GERMANY' )
-          OR ( c_nation = 'FRANCE'
-               AND s_nation = 'GERMANY' ) )
-GROUP  BY s_nation,
-          c_nation,
-          Year(Datetime( ` l_shipdate ` ))
-#+end_example
-
-*** Logical Plan
-#+begin_example
-Aggregate [s_nation#88,c_nation#104,scalaUDF(scalaUDF(l_shipdate#71))], [s_nation#88,c_nation#104,scalaUDF(scalaUDF(l_shipdate#71)) AS l_year#149,SUM(l_extendedprice#66) AS extendedPrice#150]
- Project [s_nation#88,c_nation#104,l_shipdate#71,l_extendedprice#66]
-  Filter (((s_nation#88 = FRANCE) && (c_nation#104 = GERMANY)) || ((c_nation#104 = FRANCE) && (s_nation#88 = GERMANY)))
-   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,....
-
-#+end_example
-*** Physical Plan
-#+begin_example
-Project [s_nation#88,c_nation#104,CAST(l_shipdate#172, IntegerType) AS l_year#149,alias-1#173 AS extendedPrice#150]
- PhysicalRDD [s_nation#88,c_nation#104,l_shipdate#172,alias-1#173], DruidRDD[12] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-
-** Query TPCH Q8 - extendePrice instead of market share
-#+begin_example
-SELECT Year(Datetime(`o_orderdate`)) AS o_year,
-       Sum(l_extendedprice)          AS price
-FROM   orderlineitempartsupplier
-WHERE  c_region = 'AMERICA'
-       AND p_type = 'ECONOMY ANODIZED STEEL'
-       AND Dateisafterorequal(Datetime(`o_orderdate`), Datetime("1995-01-01"))
-       AND Dateisbeforeorequal(Datetime(`o_orderdate`), Datetime("1996-12-31"))
-GROUP  BY Year(Datetime(`o_orderdate`))
-#+end_example
-
-TPCH Q8 - extendePrice instead of market share
-*** Logical Plan
-#+begin_example
-Aggregate [scalaUDF(scalaUDF(o_orderdate#57))], [scalaUDF(scalaUDF(o_orderdate#57)) AS o_year#151,SUM(l_extendedprice#66) AS price#152]
- Project [o_orderdate#57,l_extendedprice#66]
-  Filter ((((c_region#105 = AMERICA) && (p_type#93 = ECONOMY ANODIZED STEEL)) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1995-01-01))) && scalaUDF(scalaUDF(o_orderdate#57),scalaUDF(1996-12-31)))
-   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,o_orderpriority#58,o_clerk#59,o_shippriority#60,o_comment#61,...
-
-#+end_example
-*** Physical Plan
-#+begin_example
-Project [CAST(o_orderdate#174, IntegerType) AS o_year#151,alias-1#175 AS price#152]
- PhysicalRDD [o_orderdate#174,alias-1#175], DruidRDD[13] at RDD at DruidRDD.scala:34
-
-#+end_example
-
-
-* Appendix B: Druid TPCH Index Specification
-#+begin_src json
-{
-  "dataSchema": {
-    "dataSource": "tpch",
-    "parser": {
-      "type": "string",
-      "parseSpec": {
-        "format": "tsv",
-        "timestampSpec": {
-          "column": "l_shipdate",
-          "format": "iso"
-        },
-        "columns": [
-          "o_orderkey",
-          "o_custkey",
-          "o_orderstatus",
-          "o_totalprice",
-          "o_orderdate",
-          "o_orderpriority",
-          "o_clerk",
-          "o_shippriority",
-          "o_comment",
-          "l_partkey",
-          "l_suppkey",
-          "l_linenumber",
-          "l_quantity",
-          "l_extendedprice",
-          "l_discount",
-          "l_tax",
-          "l_returnflag",
-          "l_linestatus",
-          "l_shipdate",
-          "l_commitdate",
-          "l_receiptdate",
-          "l_shipinstruct",
-          "l_shipmode",
-          "l_comment",
-          "order_year",
-          "ps_partkey",
-          "ps_suppkey",
-          "ps_availqty",
-          "ps_supplycost",
-          "ps_comment",
-          "s_name",
-          "s_address",
-          "s_phone",
-          "s_acctbal",
-          "s_comment",
-          "s_nation",
-          "s_region",
-          "p_name",
-          "p_mfgr",
-          "p_brand",
-          "p_type",
-          "p_size",
-          "p_container",
-          "p_retailprice",
-          "p_comment",
-          "c_name",
-          "c_address",
-          "c_phone",
-          "c_acctbal",
-          "c_mktsegment",
-          "c_comment",
-          "c_nation",
-          "c_region"
-        ],
-        "delimiter": "|",
-        "dimensionsSpec": {
-          "dimension": [
-            "o_orderkey",
-            "o_orderdate",
-            "o_orderstatus",
-            "o_orderpriority",
-            "o_clerk",
-            "o_shippriority",
-            "o_comment",
-            "l_returnflag",
-            "l_linestatus",
-            "l_commitdate",
-            "l_receiptdate",
-            "l_shipinstruct",
-            "l_shipmode",
-            "l_comment",
-            "ps_comment",
-            "s_name",
-            "s_address",
-            "s_phone",
-            "s_comment",
-            "s_nation",
-            "s_region",
-            "p_name",
-            "p_mfgr",
-            "p_brand",
-            "p_type",
-            "p_size",
-            "p_container",
-            "p_retailprice",
-            "p_comment",
-            "c_name",
-            "c_address",
-            "c_phone",
-            "c_mktsegment",
-            "c_comment",
-            "c_nation",
-            "c_region"
-          ],
-          "dimensionExclusions": [],
-          "spatialDimensions": []
-        }
-      }
-    },
-    "metricsSpec": [
-      {
-        "type": "count",
-        "name": "count"
-      },
-      {
-        "type": "doubleSum",
-        "name": "o_totalprice",
-        "fieldName": "o_totalprice"
-      },
-      {
-        "type": "longSum",
-        "name": "l_quantity",
-        "fieldName": "l_quantity"
-      },
-      {
-        "type": "doubleSum",
-        "name": "l_extendedprice",
-        "fieldName": "l_extendedprice"
-      },
-      {
-        "type": "javascript",
-        "name": "l_tax",
-        "fieldNames": [
-          "l_extendedprice",
-          "l_discount",
-          "l_tax"
-        ],
-        "fnAggregate": "function(current, l_extendedprice, l_discount, l_tax) { return current + (l_extendedprice *(1 - l_discount) * l_tax); }",
-        "fnCombine": "function(partialA, partialB) { return partialA + partialB; }",
-        "fnReset": "function()                   { return 0; }"
-      },
-      {
-        "type": "javascript",
-        "name": "l_discount",
-        "fieldNames": [
-          "l_extendedprice",
-          "l_discount"
-        ],
-        "fnAggregate": "function(current, l_extendedprice, l_discount) { return current + (l_extendedprice * l_discount); }",
-        "fnCombine": "function(partialA, partialB) { return partialA + partialB; }",
-        "fnReset": "function()                   { return 0; }"
-      },
-      {
-        "type": "longSum",
-        "name": "ps_availqty",
-        "fieldName": "ps_availqty"
-      },
-      {
-        "type": "doubleSum",
-        "name": "ps_supplycost",
-        "fieldName": "ps_supplycost"
-      },
-      {
-        "type": "doubleSum",
-        "name": "c_acctbal",
-        "fieldName": "c_acctbal"
-      }
-    ],
-    "granularitySpec": {
-      "type": "uniform",
-      "segmentGranularity": "MONTH",
-      "queryGranularity": "NONE",
-      "intervals": [
-        "1993-01-01/1997-12-31"
-      ]
-    }
-  },
-  "ioConfig": {
-    "type": "hadoop",
-    "inputSpec": {
-      "type": "static",
-      "paths": "hdfs://hb-1.openstacklocal/user/hive/tpchFlattenedData_10/orderLineItemPartSupplierCustomer"
-    },
-    "metadataUpdateSpec": {
-      "type": "mysql",
-      "connectURI": "jdbc:mysql://hb-2.openstacklocal:3306/druid",
-      "password": "diurd",
-      "segmentTable": "druid_segments",
-      "user": "druid"
-    },
-    "segmentOutputPath": "hdfs://hb-1.openstacklocal/user/hive/druidStorage"
-  },
-  "tuningConfig": {
-    "type": "hadoop",
-    "workingPath": "/tmp",
-    "partitionsSpec": {
-      "type": "hashed",
-      "targetPartitionSize": 10000000
-    },
-    "leaveIntermediate": false,
-    "cleanupOnFailure": true,
-    "overwriteFiles": false,
-    "ignoreInvalidRows": false
-  }
-}
-#+end_src
-
-\printbibliography
-* Appendix C: Query Results
+* Appendix D: Query Results
 
 ** Raw Event Dataset Query Results
 #+begin_example
