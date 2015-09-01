@@ -2,7 +2,7 @@ name := "spark-druid-olap"
 
 version := "0.0.1"
 
-organization := "org.sparklinedata"
+organization := "SparklineData"
 
 scalaVersion := "2.10.4"
 
@@ -12,7 +12,7 @@ crossScalaVersions := Seq("2.10.4", "2.11.6")
 
 sparkVersion := "1.4.0"
 
-spName := "Sparklinedata/spark-druid-olap"
+spName := "SparklineData/spark-druid-olap"
 
 //spAppendScalaVersion := true
 
@@ -58,3 +58,11 @@ libraryDependencies ++= Seq(
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
 
 test in assembly := {}
+
+spShortDescription := "Spark Druid Package" // Your one line description of your package
+
+spDescription := """Spark-Druid package enables'Logical Plans' written against a raw event dataset
+                     to be rewritten to take advantage of a Drud Index of the Event data. It
+                     comprises of a 'Druid DataSource' that wraps the 'raw event dataset', and a
+                     'Druid Planner' that contains a set of Rewrite Rules to convert
+                     'Project-Filter-Aggregation-Having-Sort-Limit' plans to Druid Index Rest calls.""".stripMargin
