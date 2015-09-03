@@ -20,17 +20,18 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Sort, Limit, LogicalPlan}
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types.{StringType, DoubleType, IntegerType, LongType}
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidDimension, DruidDataType, DruidMetric}
 import org.sparklinedata.druid._
 
 
-abstract class DruidTransforms {
+abstract class DruidTransforms extends DruidPlannerHelper {
   self: DruidPlanner =>
 
   type DruidTransform = PartialFunction[(DruidQueryBuilder, LogicalPlan), Option[DruidQueryBuilder]]
+  type ODB = Option[DruidQueryBuilder]
 
   val druidRelationTransform: DruidTransform = {
     case (_, PhysicalOperation(projectList, filters,
@@ -309,6 +310,39 @@ abstract class DruidTransforms {
         }
       }
       case _ => None
+    }
+  }
+
+  /**
+   * ==Sort Rewrite:==
+   * A '''Sort''' Operator is pushed down to ''Druid'' if all its __order expressions__
+   * can be pushed down. An __order expression__ is pushed down if it is on an ''Expression''
+   * that is already pushed to Druid, or if it is an [[Alias]] expression whose child
+   * has been pushed to Druid.
+   *
+   * ==Limit Rewrite:==
+   * A '''Limit''' Operator above a Sort is always pushed down to Druid. The __limit__
+   * value is set on the [[LimitSpec]] of the [[GroupByQuerySpec]]
+   */
+  val limitTransform: DruidTransform = {
+    case (dqb, sort@Sort(orderExprs, global, child : Aggregate)) => { // TODO: handle Having
+      plan(dqb, child).flatMap { dqb =>
+        val exprToDruidOutput =
+          buildDruidSchemaMap(dqb.outputAttributeMap)
+
+        val dqb1 : ODB = orderExprs.foldLeft(Some(dqb).asInstanceOf[ODB]) { (dqb, e) =>
+          for(ue <- unalias(e.child, child);
+            doA <- exprToDruidOutput.get(ue))
+            yield dqb.get.orderBy(doA.name, e.direction == Ascending)
+        }
+        dqb1
+      }
+    }
+    case (dqb, sort@Limit(limitExpr, child : Sort )) => {
+      plan(dqb, child).flatMap { dqb =>
+        val amt = limitExpr.eval(null).asInstanceOf[Int]
+        dqb.limit(amt)
+      }
     }
   }
 }

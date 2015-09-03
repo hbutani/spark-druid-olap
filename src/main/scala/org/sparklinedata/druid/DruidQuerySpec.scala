@@ -314,14 +314,23 @@ case class JavascriptPostAggregationSpec(val `type`: String,
  */
 case class OrderByColumnSpec(val dimension: String,
                              val direction: String) {
-  def this(dimension: String) = this(dimension, "ascending")
+
+  def this(dimension: String, asc : Boolean) =
+    this(dimension, if (asc) "ascending" else "descending")
+
+  def this(dimension: String) =
+    this(dimension, "ascending")
 }
 
 case class LimitSpec(val `type`: String,
                      val limit: Int,
                      val columns: List[OrderByColumnSpec]) {
+
   def this(limit: Int,
            columns: List[OrderByColumnSpec]) = this("default", limit, columns)
+
+  def this(limit: Int,
+           columns: OrderByColumnSpec*) = this("default", limit, columns.toList)
 }
 
 sealed trait HavingSpec {

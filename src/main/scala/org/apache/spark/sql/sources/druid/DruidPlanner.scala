@@ -30,7 +30,8 @@ class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTran
   val transforms : Seq[Function[(DruidQueryBuilder,LogicalPlan),
     Option[Option[DruidQueryBuilder]]]] = Seq(
     druidRelationTransform.lift,
-    aggregateTransform.lift
+    aggregateTransform.lift,
+    limitTransform.lift
   )
 
   def plan(db : DruidQueryBuilder, plan: LogicalPlan): Option[DruidQueryBuilder] = {

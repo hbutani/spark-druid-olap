@@ -27,9 +27,6 @@ import scala.language.postfixOps
 
 class DruidRewritesTest extends BaseTest {
 
-
-  register(TestSQLContext)
-
   test("basicAgg") {
     val df = sqlAndLog("basicAgg",
       "select l_returnflag, l_linestatus, " +

@@ -27,7 +27,7 @@ import org.sparklinedata.druid._
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 
 private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
-with PredicateHelper with Logging {
+with PredicateHelper with DruidPlannerHelper with Logging {
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case l => {
@@ -84,24 +84,6 @@ with PredicateHelper with Logging {
 
     }
   }
-
-  /**
-   *
-   * @param outputAttributeMap outputAttributeMap from the QryBldr
-   * @return a map from the AggregationOp output to a DruidOperatorAttribute
-   */
-  def buildDruidSchemaMap(outputAttributeMap:
-                                    Map[String, (Expression, DataType, DataType)]):
-  Map[Expression, DruidOperatorAttribute] = (outputAttributeMap map {
-    case (nm, (e, oDT, dDT)) => {
-      val druidEid = e match {
-        case n: NamedExpression => n.exprId
-        case _ => NamedExpression.newExprId
-      }
-      (e -> DruidOperatorAttribute(druidEid,nm, dDT))
-    }
-  })
-
 
   def buildProjectionList(aggOp : Aggregate,
                           druidPushDownExprMap : Map[Expression, DruidOperatorAttribute]) :

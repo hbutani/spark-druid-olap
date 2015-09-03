@@ -24,6 +24,7 @@ import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.sql.test.TestSQLContext
 import org.apache.spark.sql.test.TestSQLContext._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.sparklinedata.spark.dateTime.Functions._
 
 abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
 
@@ -47,6 +48,7 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
 
   override def beforeAll() = {
 
+    register(TestSQLContext)
     DruidPlanner(TestSQLContext)
 
     val cT = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(o_orderkey integer,

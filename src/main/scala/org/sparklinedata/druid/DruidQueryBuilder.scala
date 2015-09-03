@@ -117,6 +117,19 @@ case class DruidQueryBuilder(val drInfo : DruidRelationInfo,
     this.copy(projectionAliasMap = (projectionAliasMap + (alias -> dColNm)))
   }
 
+  def orderBy(dimName : String, ascending : Boolean) : DruidQueryBuilder = limitSpec match {
+    case Some(LimitSpec(t, l, columns)) => limit(LimitSpec(t, l,
+      columns :+ new OrderByColumnSpec(dimName, ascending)))
+    case None =>  limit(new LimitSpec(Int.MaxValue,
+      new OrderByColumnSpec(dimName, ascending)))
+  }
+
+  def limit(amt : Int) : Option[DruidQueryBuilder] = limitSpec match {
+    case Some(LimitSpec(t, l, columns)) if (l == Int.MaxValue || l == amt) =>
+      Some(limit(LimitSpec(t, amt, columns )))
+    case _ => None
+  }
+
 }
 
 object DruidQueryBuilder {
