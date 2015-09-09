@@ -20,11 +20,9 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.Logging
 import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.{PhysicalRDD, SparkPlan, Project}
-import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
+import org.apache.spark.sql.execution.{PhysicalRDD, Project, SparkPlan, Union}
 import org.sparklinedata.druid._
-import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 
 private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
 with PredicateHelper with DruidPlannerHelper with Logging {
@@ -32,7 +30,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case l => {
 
-      val p = for (dqb <- planner.plan(null, l);
+      val p : Seq[SparkPlan] = for (dqb <- planner.plan(null, l);
                    a <- dqb.aggregateOper
       ) yield {
 
@@ -80,7 +78,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           Project(projections, new PhysicalRDD(druidOpAttrs.toList, dR.buildScan()))
         }
 
-      p.map(List(_)).getOrElse(Nil)
+        if (p.size < 2) p else Seq(Union(p))
 
     }
   }

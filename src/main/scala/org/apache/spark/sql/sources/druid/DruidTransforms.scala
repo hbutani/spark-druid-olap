@@ -20,17 +20,17 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Sort, Limit, LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types.{StringType, DoubleType, IntegerType, LongType}
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidDimension, DruidDataType, DruidMetric}
 import org.sparklinedata.druid._
 
-
 abstract class DruidTransforms extends DruidPlannerHelper {
   self: DruidPlanner =>
 
-  type DruidTransform = PartialFunction[(DruidQueryBuilder, LogicalPlan), Option[DruidQueryBuilder]]
+  type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan),
+    Seq[DruidQueryBuilder]]
   type ODB = Option[DruidQueryBuilder]
 
   val druidRelationTransform: DruidTransform = {
@@ -54,12 +54,47 @@ abstract class DruidTransforms extends DruidPlannerHelper {
               dimFilterExpression(b,e).map(p => b.filter(p))
             )
           }
-        }
-      } else None
+        }.map(Seq(_)).getOrElse(Seq())
+      } else Seq()
     }
+    case _ => Seq()
   }
 
   val aggregateTransform: DruidTransform = {
+    case(dqb, agg@Aggregate(gEs, aEs,
+    p@Project(projectList, e@Expand(projections, output, child)))) => {
+      plan(dqb, child).flatMap { dqb =>
+        val a = gEs
+        val b = aEs
+        val c = projectList
+        val d = projections
+        val e = output
+
+        VirtualColumn.groupingIdName
+        // Agg -> Prj -> Expand -> child
+
+        val timeElemExtractor = new TimeElementExtractor(dqb)
+
+        val dqb1 = gEs.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) { (dqb, e) =>
+          dqb.flatMap(groupingExpression(_, timeElemExtractor, e))
+        }
+
+        dqb1.map { dqb =>
+
+          /*
+           * Map from a GroupExpression to the index in the Expand.projections
+           */
+          val attrRefIdx : Option[List[(Expression, (AttributeReference, Int))]] =
+            Utils.sequence(gEs.map(gE => positionOfAttribute(gE, child)).toList)
+
+          dqb
+        }
+
+
+
+        None
+      }
+    }
     case (dqb, agg@Aggregate(gEs, aEs, child)) => {
       plan(dqb, child).flatMap { dqb =>
 
@@ -89,6 +124,7 @@ abstract class DruidTransforms extends DruidPlannerHelper {
 
       }
     }
+    case _ => Seq()
   }
 
 
@@ -326,7 +362,7 @@ abstract class DruidTransforms extends DruidPlannerHelper {
    */
   val limitTransform: DruidTransform = {
     case (dqb, sort@Sort(orderExprs, global, child : Aggregate)) => { // TODO: handle Having
-      plan(dqb, child).flatMap { dqb =>
+    val dqbs = plan(dqb, child).map { dqb =>
         val exprToDruidOutput =
           buildDruidSchemaMap(dqb.outputAttributeMap)
 
@@ -337,12 +373,15 @@ abstract class DruidTransforms extends DruidPlannerHelper {
         }
         dqb1
       }
+      Utils.sequence(dqbs.toList).getOrElse(Seq())
     }
     case (dqb, sort@Limit(limitExpr, child : Sort )) => {
-      plan(dqb, child).flatMap { dqb =>
+      val dqbs = plan(dqb, child).map { dqb =>
         val amt = limitExpr.eval(null).asInstanceOf[Int]
         dqb.limit(amt)
       }
+      Utils.sequence(dqbs.toList).getOrElse(Seq())
     }
+    case _ => Seq()
   }
 }

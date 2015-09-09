@@ -19,10 +19,10 @@ package org.sparklinedata.druid.client
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.hive.test.TestHive
+import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
-import org.apache.spark.sql.test.TestSQLContext
-import org.apache.spark.sql.test.TestSQLContext._
+
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.sparklinedata.spark.dateTime.Functions._
 
@@ -48,8 +48,8 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
 
   override def beforeAll() = {
 
-    register(TestSQLContext)
-    DruidPlanner(TestSQLContext)
+    register(TestHive)
+    DruidPlanner(TestHive)
 
     val cT = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(o_orderkey integer,
              o_custkey integer,
@@ -71,7 +71,7 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
       p_comment string, c_name string , c_address string , c_phone string , c_acctbal double ,
       c_mktsegment string , c_comment string , c_nation string , c_region string)
       USING com.databricks.spark.csv
-      OPTIONS (path "/Users/hbutani/tpch/datascale1/orderLineItemPartSupplierCustomer/",
+      OPTIONS (path "/Users/hbutani/tpch/datascale1/orderLineItemPartSupplierCustomer.small/",
       header "false", delimiter "|")""".stripMargin
 
     println(cT)

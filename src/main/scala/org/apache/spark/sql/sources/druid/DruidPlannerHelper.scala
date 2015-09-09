@@ -18,10 +18,10 @@
 package org.apache.spark.sql.sources.druid
 
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Alias, NamedExpression, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Aggregate}
 import org.apache.spark.sql.types.DataType
 import org.sparklinedata.druid.DruidOperatorAttribute
-
+import org.apache.spark.sql.catalyst.expressions.Attribute
 
 trait DruidPlannerHelper {
 
@@ -57,6 +57,15 @@ trait DruidPlannerHelper {
 
   }
 
+  def findAttribute(e : Expression) : Option[AttributeReference] = {
+    e.find(_.isInstanceOf[AttributeReference]).map(_.asInstanceOf[AttributeReference])
+  }
 
+  def positionOfAttribute(e : Expression,
+                          plan: LogicalPlan) : Option[(Expression, (AttributeReference, Int))] = {
+    for(aR <- findAttribute(e);
+        attr <- plan.output.zipWithIndex.find(t => t._1.exprId == aR.exprId))
+      yield (e, (aR, attr._2))
+  }
 
 }

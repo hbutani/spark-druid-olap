@@ -24,7 +24,7 @@ licenses := Seq("Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0")
 
 
 // Add Spark components this package depends on, e.g, "mllib", ....
-sparkComponents ++= Seq("sql")
+sparkComponents ++= Seq("sql", "hive")
 
 credentials += Credentials(Path.userHome / ".github.cred")
 
