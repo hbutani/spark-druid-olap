@@ -44,6 +44,7 @@ trait DruidPlannerHelper {
   def unalias(e: Expression, agg: Aggregate): Option[Expression] = {
 
     agg.aggregateExpressions.find { aE =>
+      // scalastyle:off if.brace
       if ((aE == e) ||
         (e.isInstanceOf[AttributeReference] &&
           e.asInstanceOf[AttributeReference].exprId == aE.exprId

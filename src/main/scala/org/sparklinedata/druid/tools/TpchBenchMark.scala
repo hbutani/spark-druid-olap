@@ -287,7 +287,7 @@ object TpchBenchMark {
       )
 
 
-    Seq(basicAgg, shipDteRange, projFiltRange, q1, q3, q5, q7, q8/*, q10*/)
+    Seq(basicAgg, shipDteRange, projFiltRange, q1, q3, q5, q7, q8 /* , q10 */)
   }
 
   def run(sqlCtx : SQLContext, c : Config) : Unit = {
@@ -339,8 +339,6 @@ object TpchBenchMark {
       println(r._1)
       println(r._2)
     }
-
-
   }
 
   def main(args: Array[String]) {

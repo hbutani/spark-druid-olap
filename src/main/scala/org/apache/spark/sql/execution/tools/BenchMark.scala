@@ -107,7 +107,7 @@ class BenchMark private(val sqlCtx: SQLContext,
   registerBaseDF
   registerDruidDS
 
-
+  // scalastyle:off object.name
   object queries {
 
     val basicAggDruid =
@@ -175,7 +175,8 @@ class BenchMark private(val sqlCtx: SQLContext,
       group by s_nation
 """)
 
-    val q1Druid = sqlCtx.sql("""select l_returnflag, l_linestatus, count(*), sum(l_extendedprice) as s,
+    val q1Druid = sqlCtx.sql("""select l_returnflag, l_linestatus,
+                            count(*), sum(l_extendedprice) as s,
               max(ps_supplycost) as m,
        avg(ps_availqty) as a,count(distinct o_orderkey)
        from orderLineItemPartSupplier
@@ -321,7 +322,8 @@ class BenchMark private(val sqlCtx: SQLContext,
 
 """)
 
-    val q1Base = sqlCtx.sql( """select l_returnflag, l_linestatus, count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m,
+    val q1Base = sqlCtx.sql( """select l_returnflag, l_linestatus,
+                            count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m,
        avg(ps_availqty) as a,count(distinct o_orderkey)
        from orderLineItemPartSupplierBase
        group by l_returnflag, l_linestatus""")

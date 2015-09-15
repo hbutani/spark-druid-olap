@@ -71,6 +71,7 @@ class TimeReferenceExtractor(val dqb : DruidQueryBuilder, indexColumn : Boolean 
     case ScalaUdf(fn, _, Seq(AttributeReference(nm, _, _, _)))
       if fn == dateTimeFn  => {
       val dC = dqb.druidColumn(nm)
+      // scalastyle:off if.brace
       if ( dC.isDefined && (!indexColumn || dC.get.name == DruidDataSource.TIME_COLUMN_NAME) )
         Some(nm)
       else None
