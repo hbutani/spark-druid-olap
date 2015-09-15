@@ -30,8 +30,8 @@ with PredicateHelper with DruidPlannerHelper with Logging {
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case l => {
 
-      val p : Seq[SparkPlan] = for (dqb <- planner.plan(null, l);
-                   a <- dqb.aggregateOper
+      val p: Seq[SparkPlan] = for (dqb <- planner.plan(null, l);
+                                   a <- dqb.aggregateOper
       ) yield {
 
           /*
@@ -74,32 +74,41 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           val druidOpAttrs = exprToDruidOutput.values.map {
             case DruidOperatorAttribute(eId, nm, dT) => AttributeReference(nm, dT)(eId)
           }
-          val projections = buildProjectionList(dqb.aggregateOper.get, exprToDruidOutput)
+          val projections = buildProjectionList(dqb.aggregateOper.get,
+            dqb.aggExprToLiteralExpr, exprToDruidOutput)
           Project(projections, new PhysicalRDD(druidOpAttrs.toList, dR.buildScan()))
         }
-
-        if (p.size < 2) p else Seq(Union(p))
+      val pL = p.toList
+      if (pL.size < 2) pL else Seq(Union(pL))
 
     }
   }
 
-  def buildProjectionList(aggOp : Aggregate,
-                          druidPushDownExprMap : Map[Expression, DruidOperatorAttribute]) :
+  def buildProjectionList(aggOp: Aggregate,
+                          grpExprToFillInLiteralExpr: Map[Expression, Expression],
+                          druidPushDownExprMap: Map[Expression, DruidOperatorAttribute]):
   Seq[NamedExpression] = {
 
-    aggOp.aggregateExpressions.map(_.transformUp {
-      case ne: AttributeReference if druidPushDownExprMap.contains(ne)  &&
+    /*
+     * Replace aggregationExprs with fillIn expressions setup for this GroupingSet.
+     * These are for Grouping__Id and for grouping expressions that are missing(null) for
+     * this Grouping Set.
+     */
+    val aEs = aggOp.aggregateExpressions.map { aE => grpExprToFillInLiteralExpr.getOrElse(aE, aE) }
+
+    aEs.map(_.transformUp {
+      case ne: AttributeReference if druidPushDownExprMap.contains(ne) &&
         druidPushDownExprMap(ne).dataType != ne.dataType => {
         val dA = druidPushDownExprMap(ne)
         Alias(Cast(
           AttributeReference(dA.name, dA.dataType)(dA.exprId), ne.dataType), dA.name)(dA.exprId)
       }
-      case ne: AttributeReference if druidPushDownExprMap.contains(ne)  &&
+      case ne: AttributeReference if druidPushDownExprMap.contains(ne) &&
         druidPushDownExprMap(ne).name != ne.name => {
         val dA = druidPushDownExprMap(ne)
         Alias(AttributeReference(dA.name, dA.dataType)(dA.exprId), dA.name)(dA.exprId)
       }
-      case ne: AttributeReference if druidPushDownExprMap.contains(ne)  => {
+      case ne: AttributeReference if druidPushDownExprMap.contains(ne) => {
         ne
       }
       case e: Expression if druidPushDownExprMap.contains(e) &&
@@ -109,7 +118,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           AttributeReference(dA.name, dA.dataType)(dA.exprId), e.dataType)
       }
       case e: Expression if druidPushDownExprMap.contains(e)
-         => {
+      => {
         val dA = druidPushDownExprMap(e)
         AttributeReference(dA.name, dA.dataType)(dA.exprId)
       }

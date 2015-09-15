@@ -17,11 +17,10 @@
 
 package org.apache.spark.sql.sources.druid
 
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Alias, NamedExpression, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Aggregate}
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
 import org.apache.spark.sql.types.DataType
 import org.sparklinedata.druid.DruidOperatorAttribute
-import org.apache.spark.sql.catalyst.expressions.Attribute
 
 trait DruidPlannerHelper {
 
@@ -38,18 +37,19 @@ trait DruidPlannerHelper {
         case n: NamedExpression => n.exprId
         case _ => NamedExpression.newExprId
       }
-      (e -> DruidOperatorAttribute(druidEid,nm, dDT))
+      (e -> DruidOperatorAttribute(druidEid, nm, dDT))
     }
   })
 
-  def unalias(e : Expression, agg : Aggregate) : Option[Expression] = {
+  def unalias(e: Expression, agg: Aggregate): Option[Expression] = {
 
-    agg.aggregateExpressions.find{ aE =>
-      if ( (aE == e) ||
+    agg.aggregateExpressions.find { aE =>
+      if ((aE == e) ||
         (e.isInstanceOf[AttributeReference] &&
           e.asInstanceOf[AttributeReference].exprId == aE.exprId
           )
-      ) true else false
+      ) true
+      else false
     }.map {
       case Alias(child, _) => child
       case x => x
@@ -57,15 +57,28 @@ trait DruidPlannerHelper {
 
   }
 
-  def findAttribute(e : Expression) : Option[AttributeReference] = {
+  def findAttribute(e: Expression): Option[AttributeReference] = {
     e.find(_.isInstanceOf[AttributeReference]).map(_.asInstanceOf[AttributeReference])
   }
 
-  def positionOfAttribute(e : Expression,
-                          plan: LogicalPlan) : Option[(Expression, (AttributeReference, Int))] = {
-    for(aR <- findAttribute(e);
-        attr <- plan.output.zipWithIndex.find(t => t._1.exprId == aR.exprId))
+  def positionOfAttribute(e: Expression,
+                          plan: LogicalPlan): Option[(Expression, (AttributeReference, Int))] = {
+    for (aR <- findAttribute(e);
+         attr <- plan.output.zipWithIndex.find(t => t._1.exprId == aR.exprId))
       yield (e, (aR, attr._2))
   }
+
+  /**
+   *
+   * @param gEs
+   * @param aEs
+   * @param aEToLiteralExpr for expressions that represent a 'null' value for
+   *                        a this GroupingSet or represent the 'grouping__id'
+   *                        columns, this is a map to the Literal value that is
+   *                        filled in the Projection above the DruidRDD.
+   */
+  case class GroupingInfo(gEs: Seq[Expression],
+                          aEs: Seq[NamedExpression],
+                          aEToLiteralExpr: Map[Expression, Expression] = Map())
 
 }

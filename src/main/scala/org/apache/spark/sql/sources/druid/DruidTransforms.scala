@@ -22,26 +22,27 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sources.LogicalRelation
-import org.apache.spark.sql.types.{StringType, DoubleType, IntegerType, LongType}
-import org.sparklinedata.druid.metadata.{DruidColumn, DruidDimension, DruidDataType, DruidMetric}
+import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType}
 import org.sparklinedata.druid._
+import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataType, DruidDimension, DruidMetric}
+
+import scala.collection.mutable.ArrayBuffer
 
 abstract class DruidTransforms extends DruidPlannerHelper {
   self: DruidPlanner =>
 
-  type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan),
-    Seq[DruidQueryBuilder]]
+  type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan), Seq[DruidQueryBuilder]]
   type ODB = Option[DruidQueryBuilder]
 
   val druidRelationTransform: DruidTransform = {
     case (_, PhysicalOperation(projectList, filters,
     l@LogicalRelation(d@DruidRelation(info, None)))) => {
-      var dqb : Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
+      var dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
       dqb = projectList.foldLeft(dqb) { (dqB, e) =>
         dqB.flatMap(projectExpression(_, e))
       }
 
-      if ( dqb.isDefined) {
+      if (dqb.isDefined) {
         /*
          * Filter Rewrites:
          * - A conjunct is a predicate on the Time Dimension => rewritten to Interval constraint
@@ -49,9 +50,9 @@ abstract class DruidTransforms extends DruidPlannerHelper {
          */
         val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb.get)
         filters.foldLeft(dqb) { (dqB, e) =>
-          dqB.flatMap{b =>
+          dqB.flatMap { b =>
             intervalFilterExpression(b, iCE, e).orElse(
-              dimFilterExpression(b,e).map(p => b.filter(p))
+              dimFilterExpression(b, e).map(p => b.filter(p))
             )
           }
         }.map(Seq(_)).getOrElse(Seq())
@@ -60,68 +61,147 @@ abstract class DruidTransforms extends DruidPlannerHelper {
     case _ => Seq()
   }
 
-  val aggregateTransform: DruidTransform = {
-    case(dqb, agg@Aggregate(gEs, aEs,
-    p@Project(projectList, e@Expand(projections, output, child)))) => {
-      plan(dqb, child).flatMap { dqb =>
-        val a = gEs
-        val b = aEs
-        val c = projectList
-        val d = projections
-        val e = output
+  private def transformSingleGrouping(dqb: DruidQueryBuilder,
+                                      aggOp: Aggregate,
+                                      grpInfo: GroupingInfo): Option[DruidQueryBuilder] = {
+    val timeElemExtractor = new TimeElementExtractor(dqb)
 
-        VirtualColumn.groupingIdName
-        // Agg -> Prj -> Expand -> child
+    /*
+     * For pushing down to Druid only consider the GrpExprs that don't have a override
+     * for this GroupingInfo(these are expressions that are missing(null) and the Grouping__Id
+     * column). For the initial call, the grouping__id is not in the override list, so we
+     * also check for it explicitly here.
+     */
+    val gEsToDruid = grpInfo.gEs.filter {
+      case x if grpInfo.aEToLiteralExpr.contains(x) => false
+      case AttributeReference(
+      VirtualColumn.groupingIdName, IntegerType, _, _) => false
+      case _ => true
+    }
 
-        val timeElemExtractor = new TimeElementExtractor(dqb)
-
-        val dqb1 = gEs.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) { (dqb, e) =>
+    val dqb1 =
+      gEsToDruid.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) {
+        (dqb, e) =>
           dqb.flatMap(groupingExpression(_, timeElemExtractor, e))
-        }
+      }
 
-        dqb1.map { dqb =>
+    val allAggregates =
+      grpInfo.aEs.flatMap(_ collect { case a: AggregateExpression => a })
+    // Collect all aggregate expressions that can be computed partially.
+    val partialAggregates =
+      grpInfo.aEs.flatMap(_ collect { case p: PartialAggregate => p })
+
+    // Only do partial aggregation if supported by all aggregate expressions.
+    if (allAggregates.size == partialAggregates.size) {
+      val dqb2 = partialAggregates.foldLeft(dqb1) {
+        (dqb, ne) =>
+          dqb.flatMap(aggregateExpression(_, ne))
+      }
+
+      dqb2.map(_.aggregateOp(aggOp)).map(
+        _.copy(aggExprToLiteralExpr = grpInfo.aEToLiteralExpr)
+      )
+    } else {
+      None
+    }
+  }
+
+
+  val aggregateTransform: DruidTransform = {
+    case (dqb, agg@Aggregate(gEs, aEs,
+    p@Project(projectList, expandOp@Expand(projections, output, child)))) => {
+      plan(dqb, child).flatMap { dqb =>
+        /*
+         * First check if the GroupBy and Aggregate Expressions are pushable to
+         * Druid.
+         */
+        val dqb1 = transformSingleGrouping(dqb,
+          agg,
+          GroupingInfo(gEs, aEs))
+
+        /*
+         * If yes, then try to create a DruidQueryBuilder for each Expand projection.
+         * Currently this is a all or nothing step. If any projection is not
+         * rewritten to a DQB then the entire rewrite is abandoned.
+         */
+        val childDQBs: Option[Seq[DruidQueryBuilder]] = dqb1.flatMap { _ =>
 
           /*
            * Map from a GroupExpression to the index in the Expand.projections
            */
-          val attrRefIdx : Option[List[(Expression, (AttributeReference, Int))]] =
-            Utils.sequence(gEs.map(gE => positionOfAttribute(gE, child)).toList)
+          val attrRefIdxList: Option[List[(Expression, (AttributeReference, Int))]] =
+            Utils.sequence(gEs.map(gE => positionOfAttribute(gE, expandOp)).toList)
 
-          dqb
+          attrRefIdxList.map { attrRefIdxList =>
+
+            val geToPosMap = attrRefIdxList.toMap
+
+            val grpSetInfos = projections.map { p =>
+              /*
+               * Represents a mapping from an AggExpr to the override value added in the Project
+               * above the DruidRDD. Any missing(null) Group Expr for this Projection and
+               * the Grouping__Id columns are added to this list. So these are not pushed to
+               * Druid, but added in on the Projection above the Druid ResultSet.
+               */
+              val literlVals: ArrayBuffer[(Expression, Expression)] = ArrayBuffer()
+
+              /*
+               * a list of gE and its corresponding aE. But for grouping___id, it may not
+               * be in aE list, just use the gE.
+               */
+              val gEsAndaEs = gEs.init.zip(aEs) :+(gEs.last, gEs.last)
+
+              gEsAndaEs.foreach { t =>
+                val gE: Expression = t._1
+                val aE: Expression = t._2
+                val gEAttrRef = geToPosMap(gE)._1
+                val gExprDT = gEAttrRef.dataType
+                val idx = geToPosMap(gE)._2
+                val grpingExpr = p.children(idx)
+
+                val transformedGExpr: Expression = aE match {
+                  case ar@AttributeReference(nm, _, _, _) => Alias(grpingExpr, nm)(ar.exprId)
+                  case al@Alias(_, nm) => Alias(grpingExpr, nm)(al.exprId)
+                  case _ => gE.transformUp {
+                    case x if x == gEAttrRef => grpingExpr
+                  }
+                }
+
+                (aE, grpingExpr) match {
+                  case (AttributeReference(
+                  VirtualColumn.groupingIdName, IntegerType, _, _), _) =>
+                    literlVals += ((aE, transformedGExpr))
+                  case (Alias(AttributeReference(
+                  VirtualColumn.groupingIdName, IntegerType, _, _), _), _) =>
+                    literlVals += ((aE, transformedGExpr))
+                  case (_, Literal(null, gExprDT)) => literlVals += ((aE, transformedGExpr))
+                  case _ => ()
+                }
+
+              }
+
+              GroupingInfo(gEs, aEs, literlVals.toMap)
+            }
+
+            val dqbs: Seq[Option[DruidQueryBuilder]] = grpSetInfos.map { gInfo =>
+
+              transformSingleGrouping(dqb,
+                agg,
+                gInfo)
+
+            }
+            Utils.sequence(dqbs.toList).getOrElse(Nil)
+          }
+
         }
-
-
-
-        None
+        childDQBs.getOrElse(Nil)
       }
     }
     case (dqb, agg@Aggregate(gEs, aEs, child)) => {
       plan(dqb, child).flatMap { dqb =>
-
-        val timeElemExtractor = new TimeElementExtractor(dqb)
-
-        val dqb1 = gEs.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) { (dqb, e) =>
-          dqb.flatMap(groupingExpression(_, timeElemExtractor, e))
-        }
-
-        val allAggregates =
-          aEs.flatMap(_ collect { case a: AggregateExpression => a})
-        // Collect all aggregate expressions that can be computed partially.
-        val partialAggregates =
-          aEs.flatMap(_ collect { case p: PartialAggregate => p})
-
-        // Only do partial aggregation if supported by all aggregate expressions.
-        if (allAggregates.size == partialAggregates.size) {
-          val dqb2 = partialAggregates.foldLeft(dqb1) {
-            (dqb, ne) =>
-              dqb.flatMap(aggregateExpression(_, ne))
-          }
-
-          dqb2.map(_.aggregateOp(agg))
-        } else {
-          None
-        }
-
+        transformSingleGrouping(dqb,
+          agg,
+          GroupingInfo(gEs, aEs))
       }
     }
     case _ => Seq()
@@ -246,7 +326,7 @@ abstract class DruidTransforms extends DruidPlannerHelper {
    * @return
    */
   def groupingExpression(dqb: DruidQueryBuilder,
-                         timeElemExtractor : TimeElementExtractor,
+                         timeElemExtractor: TimeElementExtractor,
                          ge: Expression):
   Option[DruidQueryBuilder] = {
     ge match {
@@ -258,8 +338,8 @@ abstract class DruidTransforms extends DruidPlannerHelper {
       case timeElemExtractor(nm, dC, tzId, fmt) => {
         Some(
           dqb.dimension(new ExtractionDimensionSpec(dC.name, nm,
-          new TimeFormatExtractionFunctionSpec(fmt, tzId))).
-          outputAttribute(nm, ge, ge.dataType, StringType)
+            new TimeFormatExtractionFunctionSpec(fmt, tzId))).
+            outputAttribute(nm, ge, ge.dataType, StringType)
         )
       }
       case _ => None
@@ -271,14 +351,14 @@ abstract class DruidTransforms extends DruidPlannerHelper {
     case AttributeReference(nm, dT, _, _) if dqb.druidColumn(nm).isDefined
     => Some(dqb)
     case Alias(ar@AttributeReference(nm1, dT, _, _), nm) => {
-      for(dqbc <- projectExpression(dqb, ar))
+      for (dqbc <- projectExpression(dqb, ar))
         yield dqbc.addAlias(nm, nm1)
     }
     case _ => None
   }
 
   def intervalFilterExpression(dqb: DruidQueryBuilder,
-                               iCE : IntervalConditionExtractor, fe: Expression):
+                               iCE: IntervalConditionExtractor, fe: Expression):
   Option[DruidQueryBuilder] = fe match {
     case iCE(iC) => dqb.interval(iC)
     case _ => None
@@ -361,21 +441,22 @@ abstract class DruidTransforms extends DruidPlannerHelper {
    * value is set on the [[LimitSpec]] of the [[GroupByQuerySpec]]
    */
   val limitTransform: DruidTransform = {
-    case (dqb, sort@Sort(orderExprs, global, child : Aggregate)) => { // TODO: handle Having
-    val dqbs = plan(dqb, child).map { dqb =>
+    case (dqb, sort@Sort(orderExprs, global, child: Aggregate)) => {
+      // TODO: handle Having
+      val dqbs = plan(dqb, child).map { dqb =>
         val exprToDruidOutput =
           buildDruidSchemaMap(dqb.outputAttributeMap)
 
-        val dqb1 : ODB = orderExprs.foldLeft(Some(dqb).asInstanceOf[ODB]) { (dqb, e) =>
-          for(ue <- unalias(e.child, child);
-            doA <- exprToDruidOutput.get(ue))
+        val dqb1: ODB = orderExprs.foldLeft(Some(dqb).asInstanceOf[ODB]) { (dqb, e) =>
+          for (ue <- unalias(e.child, child);
+               doA <- exprToDruidOutput.get(ue))
             yield dqb.get.orderBy(doA.name, e.direction == Ascending)
         }
         dqb1
       }
       Utils.sequence(dqbs.toList).getOrElse(Seq())
     }
-    case (dqb, sort@Limit(limitExpr, child : Sort )) => {
+    case (dqb, sort@Limit(limitExpr, child: Sort)) => {
       val dqbs = plan(dqb, child).map { dqb =>
         val amt = limitExpr.eval(null).asInstanceOf[Int]
         dqb.limit(amt)
