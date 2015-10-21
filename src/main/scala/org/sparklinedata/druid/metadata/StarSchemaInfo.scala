@@ -27,9 +27,10 @@ import scala.collection.mutable.ArrayBuffer
  * Describes the relations in a Star Schema. Used to build a [[StarSchema]] model.
  * This will be part of the [[org.sparklinedata.druid.DefaultSource DruidDataSource]] defintion.
  *
+ * @param factTable name of the fact table for the StarSchema
  * @param relations how are tables related in this StarSchema.
  */
-case class StarSchemaInfo(relations : StarRelationInfo*)
+case class StarSchemaInfo(factTable : String, relations : StarRelationInfo*)
 
 /**
  * Represents how 2 tables in a StarSchema are related.
@@ -289,8 +290,7 @@ object StarSchema {
     Right(())
   }
 
-  def apply(factTable : String,
-            info : StarSchemaInfo)(implicit sqlContext : SQLContext) :
+  def apply(info : StarSchemaInfo)(implicit sqlContext : SQLContext) :
   Either[ErrorInfo, StarSchema] = {
 
     val joinGraph : StarJoinGraph = collection.mutable.Map()
@@ -314,8 +314,8 @@ object StarSchema {
     val tableMap = collection.mutable.Map[String, StarTable]()
     val attrMap = collection.mutable.Map[String, StarTable]()
 
-    if ( !joinGraph.contains(factTable)) {
-      return Left(s"No joins specified for the Fact table '$factTable'")
+    if ( !joinGraph.contains(info.factTable)) {
+      return Left(s"No joins specified for the Fact table '${info.factTable}'")
     }
 
     def addTables(tables : Seq[String]) : Either[ErrorInfo, Unit] = {
@@ -356,7 +356,7 @@ object StarSchema {
 
     }
 
-    tableMap(factTable) = StarTable(factTable, None)
+    tableMap(info.factTable) = StarTable(info.factTable, None)
     /**
      * Starting from the '''Fact Table''' recursively walk the Related tables, building out the
      * StarSchema with a [[StarTable]] node for each table. The following constraints are
@@ -364,12 +364,12 @@ object StarSchema {
      *  - there is a unique Path to any Table.
      *  - the columnNames across the StarSchema are unique.
      */
-    val r = addTables(Seq(factTable))
+    val r = addTables(Seq(info.factTable))
 
     r match {
       case Left(err) => Left(err)
       case _ => Right(new StarSchema(info,
-        tableMap(factTable),
+        tableMap(info.factTable),
         tableMap.toMap,
         attrMap.toMap)
       )

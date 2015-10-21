@@ -32,6 +32,7 @@ case class DruidRelationInfo(val druidClientInfo : DruidClientInfo,
                          val druidDS : DruidDataSource,
                          val sourceToDruidMapping : Map[String, DruidColumn],
                          val fd : FunctionalDependencies,
+                            val starSchema : Option[StarSchema],
                          val maxCardinality : Long,
                          val cardinalityPerDruidQuery : Long,
                               val allowCountDistinct : Boolean) {
@@ -51,6 +52,7 @@ object DruidRelationInfo {
              druidPort : Int,
              columnMapping : Map[String, String],
              functionalDeps : List[FunctionalDependency],
+             starSchema : Option[StarSchema],
             maxCardinality : Long,
             cardinalityPerDruidQuery : Long,
              allowCountDistinct : Boolean = true) : DruidRelationInfo = {
@@ -68,6 +70,7 @@ object DruidRelationInfo {
     druidDS,
     sourceToDruidMapping,
     fd,
+    starSchema,
     maxCardinality,
     cardinalityPerDruidQuery,
     allowCountDistinct)

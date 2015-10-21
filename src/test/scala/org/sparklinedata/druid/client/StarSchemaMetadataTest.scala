@@ -18,6 +18,7 @@
 package org.sparklinedata.druid.client
 
 import org.apache.spark.sql.hive.test.TestHive
+import org.sparklinedata.druid.Utils
 import org.sparklinedata.druid.metadata.{StarSchema, StarRelationInfo, StarSchemaInfo}
 
 
@@ -25,11 +26,11 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   test("simpleStar") {
 
-    val starInfo = StarSchemaInfo(
-      StarRelationInfo.manyToone("lineitembase", "orders", ("l_orderkey", "o_orderkey"))
+    val starInfo = StarSchemaInfo("lineitem",
+      StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey"))
     )
 
-    val ss = StarSchema("lineitembase", starInfo)(TestHive)
+    val ss = StarSchema(starInfo)(TestHive)
 
     println(ss.right.get.prettyString)
 
@@ -37,13 +38,13 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   test("salesStar") {
 
-    val starInfo = StarSchemaInfo(
-      StarRelationInfo.manyToone("lineitembase", "orders", ("l_orderkey", "o_orderkey")),
-      StarRelationInfo.manyToone("lineitembase", "part", ("l_partkey", "p_partkey")),
-      StarRelationInfo.manyToone("lineitembase", "supplier", ("l_suppkey", "s_suppkey"))
+    val starInfo = StarSchemaInfo("lineitem",
+      StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),
+      StarRelationInfo.manyToone("lineitem", "part", ("l_partkey", "p_partkey")),
+      StarRelationInfo.manyToone("lineitem", "supplier", ("l_suppkey", "s_suppkey"))
     )
 
-    val ss = StarSchema("lineitembase", starInfo)(TestHive)
+    val ss = StarSchema(starInfo)(TestHive)
 
     println(ss.right.get.prettyString)
 
@@ -51,9 +52,9 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   test("tpch") {
 
-    val starInfo = StarSchemaInfo(
-      StarRelationInfo.manyToone("lineitembase", "orders", ("l_orderkey", "o_orderkey")),
-      StarRelationInfo.manyToone("lineitembase", "partsupp",
+    val starInfo = StarSchemaInfo("lineitem",
+      StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),
+      StarRelationInfo.manyToone("lineitem", "partsupp",
         ("l_partkey", "ps_partkey"), ("l_suppkey", "ps_suppkey")),
       StarRelationInfo.manyToone("partsupp", "part", ("ps_partkey", "p_partkey")),
       StarRelationInfo.manyToone("partsupp", "supplier", ("ps_suppkey", "s_suppkey")),
@@ -64,24 +65,26 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
       StarRelationInfo.manyToone("suppnation", "suppregion", ("sn_regionkey", "sr_regionkey"))
     )
 
-    val ss = StarSchema("lineitembase", starInfo)(TestHive)
+    val ss = StarSchema(starInfo)(TestHive)
 
     println(ss.right.get.prettyString)
+
+    Utils.logStarSchema(starInfo)
 
   }
 
   test("multiPathsNotAllowed") {
 
-    val starInfo = StarSchemaInfo(
-      StarRelationInfo.manyToone("lineitembase", "orders", ("l_orderkey", "o_orderkey")),
-      StarRelationInfo.manyToone("lineitembase", "partsupp",
+    val starInfo = StarSchemaInfo("lineitem",
+      StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),
+      StarRelationInfo.manyToone("lineitem", "partsupp",
         ("l_partkey", "ps_partkey"), ("l_suppkey", "ps_suppkey")),
       StarRelationInfo.manyToone("partsupp", "part", ("ps_partkey", "p_partkey")),
       StarRelationInfo.manyToone("partsupp", "supplier", ("ps_suppkey", "s_suppkey")),
-      StarRelationInfo.manyToone("lineitembase", "supplier", ("li_suppkey", "s_suppkey"))
+      StarRelationInfo.manyToone("lineitem", "supplier", ("li_suppkey", "s_suppkey"))
     )
 
-    val ss = StarSchema("lineitembase", starInfo)(TestHive)
+    val ss = StarSchema(starInfo)(TestHive)
 
     assert(ss.left.get == "multiple join paths to table 'supplier'")
 
@@ -89,17 +92,17 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   test("nonUniqueColumnsNotAllowed") {
 
-    val starInfo = StarSchemaInfo(
-      StarRelationInfo.manyToone("lineitembase", "orders", ("l_orderkey", "o_orderkey")),
-      StarRelationInfo.manyToone("lineitembase", "partsupp",
+    val starInfo = StarSchemaInfo("lineitem",
+      StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),
+      StarRelationInfo.manyToone("lineitem", "partsupp",
         ("l_partkey", "ps_partkey"), ("l_suppkey", "ps_suppkey")),
       StarRelationInfo.manyToone("partsupp", "part", ("ps_partkey", "p_partkey")),
       StarRelationInfo.manyToone("partsupp", "supplier", ("ps_suppkey", "s_suppkey")),
-      StarRelationInfo.manyToone("lineitembase", "partsupp2",
+      StarRelationInfo.manyToone("lineitem", "partsupp2",
         ("l_partkey", "ps_partkey"), ("l_suppkey", "ps_suppkey"))
     )
 
-    val ss = StarSchema("lineitembase", starInfo)(TestHive)
+    val ss = StarSchema(starInfo)(TestHive)
 
     assert(ss.left.get ==
       "Column ps_partkey is not unique across Star Schema; in tables partsupp2, partsupp")

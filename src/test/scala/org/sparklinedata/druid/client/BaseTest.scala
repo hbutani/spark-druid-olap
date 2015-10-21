@@ -46,6 +46,89 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
       |]
     """.stripMargin.replace('\n', ' ')
 
+  val starSchema =
+  """
+    |{
+    |  "factTable" : "lineitem",
+    |  "relations" : [ {
+    |    "leftTable" : "lineitem",
+    |    "rightTable" : "orders",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "l_orderkey",
+    |      "rightAttribute" : "o_orderkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "lineitem",
+    |    "rightTable" : "partsupp",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "l_partkey",
+    |      "rightAttribute" : "ps_partkey"
+    |    }, {
+    |      "leftAttribute" : "l_suppkey",
+    |      "rightAttribute" : "ps_suppkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "partsupp",
+    |    "rightTable" : "part",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "ps_partkey",
+    |      "rightAttribute" : "p_partkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "partsupp",
+    |    "rightTable" : "supplier",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "ps_suppkey",
+    |      "rightAttribute" : "s_suppkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "orders",
+    |    "rightTable" : "customer",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "o_custkey",
+    |      "rightAttribute" : "c_custkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "customer",
+    |    "rightTable" : "custnation",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "c_nationkey",
+    |      "rightAttribute" : "cn_nationkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "custnation",
+    |    "rightTable" : "custregion",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "cn_regionkey",
+    |      "rightAttribute" : "cr_regionkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "supplier",
+    |    "rightTable" : "suppnation",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "s_nationkey",
+    |      "rightAttribute" : "sn_nationkey"
+    |    } ]
+    |  }, {
+    |    "leftTable" : "suppnation",
+    |    "rightTable" : "suppregion",
+    |    "relationType" : "n-1",
+    |    "joinCondition" : [ {
+    |      "leftAttribute" : "sn_regionkey",
+    |      "rightAttribute" : "sr_regionkey"
+    |    } ]
+    |  } ]
+    |}
+  """.stripMargin.replace('\n', ' ')
+
   override def beforeAll() = {
 
     register(TestHive)

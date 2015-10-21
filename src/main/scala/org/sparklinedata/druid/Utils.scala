@@ -23,7 +23,7 @@ import org.json4s.{Extraction, ShortTypeHints, FullTypeHints, DefaultFormats}
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.Serialization
 import org.sparklinedata.druid.client.QueryResultRowSerializer
-import org.sparklinedata.druid.metadata.FunctionalDependencyType
+import org.sparklinedata.druid.metadata.{EqualityCondition, StarRelationInfo, StarSchemaInfo, FunctionalDependencyType}
 
 object Utils extends Logging {
 
@@ -68,7 +68,10 @@ object Utils extends Logging {
         classOf[TimeParsingExtractionFunctionSpec],
         classOf[TimeSeriesQuerySpec],
         classOf[TopNMetricSpec],
-        classOf[TopNQuerySpec]
+        classOf[TopNQuerySpec],
+        classOf[StarSchemaInfo],
+        classOf[StarRelationInfo],
+        classOf[EqualityCondition]
       )
     )
   ) +
@@ -77,6 +80,10 @@ object Utils extends Logging {
 
   def logQuery(dq : DruidQuery) : Unit = {
     log.info("\nDruid Query:\n" + pretty(render(Extraction.decompose(dq))))
+  }
+
+  def logStarSchema(ss : StarSchemaInfo) : Unit = {
+    log.info("\nStar Schema:\n" + pretty(render(Extraction.decompose(ss))))
   }
 
   def queryToString(dq : DruidQuery) : String = pretty(render(Extraction.decompose(dq)))

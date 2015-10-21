@@ -23,7 +23,8 @@ import org.apache.spark.sql.sources.{BaseRelation, RelationProvider}
 import org.json4s._
 import org.json4s.ext.{EnumNameSerializer}
 import org.json4s.jackson.JsonMethods._
-import org.sparklinedata.druid.metadata.{DruidRelationInfo, FunctionalDependencyType, FunctionalDependency}
+import org.sparklinedata.druid.metadata.{DruidRelationInfo, FunctionalDependency}
+import org.sparklinedata.druid.metadata.{StarSchemaInfo, StarSchema}
 
 class DefaultSource extends RelationProvider with Logging {
 
@@ -73,6 +74,20 @@ class DefaultSource extends RelationProvider with Logging {
     val druidHost = parameters.get(DRUID_HOST_PARAM).getOrElse(DEFAULT_DRUID_HOST)
     val druidPort : Int = parameters.get(DRUID_PORT_PARAM).getOrElse(DEFAULT_DRUID_PORT).toInt
 
+    val starSchemaInfo =
+      parameters.get(STAR_SCHEMA_INFO_PARAM).map(parse(_).extract[StarSchemaInfo])
+
+    var starSchema : Option[StarSchema] = None
+
+    if (starSchemaInfo.isDefined) {
+      val ss = StarSchema(starSchemaInfo.get)(sqlContext)
+      if (ss.isLeft) {
+        throw new DruidDataSourceException(
+          s"Failed to parse StarSchemaInfo: ${ss.left.get}")
+      }
+      starSchema = Some(ss.right.get)
+    }
+
     val drI = DruidRelationInfo(sourceDFName, sourceDF,
     dsName,
     timeDimensionCol,
@@ -80,6 +95,7 @@ class DefaultSource extends RelationProvider with Logging {
     druidPort,
     columnMapping,
     fds,
+    starSchema,
     maxCardinality,
     cardinalityPerDruidQuery)
 
@@ -140,5 +156,7 @@ object DefaultSource {
 
   // this is only for test purposes
   val DRUID_QUERY = "druidQuery"
+
+  val STAR_SCHEMA_INFO_PARAM = "starSchema"
 
 }

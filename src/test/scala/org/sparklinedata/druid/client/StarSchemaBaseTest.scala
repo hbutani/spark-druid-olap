@@ -17,18 +17,16 @@
 
 package org.sparklinedata.druid.client
 
-import org.apache.spark.Logging
-import org.apache.spark.sql.hive.test.TestHive
-import org.apache.spark.sql.hive.test.TestHive._
-import org.apache.spark.sql.sources.druid.DruidPlanner
-import org.scalatest.BeforeAndAfterAll
-import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.sparklinedata.spark.dateTime.Functions._
-import org.sparklinedata.spark.dateTime.dsl.expressions._
 import com.github.nscala_time.time.Imports._
+import org.apache.spark.Logging
+import org.apache.spark.sql.catalyst.dsl.expressions._
+import org.apache.spark.sql.hive.test.TestHive._
+import org.scalatest.BeforeAndAfterAll
+import org.sparklinedata.spark.dateTime.dsl.expressions._
+
 import scala.language.postfixOps
 
-object TpchQueries {
+object StarSchemaTpchQueries {
 
   val q1Predicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 3.day)
 
@@ -156,10 +154,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
   def tpchDataFolder(tableName : String) = s"$TPCH_BASE_DIR/$tableName/"
 
   override def beforeAll() = {
-    //super.beforeAll()
-
-    register(TestHive)
-    DruidPlanner(TestHive)
+    super.beforeAll()
 
     sql(s"""CREATE TEMPORARY TABLE lineitembase(l_orderkey integer,
         l_partkey integer, l_suppkey integer,
@@ -271,19 +266,18 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       header "false", delimiter "|")""".stripMargin)
 
 
-
-
-    //    sql(
-//      s"""CREATE TEMPORARY TABLE lineitem
-//      USING org.sparklinedata.druid
-//      OPTIONS (sourceDataframe "lineItemBase",
-//      timeDimensionColumn "l_shipdate",
-//      druidDatasource "tpch",
-//      druidHost "localhost",
-//      druidPort "8082",
-//      columnMapping '$colMapping',
-//      functionalDependencies '$functionalDependencies')""".stripMargin
-//    )
+    sql(
+      s"""CREATE TEMPORARY TABLE lineitem
+      USING org.sparklinedata.druid
+      OPTIONS (sourceDataframe "lineItemBase",
+      timeDimensionColumn "l_shipdate",
+      druidDatasource "tpch",
+      druidHost "localhost",
+      druidPort "8082",
+      columnMapping '$colMapping',
+      functionalDependencies '$functionalDependencies',
+      starSchema '$starSchema')""".stripMargin
+    )
 
 
   }
