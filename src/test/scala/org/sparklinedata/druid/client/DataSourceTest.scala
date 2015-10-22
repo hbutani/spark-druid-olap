@@ -49,6 +49,7 @@ class DataSourceTest extends BaseTest {
       druidPort "8082",
       columnMapping '$colMapping',
       functionalDependencies '$functionalDependencies',
+      starSchema '$flatStarSchema',
       druidQuery '$dq')""".stripMargin
 
     println(q)
@@ -75,6 +76,7 @@ class DataSourceTest extends BaseTest {
       druidPort "8082",
       columnMapping '$colMapping',
       functionalDependencies '$functionalDependencies',
+      starSchema '$flatStarSchema',
       druidQuery '$dq')""".stripMargin
     )
 

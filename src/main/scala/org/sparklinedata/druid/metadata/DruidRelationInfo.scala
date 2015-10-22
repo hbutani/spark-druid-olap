@@ -32,7 +32,7 @@ case class DruidRelationInfo(val druidClientInfo : DruidClientInfo,
                          val druidDS : DruidDataSource,
                          val sourceToDruidMapping : Map[String, DruidColumn],
                          val fd : FunctionalDependencies,
-                            val starSchema : Option[StarSchema],
+                            val starSchema : StarSchema,
                          val maxCardinality : Long,
                          val cardinalityPerDruidQuery : Long,
                               val allowCountDistinct : Boolean) {
@@ -44,7 +44,8 @@ case class DruidRelationInfo(val druidClientInfo : DruidClientInfo,
 object DruidRelationInfo {
 
   // scalastyle:off parameter.number
-  def apply(sourceDFName : String,
+  def apply(sqlContext : SQLContext,
+            sourceDFName : String,
              sourceDF : DataFrame,
            dsName : String,
             timeDimensionCol : String,
@@ -52,7 +53,7 @@ object DruidRelationInfo {
              druidPort : Int,
              columnMapping : Map[String, String],
              functionalDeps : List[FunctionalDependency],
-             starSchema : Option[StarSchema],
+             starSchema : StarSchema,
             maxCardinality : Long,
             cardinalityPerDruidQuery : Long,
              allowCountDistinct : Boolean = true) : DruidRelationInfo = {
@@ -60,7 +61,8 @@ object DruidRelationInfo {
     val client = new DruidClient(druidHost, druidPort)
     val druidDS = client.metadata(dsName)
     val sourceToDruidMapping =
-      MappingBuilder.buildMapping(columnMapping, sourceDF, timeDimensionCol, druidDS)
+      MappingBuilder.buildMapping(sqlContext, sourceDFName,
+        starSchema, columnMapping, timeDimensionCol, druidDS)
     val fd = new FunctionalDependencies(druidDS, functionalDeps,
       DependencyGraph(druidDS, functionalDeps))
 
@@ -91,24 +93,29 @@ private object MappingBuilder extends Logging {
     case _ => false
   }
 
-  def buildMapping( nameMapping : Map[String, String],
-                            sourceDF : DataFrame,
-                    timeDimensionCol : String,
-                            druidDS : DruidDataSource) : Map[String, DruidColumn] = {
+  def buildMapping(sqlContext : SQLContext,
+                  sourceDFName : String,
+                    starSchema : StarSchema,
+                   nameMapping : Map[String, String],timeDimensionCol : String,
+                   druidDS : DruidDataSource) : Map[String, DruidColumn] = {
 
     val m = MMap[String, DruidColumn]()
 
-    sourceDF.schema.iterator.foreach { f =>
-      if ( supportedDataType(f.dataType)) {
-        val dCol = druidDS.columns.get(nameMapping.getOrElse(f.name, f.name))
-        if ( dCol.isDefined) {
-          m += (f.name -> dCol.get)
-        } else if (f.name == timeDimensionCol) {
-          m += (f.name -> druidDS.timeDimension.get)
-        }
+    starSchema.tableMap.values.foreach { t =>
+      val tName = if ( t.name == starSchema.factTable.name) sourceDFName else t.name
+      val df = sqlContext.table(tName)
+      df.schema.iterator.foreach { f =>
+        if (supportedDataType(f.dataType)) {
+          val dCol = druidDS.columns.get(nameMapping.getOrElse(f.name, f.name))
+          if (dCol.isDefined) {
+            m += (f.name -> dCol.get)
+          } else if (f.name == timeDimensionCol) {
+            m += (f.name -> druidDS.timeDimension.get)
+          }
 
-      } else {
-        logDebug(s"${f.name} not mapped to Druid dataSource, unsupported dataType")
+        } else {
+          logDebug(s"${f.name} not mapped to Druid dataSource, unsupported dataType")
+        }
       }
     }
 

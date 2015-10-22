@@ -314,9 +314,9 @@ object StarSchema {
     val tableMap = collection.mutable.Map[String, StarTable]()
     val attrMap = collection.mutable.Map[String, StarTable]()
 
-    if ( !joinGraph.contains(info.factTable)) {
-      return Left(s"No joins specified for the Fact table '${info.factTable}'")
-    }
+//    if ( !joinGraph.contains(info.factTable)) {
+//      return Left(s"No joins specified for the Fact table '${info.factTable}'")
+//    }
 
     def addTables(tables : Seq[String]) : Either[ErrorInfo, Unit] = {
 
@@ -364,7 +364,26 @@ object StarSchema {
      *  - there is a unique Path to any Table.
      *  - the columnNames across the StarSchema are unique.
      */
-    val r = addTables(Seq(info.factTable))
+    val r = addTables(Seq(info.factTable)).right.flatMap { x =>
+
+      val tableSet = scala.collection.mutable.Set[String]()
+      info.relations.foreach { r =>
+        tableSet += r.leftTable
+        tableSet += r.rightTable
+      }
+
+      val errors = (ArrayBuffer[String]() /: tableSet) {
+        case (a, t) if (!tableMap.contains(t)) =>
+          a += "Table '${t}' is not part of the join Graph"
+        case (a, t) => a
+      }
+
+      if ( errors.size > 0) {
+        return Left(errors.mkString("\n"))
+      } else {
+        Right(())
+      }
+    }
 
     r match {
       case Left(err) => Left(err)

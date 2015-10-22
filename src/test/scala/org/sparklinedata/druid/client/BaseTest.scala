@@ -46,6 +46,14 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
       |]
     """.stripMargin.replace('\n', ' ')
 
+  val flatStarSchema =
+    """
+      |{
+      |  "factTable" : "orderLineItemPartSupplier",
+      |  "relations" : []
+      | }
+    """.stripMargin.replace('\n', ' ')
+
   val starSchema =
   """
     |{
@@ -170,7 +178,8 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
       druidHost "localhost",
       druidPort "8082",
       columnMapping '$colMapping',
-      functionalDependencies '$functionalDependencies')""".stripMargin
+      functionalDependencies '$functionalDependencies',
+      starSchema '$flatStarSchema')""".stripMargin
 
     println(cTOlap)
     sql(cTOlap)

@@ -75,27 +75,26 @@ class DefaultSource extends RelationProvider with Logging {
     val druidPort : Int = parameters.get(DRUID_PORT_PARAM).getOrElse(DEFAULT_DRUID_PORT).toInt
 
     val starSchemaInfo =
-      parameters.get(STAR_SCHEMA_INFO_PARAM).map(parse(_).extract[StarSchemaInfo])
+      parameters.get(STAR_SCHEMA_INFO_PARAM).map(parse(_).extract[StarSchemaInfo]).orElse(
+        throw new DruidDataSourceException(
+          s"'$STAR_SCHEMA_INFO_PARAM' must be specified for Druid DataSource")
+      ).get
 
-    var starSchema : Option[StarSchema] = None
-
-    if (starSchemaInfo.isDefined) {
-      val ss = StarSchema(starSchemaInfo.get)(sqlContext)
+      val ss = StarSchema(starSchemaInfo)(sqlContext)
       if (ss.isLeft) {
         throw new DruidDataSourceException(
           s"Failed to parse StarSchemaInfo: ${ss.left.get}")
       }
-      starSchema = Some(ss.right.get)
-    }
 
-    val drI = DruidRelationInfo(sourceDFName, sourceDF,
+    val drI = DruidRelationInfo(sqlContext,
+      sourceDFName, sourceDF,
     dsName,
     timeDimensionCol,
     druidHost,
     druidPort,
     columnMapping,
     fds,
-    starSchema,
+      ss.right.get,
     maxCardinality,
     cardinalityPerDruidQuery)
 

@@ -20,6 +20,7 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
+import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sources.LogicalRelation
 import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType}
@@ -465,4 +466,42 @@ abstract class DruidTransforms extends DruidPlannerHelper {
     }
     case _ => Seq()
   }
+
+  val joinTransform : DruidTransform = {
+      case (dqb, Join(
+      left,
+        PhysicalOperation(projectList, filters,l@LogicalRelation(dimRelation)),
+     Inner,
+      Some(joinCond)
+      )
+        )=> {
+
+        joinPlan(dqb, left).flatMap { dqb =>
+
+          var dqb1: Option[DruidQueryBuilder] = Some(dqb)
+
+          dqb1 = projectList.foldLeft(dqb1) { (dqB, e) =>
+            dqB.flatMap(projectExpression(_, e))
+          }
+
+          if (dqb1.isDefined) {
+            /*
+             * Filter Rewrites:
+             * - A conjunct is a predicate on the Time Dimension => rewritten to Interval constraint
+             * - A expression containing comparisons on Dim Columns.
+             */
+            val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb1.get)
+            filters.foldLeft(dqb1) { (dqB, e) =>
+              dqB.flatMap { b =>
+                intervalFilterExpression(b, iCE, e).orElse(
+                  dimFilterExpression(b, e).map(p => b.filter(p))
+                )
+              }
+            }.map(Seq(_)).getOrElse(Seq())
+          } else Seq()
+        }
+
+      }
+      case _ => Seq()
+    }
 }
