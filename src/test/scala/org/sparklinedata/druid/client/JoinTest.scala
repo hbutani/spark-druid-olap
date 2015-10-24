@@ -19,19 +19,41 @@ package org.sparklinedata.druid.client
 
 class JoinTest extends StarSchemaBaseTest {
 
-  test("basicJoin") {
-    val df = sqlAndLog("li-supp-join",
+  test("2tableJoin") {
+    val df = sqlAndLog("li-partsupp",
       "select  l_linestatus, sum(ps_availqty) " +
         "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
         "and li.l_partkey = ps.ps_partkey " +
         "group by l_linestatus")
     logPlan("basicJoin", df)
-
     df.explain(true)
+    //df.show()
+  }
 
-    df.show()
+  test("2tableJoinFactTableIsRight") {
+    val df = sqlAndLog("partsupp-li",
+      "select  l_linestatus, sum(ps_availqty) " +
+        "from partsupp ps join lineitem li  on  li.l_suppkey = ps.ps_suppkey " +
+        "and li.l_partkey = ps.ps_partkey " +
+        "group by l_linestatus")
+    df.explain(true)
+    //df.show()
+  }
 
+  test("3tableJoin") {
+    val df = sqlAndLog("li-partsupp-supp",
+      "select  s_name, sum(ps_availqty) " +
+        "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
+        "and li.l_partkey = ps.ps_partkey " +
+        " join supplier s on ps.ps_suppkey = s.s_suppkey " +
+        "group by s_name")
+    df.explain(true)
+    //df.show()
+  }
 
+  test("tpchQ3") {
+    val df = sqlAndLog("tpchQ3", StarSchemaTpchQueries.q3)
+    df.explain(true)
   }
 
   test("basicJoinAgg") {

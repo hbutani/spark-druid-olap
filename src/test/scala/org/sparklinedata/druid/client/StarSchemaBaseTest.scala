@@ -36,7 +36,7 @@ object StarSchemaTpchQueries {
        avg(ps_availqty) as a,count(distinct o_orderkey)
        from lineitem
        where $q1Predicate
-       group by l_returnflag, l_linestatus"""
+       group by l_returnflag, l_linestatus""".stripMargin
 
   val q3OrderDtPredicate = dateTime('o_orderdate) < dateTime("1995-03-15")
   val q3ShipDtPredicate = dateTime('l_shipdate) > dateTime("1995-03-15")
@@ -55,7 +55,7 @@ object StarSchemaTpchQueries {
       group by o_orderkey,
       o_orderdate,
       o_shippriority
-      """
+      """.stripMargin
 
   val q5orderDtPredicateLower = dateTime('o_orderdate) >= dateTime("1994-01-01")
   val q5OrderDtPredicateUpper= dateTime('o_orderdate) < (dateTime("1994-01-01") + 1.year)
@@ -74,7 +74,7 @@ object StarSchemaTpchQueries {
       and $q5orderDtPredicateLower
       and $q5OrderDtPredicateUpper
       group by s_nation
-      """
+      """.stripMargin
 
   val q5Altered =  date"""
       select s_nation,
@@ -89,7 +89,7 @@ object StarSchemaTpchQueries {
       and $q5orderDtPredicateLower
       and $q5OrderDtPredicateUpper
       group by s_nation
-      """
+      """.stripMargin
 
   val q7ShipDtYear = dateTime('l_shipdate) year
 
@@ -106,7 +106,7 @@ object StarSchemaTpchQueries {
            (cn_name = 'FRANCE' and sn_name = 'GERMANY')
            )
     group by sn_name, cn_name, $q7ShipDtYear
-    """
+    """.stripMargin
 
   val q8OrderDtYear = dateTime('o_orderdate) year
 
@@ -127,7 +127,7 @@ object StarSchemaTpchQueries {
                    |s_nationkey = n2.sn_nationkey
       c_region = 'AMERICA' and p_type = 'ECONOMY ANODIZED STEEL' and $q8DtP1 and $q8DtP2
       group by $q8OrderDtYear
-      """
+      """.stripMargin
 
   val q10DtP1 = dateTime('o_orderdate) >= dateTime("1993-10-01")
   val q10DtP2 = dateTime('o_orderdate) < (dateTime("1993-10-01") + 3.month)
@@ -144,7 +144,7 @@ object StarSchemaTpchQueries {
       $q10DtP2 and
       l_returnflag = 'R'
     group by c_name, c_nation, c_address, c_phone, c_comment
-    """
+    """.stripMargin
 }
 
 class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
