@@ -30,7 +30,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
       StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey"))
     )
 
-    val ss = StarSchema(starInfo)(TestHive)
+    val ss = StarSchema("lineitembase", starInfo)(TestHive)
 
     println(ss.right.get.prettyString)
 
@@ -44,7 +44,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
       StarRelationInfo.manyToone("lineitem", "supplier", ("l_suppkey", "s_suppkey"))
     )
 
-    val ss = StarSchema(starInfo)(TestHive)
+    val ss = StarSchema("lineitembase", starInfo)(TestHive)
 
     println(ss.right.get.prettyString)
 
@@ -65,7 +65,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
       StarRelationInfo.manyToone("suppnation", "suppregion", ("sn_regionkey", "sr_regionkey"))
     )
 
-    val ss = StarSchema(starInfo)(TestHive)
+    val ss = StarSchema("lineitembase", starInfo)(TestHive)
 
     println(ss.right.get.prettyString)
 
@@ -84,7 +84,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
       StarRelationInfo.manyToone("lineitem", "supplier", ("li_suppkey", "s_suppkey"))
     )
 
-    val ss = StarSchema(starInfo)(TestHive)
+    val ss = StarSchema("lineitembase", starInfo)(TestHive)
 
     assert(ss.left.get == "multiple join paths to table 'supplier'")
 
@@ -102,7 +102,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
         ("l_partkey", "ps_partkey"), ("l_suppkey", "ps_suppkey"))
     )
 
-    val ss = StarSchema(starInfo)(TestHive)
+    val ss = StarSchema("lineitembase", starInfo)(TestHive)
 
     assert(ss.left.get ==
       "Column ps_partkey is not unique across Star Schema; in tables partsupp2, partsupp")

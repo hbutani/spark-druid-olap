@@ -40,6 +40,7 @@ class DruidRDD(sqlContext: SQLContext,
     val p = split.asInstanceOf[DruidPartition]
     val client = new DruidClient(drInfo.druidClientInfo.host, drInfo.druidClientInfo.port)
     val mQry = dQuery.q.setInterval(p.i)
+    Utils.logQuery(mQry)
     val r = client.executeQuery(mQry)
     val schema = dQuery.schema(drInfo)
     r.iterator.map { r =>

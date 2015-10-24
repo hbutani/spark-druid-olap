@@ -190,6 +190,8 @@ case class StarSchema(val info : StarSchemaInfo,
         case (l,r) => (l.get,r.get)
       }
 
+    var flip = false
+
     /*
      * the 2 tables must be related in the StarSchema.
      */
@@ -197,6 +199,7 @@ case class StarSchema(val info : StarSchemaInfo,
       case(lT, rT) if (lT.parent.isDefined && lT.parent.get.tableName == rT.name) =>
         lT.parent.get.joiningKeys
       case(lT, rT) if (rT.parent.isDefined && rT.parent.get.tableName == lT.name) =>
+        flip = true
         rT.parent.get.joiningKeys
       case _ => null
     }
@@ -205,11 +208,14 @@ case class StarSchema(val info : StarSchemaInfo,
       return None
     }
 
+    val lKeys = if (!flip) leftJoinKeys else rightJoinKeys
+    val rKeys = if (!flip) rightJoinKeys else leftJoinKeys
+
     /*
      * form a list of tuples representing the joined columns from the 2 tables.
      */
-    val joiningKeys = (leftJoinKeys.map(_.asInstanceOf[AttributeReference].name)).zip(
-      rightJoinKeys.map(_.asInstanceOf[AttributeReference].name)
+    val joiningKeys = (lKeys.map(_.asInstanceOf[AttributeReference].name)).zip(
+      rKeys.map(_.asInstanceOf[AttributeReference].name)
     ).toList
 
     /*
@@ -290,7 +296,7 @@ object StarSchema {
     Right(())
   }
 
-  def apply(info : StarSchemaInfo)(implicit sqlContext : SQLContext) :
+  def apply(sourceDFName : String, info : StarSchemaInfo)(implicit sqlContext : SQLContext) :
   Either[ErrorInfo, StarSchema] = {
 
     val joinGraph : StarJoinGraph = collection.mutable.Map()
@@ -314,9 +320,17 @@ object StarSchema {
     val tableMap = collection.mutable.Map[String, StarTable]()
     val attrMap = collection.mutable.Map[String, StarTable]()
 
-//    if ( !joinGraph.contains(info.factTable)) {
-//      return Left(s"No joins specified for the Fact table '${info.factTable}'")
-//    }
+    def addColumns(tabNm : String, tbl : StarTable) : Either[ErrorInfo, Unit] = {
+
+      sqlContext.table(tabNm).schema.fieldNames.foreach { aName =>
+        if ( attrMap.contains(aName) ) {
+          return Left(s"Column $aName is not unique across Star Schema; " +
+            s"in tables ${attrMap(aName).name}, $tabNm")
+        }
+        attrMap(aName) = tbl
+      }
+      return Right(())
+    }
 
     def addTables(tables : Seq[String]) : Either[ErrorInfo, Unit] = {
 
@@ -337,17 +351,9 @@ object StarSchema {
             val childStarTable = StarTable(childTable,
             Some(StarRelation(tName, jRInfo._1, flipJoinCondition(jRInfo._2))))
             tableMap(childTable) = childStarTable
-
-            sqlContext.table(childTable).schema.fieldNames.foreach { aName =>
-              if ( attrMap.contains(aName) ) {
-                return Left(s"Column $aName is not unique across Star Schema; " +
-                  s"in tables ${attrMap(aName).name}, $childTable")
-              }
-              attrMap(aName) = childStarTable
-            }
-
+            val r = addColumns(childTable, childStarTable)
+            if (r.isLeft) return r
             descendantTables += childTable
-
           }
         }
       }
@@ -357,6 +363,11 @@ object StarSchema {
     }
 
     tableMap(info.factTable) = StarTable(info.factTable, None)
+    val ac = addColumns(sourceDFName, tableMap(info.factTable))
+    if (ac.isLeft) {
+      return Left(ac.left.get)
+    }
+
     /**
      * Starting from the '''Fact Table''' recursively walk the Related tables, building out the
      * StarSchema with a [[StarTable]] node for each table. The following constraints are

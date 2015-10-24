@@ -21,17 +21,17 @@ class JoinTest extends StarSchemaBaseTest {
 
   test("basicJoin") {
     val df = sqlAndLog("li-supp-join",
-      "select s_name, l_linestatus " +
-        "from lineitem li join supplier s on  li.l_suppkey = s.s_suppkey ")
-    logPlan("basicAggOrderByDimension", df)
-
-    val lp = df.queryExecution.optimizedPlan
-
-    val pp = df.queryExecution.sparkPlan
-
-    //df.show()
+      "select  l_linestatus, sum(ps_availqty) " +
+        "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
+        "and li.l_partkey = ps.ps_partkey " +
+        "group by l_linestatus")
+    logPlan("basicJoin", df)
 
     df.explain(true)
+
+    df.show()
+
+
   }
 
   test("basicJoinAgg") {

@@ -19,10 +19,10 @@ package org.apache.spark.sql.sources.druid
 
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.PhysicalOperation
+import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalOperation}
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.sources.LogicalRelation
+import org.apache.spark.sql.sources.{BaseRelation, LogicalRelation}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType}
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataType, DruidDimension, DruidMetric}
@@ -35,29 +35,39 @@ abstract class DruidTransforms extends DruidPlannerHelper {
   type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan), Seq[DruidQueryBuilder]]
   type ODB = Option[DruidQueryBuilder]
 
+  def translateProjectFilter(dqb1 : Option[DruidQueryBuilder],
+                             projectList : Seq[NamedExpression],
+                             filters : Seq[Expression],
+                             joinAttrs : Set[String] = Set()) : Seq[DruidQueryBuilder] = {
+
+    val dqb = projectList.foldLeft(dqb1) { (dqB, e) =>
+      dqB.flatMap(projectExpression(_, e, joinAttrs))
+    }
+
+    if (dqb.isDefined) {
+      /*
+       * Filter Rewrites:
+       * - A conjunct is a predicate on the Time Dimension => rewritten to Interval constraint
+       * - A expression containing comparisons on Dim Columns.
+       */
+      val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb.get)
+      filters.foldLeft(dqb) { (dqB, e) =>
+        dqB.flatMap { b =>
+          intervalFilterExpression(b, iCE, e).orElse(
+            dimFilterExpression(b, e).map(p => b.filter(p))
+          )
+        }
+      }.map(Seq(_)).getOrElse(Seq())
+    } else Seq()
+  }
+
   val druidRelationTransform: DruidTransform = {
     case (_, PhysicalOperation(projectList, filters,
     l@LogicalRelation(d@DruidRelation(info, None)))) => {
-      var dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
-      dqb = projectList.foldLeft(dqb) { (dqB, e) =>
-        dqB.flatMap(projectExpression(_, e))
-      }
-
-      if (dqb.isDefined) {
-        /*
-         * Filter Rewrites:
-         * - A conjunct is a predicate on the Time Dimension => rewritten to Interval constraint
-         * - A expression containing comparisons on Dim Columns.
-         */
-        val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb.get)
-        filters.foldLeft(dqb) { (dqB, e) =>
-          dqB.flatMap { b =>
-            intervalFilterExpression(b, iCE, e).orElse(
-              dimFilterExpression(b, e).map(p => b.filter(p))
-            )
-          }
-        }.map(Seq(_)).getOrElse(Seq())
-      } else Seq()
+      val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
+      translateProjectFilter(dqb,
+        projectList,
+        filters)
     }
     case _ => Seq()
   }
@@ -347,9 +357,17 @@ abstract class DruidTransforms extends DruidPlannerHelper {
     }
   }
 
-  def projectExpression(dqb: DruidQueryBuilder, pe: Expression):
+  def projectExpression(dqb: DruidQueryBuilder, pe: Expression,
+                        joinAttrs: Set[String] = Set()):
   Option[DruidQueryBuilder] = pe match {
     case AttributeReference(nm, dT, _, _) if dqb.druidColumn(nm).isDefined
+    => Some(dqb)
+    /*
+     * If Attribute is a joining column and it is not in the DruidIndex,
+     * then allow this. This is used when replacing a Dimension Table
+     * join with a DriudQuery.
+     */
+    case AttributeReference(nm, dT, _, _) if joinAttrs.contains(nm)
     => Some(dqb)
     case Alias(ar@AttributeReference(nm1, dT, _, _), nm) => {
       for (dqbc <- projectExpression(dqb, ar))
@@ -467,41 +485,80 @@ abstract class DruidTransforms extends DruidPlannerHelper {
     case _ => Seq()
   }
 
-  val joinTransform : DruidTransform = {
-      case (dqb, Join(
-      left,
-        PhysicalOperation(projectList, filters,l@LogicalRelation(dimRelation)),
-     Inner,
-      Some(joinCond)
-      )
-        )=> {
+  def translateJoin(leftExpressions : Seq[Expression],
+                    rightExpressions : Seq[Expression],
+                    left : LogicalPlan,
+                    dimProjectList : Seq[NamedExpression],
+                    dimFilters : Seq[Expression],
+                   dimRelation : BaseRelation,
+                    projectListOnTopOfJoin: Seq[NamedExpression]
+                     ) : Seq[DruidQueryBuilder] = {
+    joinPlan(null, left).flatMap { dqb =>
 
-        joinPlan(dqb, left).flatMap { dqb =>
+      var dqb1: Option[DruidQueryBuilder] = Some(dqb)
 
-          var dqb1: Option[DruidQueryBuilder] = Some(dqb)
+      val (leftTable, righTable) = dqb1.flatMap{ dqb =>
+        dqb.drInfo.starSchema.isStarJoin(leftExpressions, rightExpressions)
+      }.getOrElse((null, null))
 
-          dqb1 = projectList.foldLeft(dqb1) { (dqB, e) =>
-            dqB.flatMap(projectExpression(_, e))
-          }
-
-          if (dqb1.isDefined) {
-            /*
-             * Filter Rewrites:
-             * - A conjunct is a predicate on the Time Dimension => rewritten to Interval constraint
-             * - A expression containing comparisons on Dim Columns.
-             */
-            val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb1.get)
-            filters.foldLeft(dqb1) { (dqB, e) =>
-              dqB.flatMap { b =>
-                intervalFilterExpression(b, iCE, e).orElse(
-                  dimFilterExpression(b, e).map(p => b.filter(p))
-                )
-              }
-            }.map(Seq(_)).getOrElse(Seq())
-          } else Seq()
-        }
-
+      dqb1 = leftTable match {
+        case null => None
+        case _ => dqb1
       }
-      case _ => Seq()
+
+      val rightJoinAttrs : Set[String] = rightExpressions.map {
+        case AttributeReference(nm, _, _, _) => nm
+      }.toSet
+
+      translateProjectFilter(dqb1,
+        dimProjectList,
+        dimFilters,
+        rightJoinAttrs)
+
     }
+  }
+
+  val joinTransform: DruidTransform = {
+    case (dqb, ExtractEquiJoinKeys(
+    Inner,
+    leftExpressions,
+    rightExpressions,
+    None,
+    left,
+    PhysicalOperation(projectList, filters, l@LogicalRelation(dimRelation))
+    )
+      ) => {
+
+      translateJoin(leftExpressions,
+        rightExpressions,
+        left,
+        projectList,
+        filters,
+        dimRelation,
+        Seq()
+      )
+    }
+    case (dqb, Project(joinProjectList,
+    ExtractEquiJoinKeys(
+    Inner,
+    leftExpressions,
+    rightExpressions,
+    None,
+    left,
+    PhysicalOperation(projectList, filters, l@LogicalRelation(dimRelation))
+    )
+    )) => {
+
+      translateJoin(leftExpressions,
+        rightExpressions,
+        left,
+        projectList,
+        filters,
+        dimRelation,
+        joinProjectList
+      )
+    }
+    case _ => Seq()
+  }
+
 }

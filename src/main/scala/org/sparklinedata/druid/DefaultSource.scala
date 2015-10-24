@@ -80,7 +80,7 @@ class DefaultSource extends RelationProvider with Logging {
           s"'$STAR_SCHEMA_INFO_PARAM' must be specified for Druid DataSource")
       ).get
 
-      val ss = StarSchema(starSchemaInfo)(sqlContext)
+      val ss = StarSchema(sourceDFName, starSchemaInfo)(sqlContext)
       if (ss.isLeft) {
         throw new DruidDataSourceException(
           s"Failed to parse StarSchemaInfo: ${ss.left.get}")

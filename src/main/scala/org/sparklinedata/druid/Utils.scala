@@ -82,6 +82,10 @@ object Utils extends Logging {
     log.info("\nDruid Query:\n" + pretty(render(Extraction.decompose(dq))))
   }
 
+  def logQuery(qSpec : QuerySpec) : Unit = {
+    log.info("\nDruid Query:\n" + pretty(render(Extraction.decompose(qSpec))))
+  }
+
   def logStarSchema(ss : StarSchemaInfo) : Unit = {
     log.info("\nStar Schema:\n" + pretty(render(Extraction.decompose(ss))))
   }
