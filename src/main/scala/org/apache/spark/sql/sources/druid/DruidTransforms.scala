@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.sources.druid
 
+import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalOperation}
@@ -71,7 +72,8 @@ trait LimitTransfom {
 }
 
 abstract class DruidTransforms extends DruidPlannerHelper
-with ProjectFilterTransfom with AggregateTransform with JoinTransform with LimitTransfom {
+with ProjectFilterTransfom with AggregateTransform with JoinTransform with LimitTransfom
+with Logging  {
   self: DruidPlanner =>
 
   type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan), Seq[DruidQueryBuilder]]

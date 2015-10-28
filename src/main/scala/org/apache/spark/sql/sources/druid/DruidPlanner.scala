@@ -28,7 +28,7 @@ class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTran
     (new DruidStrategy(this) +: sqlContext.experimental.extraStrategies)
 
   val joinGraphTransforms : Seq[DruidTransform] = Seq(
-    druidRelationTransform,
+    druidRelationTransformForJoin,
     joinTransform
   )
 

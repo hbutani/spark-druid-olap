@@ -172,7 +172,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
            |o_orderkey integer, o_custkey integer,
            |    o_orderstatus VARCHAR(1),
            |    o_totalprice double,
-           |    o_orderdate DATE,
+           |    o_orderdate string,
            |    o_orderpriority VARCHAR(15),
            |    o_clerk VARCHAR(15),
            |    o_shippriority integer,

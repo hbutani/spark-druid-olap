@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.sources.LogicalRelation
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.DruidDimension
+import Debugging._
 
 trait ProjectFilterTransfom {
   self: DruidPlanner =>
@@ -29,10 +30,14 @@ trait ProjectFilterTransfom {
   def translateProjectFilter(dqb1 : Option[DruidQueryBuilder],
                              projectList : Seq[NamedExpression],
                              filters : Seq[Expression],
+                            ignoreProjectList : Boolean = false,
                              joinAttrs : Set[String] = Set()) : Seq[DruidQueryBuilder] = {
-
-    val dqb = projectList.foldLeft(dqb1) { (dqB, e) =>
-      dqB.flatMap(projectExpression(_, e, joinAttrs))
+    val dqb = if (ignoreProjectList) {
+      dqb1
+    } else {
+      projectList.foldLeft(dqb1) { (dqB, e) =>
+        dqB.flatMap(projectExpression(_, e, joinAttrs))
+      }
     }
 
     if (dqb.isDefined) {
@@ -48,7 +53,7 @@ trait ProjectFilterTransfom {
             dimFilterExpression(b, e).map(p => b.filter(p))
           )
         }
-      }.map(Seq(_)).getOrElse(Seq())
+      }.debug.map(Seq(_)).getOrElse(Seq())
     } else Seq()
   }
 
@@ -59,6 +64,22 @@ trait ProjectFilterTransfom {
       translateProjectFilter(dqb,
         projectList,
         filters)
+    }
+    case _ => Seq()
+  }
+
+  /**
+   * For joins ignore projections at the individual table level. The projections above
+   * the final join will be checked.
+   */
+  val druidRelationTransformForJoin: DruidTransform = {
+    case (_, PhysicalOperation(projectList, filters,
+    l@LogicalRelation(d@DruidRelation(info, None)))) => {
+      val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
+      translateProjectFilter(dqb,
+        projectList,
+        filters,
+        true)
     }
     case _ => Seq()
   }

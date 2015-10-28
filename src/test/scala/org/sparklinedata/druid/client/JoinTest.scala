@@ -54,6 +54,7 @@ class JoinTest extends StarSchemaBaseTest {
   test("tpchQ3") {
     val df = sqlAndLog("tpchQ3", StarSchemaTpchQueries.q3)
     df.explain(true)
+    df.show()
   }
 
   test("basicJoinAgg") {
