@@ -18,17 +18,10 @@
 package org.apache.spark.sql.sources.druid
 
 import org.apache.spark.Logging
-import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.{ExtractEquiJoinKeys, PhysicalOperation}
-import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.sources.{BaseRelation, LogicalRelation}
-import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType}
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataType, DruidDimension, DruidMetric}
-
-import scala.collection.mutable.ArrayBuffer
+import scala.language.implicitConversions
 
 trait LimitTransfom {
   self: DruidPlanner =>
@@ -78,5 +71,25 @@ with Logging  {
 
   type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan), Seq[DruidQueryBuilder]]
   type ODB = Option[DruidQueryBuilder]
+
+  case class ORTransform(t1 : DruidTransform, t2 : DruidTransform) extends DruidTransform {
+
+    def apply(t : (Seq[DruidQueryBuilder], LogicalPlan)) : Seq[DruidQueryBuilder] = {
+
+      val r = t1((t._1, t._2))
+      if (r.size > 0) {
+        r
+      } else {
+        t2((t._1, t._2))
+      }
+    }
+  }
+
+  case class TransformHolder(t : DruidTransform) {
+
+    def or(t2 : DruidTransform) = ORTransform(t, t2)
+  }
+
+  implicit def transformToHolder(t : DruidTransform) = TransformHolder(t)
 
 }

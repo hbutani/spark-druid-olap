@@ -28,15 +28,13 @@ class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTran
     (new DruidStrategy(this) +: sqlContext.experimental.extraStrategies)
 
   val joinGraphTransforms : Seq[DruidTransform] = Seq(
-    druidRelationTransformForJoin,
-    joinTransform
+    druidRelationTransformForJoin or joinTransform
   )
 
   val transforms : Seq[DruidTransform] = Seq(
-    druidRelationTransform,
+    druidRelationTransform or joinTransform,
     aggregateTransform,
-    limitTransform,
-    joinTransform
+    limitTransform
   )
 
   def plan(db : Seq[DruidQueryBuilder], plan: LogicalPlan): Seq[DruidQueryBuilder] = {
