@@ -32,7 +32,9 @@ class DataSourceTest extends BaseTest {
   }
 
   test("noQuery") {
-    sql("select * from orderLineItemPartSupplier").show(10)
+    val df = sql("select * from orderLineItemPartSupplier")
+    df.explain(true)
+    df.show(10)
   }
 
   test("tpchQ1") {

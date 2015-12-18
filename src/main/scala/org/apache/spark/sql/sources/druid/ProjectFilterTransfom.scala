@@ -19,7 +19,7 @@ package org.apache.spark.sql.sources.druid
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
-import org.apache.spark.sql.sources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.DruidDimension
 import Debugging._

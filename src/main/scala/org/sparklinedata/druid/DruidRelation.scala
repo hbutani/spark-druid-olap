@@ -18,6 +18,7 @@
 package org.sparklinedata.druid
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Attribute, ExprId}
 import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.sources.{TableScan, BaseRelation}
@@ -97,9 +98,16 @@ case class DruidRelation (val info : DruidRelationInfo,
    - optionally a  Druid Query
    */
 
+  override val needConversion: Boolean = false
+
   override def schema: StructType =
     dQuery.map(_.schema(info)).getOrElse(info.sourceDF(sqlContext).schema)
 
+  def buildInternalScan : RDD[InternalRow] =
+    dQuery.map(new DruidRDD(sqlContext, info, _)).getOrElse(
+      info.sourceDF(sqlContext).queryExecution.toRdd
+    )
+
   override def buildScan(): RDD[Row] =
-    dQuery.map(new DruidRDD(sqlContext, info, _)).getOrElse(info.sourceDF(sqlContext).rdd)
+    buildInternalScan.asInstanceOf[RDD[Row]]
 }

@@ -382,7 +382,7 @@ class BenchMark private(val sqlCtx: SQLContext,
     """)
 
     private def getDruidRDD(p : SparkPlan) : Option[DruidRDD] = p match {
-      case PhysicalRDD(_, r) if r.isInstanceOf[DruidRDD] => Some(r.asInstanceOf[DruidRDD])
+      case PhysicalRDD(_, r, _) if r.isInstanceOf[DruidRDD] => Some(r.asInstanceOf[DruidRDD])
       case _ if p.children.size == 1 => getDruidRDD(p.children(0))
     }
 

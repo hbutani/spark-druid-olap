@@ -21,7 +21,8 @@ import org.apache.spark.sql.catalyst.expressions.{AttributeReference, NamedExpre
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ExtractEquiJoinKeys}
 import org.apache.spark.sql.catalyst.plans.Inner
 import org.apache.spark.sql.catalyst.plans.logical.{Project, LogicalPlan}
-import org.apache.spark.sql.sources.{LogicalRelation, BaseRelation}
+import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.sources.BaseRelation
 import org.sparklinedata.druid.DruidQueryBuilder
 import org.sparklinedata.druid.metadata.StarSchema
 

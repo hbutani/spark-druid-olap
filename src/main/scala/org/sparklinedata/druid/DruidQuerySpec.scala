@@ -213,7 +213,7 @@ case class CardinalityAggregationSpec(val `type`: String,
   def this(name: String,
            fieldNames: List[String]) = this("cardinality", name, fieldNames, true)
 
-  def sparkDataType(dDS : DruidDataSource) : DataType = LongType
+  def sparkDataType(dDS : DruidDataSource) : DataType = DoubleType
 }
 
 /**

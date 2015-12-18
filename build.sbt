@@ -10,7 +10,7 @@ parallelExecution in Test := false
 
 crossScalaVersions := Seq("2.10.4", "2.11.6")
 
-sparkVersion := "1.4.0"
+sparkVersion := "1.5.1"
 
 spName := "SparklineData/spark-druid-olap"
 
@@ -42,7 +42,7 @@ resolvers ++= Seq(
 val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
 val scalatestVersion = "2.2.4"
-val sparkdateTimeVersion = "9f6589a01fdd50250a8e155d5710490e1dd353b3"
+val sparkdateTimeVersion = "bf5693a575a1dea5b663e4e8b30a0ba94c21d62d"
 val scoptVersion = "3.3.0"
 
 libraryDependencies ++= Seq(

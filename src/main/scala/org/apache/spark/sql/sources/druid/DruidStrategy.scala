@@ -76,7 +76,10 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           }
           val projections = buildProjectionList(dqb.aggregateOper.get,
             dqb.aggExprToLiteralExpr, exprToDruidOutput)
-          Project(projections, new PhysicalRDD(druidOpAttrs.toList, dR.buildScan()))
+          Project(projections, PhysicalRDD.createFromDataSource(
+            druidOpAttrs.toList,
+            dR.buildInternalScan,
+            dR))
         }
       val pL = p.toList
       if (pL.size < 2) pL else Seq(Union(pL))

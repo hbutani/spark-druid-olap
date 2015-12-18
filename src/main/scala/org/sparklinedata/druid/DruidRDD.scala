@@ -17,8 +17,10 @@
 
 package org.sparklinedata.druid
 
-import org.apache.spark.sql.catalyst.expressions.GenericRow
-import org.apache.spark.sql.types.{LongType, UTF8String, StringType, StructField}
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRowWithSchema
+import org.apache.spark.sql.types.{LongType, StringType, StructField}
+import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.{TaskContext, Partition}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
@@ -33,9 +35,9 @@ class DruidPartition(idx: Int, val i : Interval) extends Partition {
 
 class DruidRDD(sqlContext: SQLContext,
               val drInfo : DruidRelationInfo,
-                val dQuery : DruidQuery)  extends  RDD[Row](sqlContext.sparkContext, Nil) {
+                val dQuery : DruidQuery)  extends  RDD[InternalRow](sqlContext.sparkContext, Nil) {
   @DeveloperApi
-  override def compute(split: Partition, context: TaskContext): Iterator[Row] = {
+  override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
 
     val p = split.asInstanceOf[DruidPartition]
     val client = new DruidClient(drInfo.druidClientInfo.host, drInfo.druidClientInfo.port)
@@ -44,7 +46,8 @@ class DruidRDD(sqlContext: SQLContext,
     val r = client.executeQuery(mQry)
     val schema = dQuery.schema(drInfo)
     r.iterator.map { r =>
-      new GenericRow(schema.fields.map(f => sparkValue(f, r.event(f.name))))
+      new GenericInternalRowWithSchema(schema.fields.map(f => sparkValue(f, r.event(f.name))),
+        schema)
     }
   }
 
@@ -60,7 +63,7 @@ class DruidRDD(sqlContext: SQLContext,
    * @return
    */
   def sparkValue(f : StructField, druidVal : Any) : Any = f.dataType match {
-    case StringType if druidVal != null => new UTF8String().set(druidVal.toString)
+    case StringType if druidVal != null => UTF8String.fromString(druidVal.toString)
     case LongType if druidVal.isInstanceOf[BigInt] => druidVal.asInstanceOf[BigInt].longValue()
     case _ => druidVal
   }

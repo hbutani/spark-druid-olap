@@ -87,7 +87,7 @@ trait AggregateTransform {
       grpInfo.aEs.flatMap(_ collect { case a: AggregateExpression => a })
     // Collect all aggregate expressions that can be computed partially.
     val partialAggregates =
-      grpInfo.aEs.flatMap(_ collect { case p: PartialAggregate => p })
+      grpInfo.aEs.flatMap(_ collect { case p: PartialAggregate1 => p })
 
     // Only do partial aggregation if supported by all aggregate expressions.
     if (allAggregates.size == partialAggregates.size) {
@@ -107,8 +107,10 @@ trait AggregateTransform {
 
   val aggregateTransform: DruidTransform = {
     case (dqb, agg@Aggregate(gEs, aEs,
-    p@Project(projectList, expandOp@Expand(projections, output, child)))) => {
+    expandOp@Expand(bitmasks, _, _, child))) => {
       plan(dqb, child).flatMap { dqb =>
+
+        val projections = expandOp.projections
         /*
          * First check if the GroupBy and Aggregate Expressions are pushable to
          * Druid.
@@ -155,7 +157,7 @@ trait AggregateTransform {
                 val gEAttrRef = geToPosMap(gE)._1
                 val gExprDT = gEAttrRef.dataType
                 val idx = geToPosMap(gE)._2
-                val grpingExpr = p.children(idx)
+                val grpingExpr = p(idx)
 
                 val transformedGExpr: Expression = aE match {
                   case ar@AttributeReference(nm, _, _, _) => Alias(grpingExpr, nm)(ar.exprId)
@@ -205,7 +207,7 @@ trait AggregateTransform {
     case _ => Seq()
   }
 
-  def aggregateExpression(dqb: DruidQueryBuilder, pa: PartialAggregate):
+  def aggregateExpression(dqb: DruidQueryBuilder, pa: PartialAggregate1):
   Option[DruidQueryBuilder] = pa match {
     case Count(Literal(1, IntegerType)) => {
       val a = dqb.nextAlias
@@ -256,7 +258,7 @@ trait AggregateTransform {
   }
 
   private object CountDistinctAggregate {
-    def unapply(t: (DruidQueryBuilder, PartialAggregate)): Option[(String)]
+    def unapply(t: (DruidQueryBuilder, PartialAggregate1)): Option[(String)]
     = {
       val dqb = t._1
       val pa = t._2
@@ -283,7 +285,7 @@ trait AggregateTransform {
    */
   private object SumMinMaxAvgAggregate {
 
-    def unapply(t: (DruidQueryBuilder, PartialAggregate)): Option[(String, DruidColumn)]
+    def unapply(t: (DruidQueryBuilder, PartialAggregate1)): Option[(String, DruidColumn)]
     = {
       val dqb = t._1
       val pa = t._2
@@ -292,7 +294,7 @@ trait AggregateTransform {
                    mNm <- attributeRef(c);
                    dM <- dqb.druidColumn(mNm) if dM.isInstanceOf[DruidMetric];
                    mDT <- Some(DruidDataType.sparkDataType(dM.dataType));
-                   commonType <- HiveTypeCoercion.findTightestCommonType(pa.dataType, mDT)
+                   commonType <- HiveTypeCoercion.findTightestCommonTypeOfTwo(pa.dataType, mDT)
                    if (commonType == mDT || pa.isInstanceOf[Average])
       ) yield (pa, commonType, dM)
 
