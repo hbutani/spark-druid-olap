@@ -44,13 +44,12 @@ trait DruidPlannerHelper {
   def unalias(e: Expression, agg: Aggregate): Option[Expression] = {
 
     agg.aggregateExpressions.find { aE =>
-      // scalastyle:off if.brace
-      if ((aE == e) ||
-        (e.isInstanceOf[AttributeReference] &&
-          e.asInstanceOf[AttributeReference].exprId == aE.exprId
-          )
-      ) true
-      else false
+      (aE, e) match {
+        case _ if aE == e => true
+        case (_, e:AttributeReference) if e.exprId == aE.exprId => true
+        case (Alias(child, _), e) if child == e => true
+        case _ => false
+      }
     }.map {
       case Alias(child, _) => child
       case x => x

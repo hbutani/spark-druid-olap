@@ -47,9 +47,10 @@ class DruidRewriteOrderTest extends BaseTest {
   }
 
   /*
-   * TODO: hit by issue SPARK-6583; need to followup in 1.5
+   * SPARK-10437 is only fixed in Spark-1.6, but the issue here was translation of
+   * SortOrder clause.
    */
-  ignore("basicAggOrderByMetric") {
+  test("basicAggOrderByMetric") {
     val df = sqlAndLog("basicAggOrderByMetric",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
@@ -58,7 +59,7 @@ class DruidRewriteOrderTest extends BaseTest {
         "order by count(*)")
     logPlan("basicAggOrderByMetric", df)
 
-    //df.show()
+    df.show()
   }
 
   test("basicAggOrderByMetric2") {
