@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.sources.druid
 
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, NamedExpression, Expression}
+import org.apache.spark.sql.catalyst.expressions.{PredicateHelper, AttributeReference, NamedExpression, Expression}
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ExtractEquiJoinKeys}
 import org.apache.spark.sql.catalyst.plans.Inner
 import org.apache.spark.sql.catalyst.plans.logical.{Project, LogicalPlan}
@@ -40,6 +40,7 @@ sealed trait JoinNode {
 
   val leftExpressions: Seq[Expression]
   val rightExpressions: Seq[Expression]
+  val otherJoinPredicate : Option[Expression]
 
   private def checkStarJoin(tables: Map[String, DimTableInfo])
                            (implicit sSchema: StarSchema): Either[String, Map[String, DimTableInfo]] = {
@@ -81,9 +82,9 @@ sealed trait JoinNode {
   def validate(implicit sSchema: StarSchema):
   Either[String, Map[String, DimTableInfo]] = this match {
     case n: LeafJoinNode => checkStarJoin(Map())
-    case LeftJoinNode(left, lE, rE, _) => checkOnesidedJoinTree(left)
-    case RightJoinNode(right, lE, rE, _) => checkOnesidedJoinTree(right)
-    case BushyJoinNode(left, right, _, _) => {
+    case LeftJoinNode(left, lE, rE, _, _) => checkOnesidedJoinTree(left)
+    case RightJoinNode(right, lE, rE, _, _) => checkOnesidedJoinTree(right)
+    case BushyJoinNode(left, right, _, _, _) => {
       val lJPath = left.validate(sSchema)
       lJPath.right.flatMap { ltables =>
         val rJPath = right.validate(sSchema)
@@ -105,22 +106,26 @@ case class LeafJoinNode(
                          leftExpressions: Seq[Expression],
                          leftDimInfo: DimTableInfo,
                          rightExpressions: Seq[Expression],
-                         rightDimInfo: DimTableInfo) extends JoinNode
+                         rightDimInfo: DimTableInfo,
+                         otherJoinPredicate : Option[Expression]) extends JoinNode
 
 case class LeftJoinNode(left: JoinNode,
                         leftExpressions: Seq[Expression],
                         rightExpressions: Seq[Expression],
-                        rightDimInfo: DimTableInfo) extends JoinNode
+                        rightDimInfo: DimTableInfo,
+                        otherJoinPredicate : Option[Expression]) extends JoinNode
 
 case class RightJoinNode(right: JoinNode,
                          leftExpressions: Seq[Expression],
                          leftDimInfo: DimTableInfo,
-                         rightExpressions: Seq[Expression]) extends JoinNode
+                         rightExpressions: Seq[Expression],
+                         otherJoinPredicate : Option[Expression]) extends JoinNode
 
 case class BushyJoinNode(left: JoinNode,
                          right: JoinNode,
                          leftExpressions: Seq[Expression],
-                         rightExpressions: Seq[Expression]) extends JoinNode
+                         rightExpressions: Seq[Expression],
+                         otherJoinPredicate : Option[Expression]) extends JoinNode
 
 object JoinNode {
 
@@ -129,44 +134,47 @@ object JoinNode {
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     PhysicalOperation(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
     PhysicalOperation(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
       Some(LeafJoinNode(leftExpressions,
         DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
         rightExpressions,
-        DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions)))
+        DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
+      otherJoinPredicate))
 
     case ExtractEquiJoinKeys(
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     JoinNode(lJT),
     PhysicalOperation(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
       Some(LeftJoinNode(lJT, leftExpressions,
         rightExpressions,
-        DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions)))
+        DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
+      otherJoinPredicate))
 
     case ExtractEquiJoinKeys(
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     PhysicalOperation(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
     JoinNode(rJT)
     ) => Some(RightJoinNode(rJT,
       leftExpressions, DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
-      rightExpressions))
+      rightExpressions,
+    otherJoinPredicate))
 
     case ExtractEquiJoinKeys(
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     JoinNode(lJT),
     JoinNode(rJT)
-    ) => Some(BushyJoinNode(lJT, rJT, leftExpressions, rightExpressions))
+    ) => Some(BushyJoinNode(lJT, rJT, leftExpressions, rightExpressions, otherJoinPredicate))
 
     case Project(_, JoinNode(jt)) => Some(jt)
 
@@ -192,7 +200,7 @@ object JoinNode {
  * - for JoinTrees, it must validate for the Facttable's StarSchema
  */
 trait JoinTransform {
-  self: DruidPlanner =>
+  self: DruidPlanner with PredicateHelper =>
 
   private object JoinDruidQuery {
     def unapply(lp: LogicalPlan): Option[DruidQueryBuilder] = {
@@ -213,8 +221,57 @@ trait JoinTransform {
     }
   }
 
+  private def translateOtherJoinPredicates(dqb : Option[DruidQueryBuilder],
+                                           otherJoinPredicate : Option[Expression])
+  : Seq[DruidQueryBuilder] = (dqb, otherJoinPredicate) match {
+    case(None, _) => Seq()
+    case (Some(dqb), None) => Seq(dqb)
+    case (Some(dqb), Some(p)) => translateProjectFilter(Some(dqb),
+      Seq(),
+      splitConjunctivePredicates(p),
+      true,
+      Set())
+  }
+
+  private def translateOtherJoinPredicates(dqb : Option[DruidQueryBuilder],
+                                           joinTree : JoinNode)
+  : Seq[DruidQueryBuilder] = (dqb, joinTree) match {
+    case(None, _) => Seq()
+    case (Some(dqb), LeafJoinNode(_,_,_,_,None)) => Seq(dqb)
+    case (Some(dqb), LeafJoinNode(_,_,_,_,Some(p))) => translateProjectFilter(Some(dqb),
+      Seq(),
+      splitConjunctivePredicates(p),
+      true,
+      Set())
+    case (Some(dqb), LeftJoinNode(lTree,_,_,_,p)) => {
+      val dqb2 = translateOtherJoinPredicates(Some(dqb), lTree)
+      p match {
+        case None => dqb2
+        case Some(p) => translateOtherJoinPredicates(dqb2.headOption, Some(p))
+      }
+    }
+    case (Some(dqb), RightJoinNode(lTree,_,_,_,p)) => {
+      val dqb2 = translateOtherJoinPredicates(Some(dqb), lTree)
+      p match {
+        case None => dqb2
+        case Some(p) => translateOtherJoinPredicates(dqb2.headOption, Some(p))
+      }
+    }
+    case (Some(dqb), BushyJoinNode(lTree,rTree,_,_,p)) => {
+      val dqb2 = translateOtherJoinPredicates(Some(dqb), lTree).flatMap(dqb4 =>
+        translateOtherJoinPredicates(Some(dqb4), rTree)
+      )
+      p match {
+        case None => dqb2
+        case Some(p) => translateOtherJoinPredicates(dqb2.headOption, Some(p))
+      }
+    }
+
+  }
+
   private def translateJoin(leftExpressions: Seq[Expression],
                             rightExpressions: Seq[Expression],
+                           otherJoinPredicate : Option[Expression],
                             dqb: DruidQueryBuilder,
                             joinTree: JoinNode
                              ): Seq[DruidQueryBuilder] = {
@@ -224,7 +281,7 @@ trait JoinTransform {
     val (leftTable, righTable, dqb1) =
       validateJoinCondition(leftExpressions, rightExpressions, dqb)
 
-    dqb1.flatMap { dqb =>
+    val dqb2 = dqb1.flatMap { dqb =>
       joinTree.validate match {
         case Right(tMap) if tMap.contains(righTable) => {
           (dqb1 /: tMap.toList) {
@@ -245,11 +302,18 @@ trait JoinTransform {
           None
         }
       }
-    }.toSeq
+    }
+
+    translateOtherJoinPredicates(
+      translateOtherJoinPredicates(dqb2, joinTree).headOption,
+      otherJoinPredicate
+    )
+
   }
 
   private def translateJoin(leftExpressions: Seq[Expression],
                             rightExpressions: Seq[Expression],
+                            otherJoinPredicate : Option[Expression],
                             dqb: DruidQueryBuilder,
                             dimProjectList: Seq[NamedExpression],
                             dimFilters: Seq[Expression],
@@ -263,11 +327,13 @@ trait JoinTransform {
       case AttributeReference(nm, _, _, _) => nm
     }.toSet
 
-    translateProjectFilter(dqb1,
+    val dqb2 = translateProjectFilter(dqb1,
       dimProjectList,
       dimFilters,
       true,
-      rightJoinAttrs)
+      rightJoinAttrs).headOption
+
+    translateOtherJoinPredicates(dqb2, otherJoinPredicate)
   }
 
   val joinTransform: DruidTransform = {
@@ -275,13 +341,14 @@ trait JoinTransform {
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     JoinDruidQuery(jdqb),
     PhysicalOperation(projectList, filters, l@LogicalRelation(dimRelation))
     )
       ) => {
       translateJoin(leftExpressions,
         rightExpressions,
+        otherJoinPredicate,
         jdqb,
         projectList,
         filters,
@@ -292,13 +359,14 @@ trait JoinTransform {
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     PhysicalOperation(projectList, filters, l@LogicalRelation(dimRelation)),
     JoinDruidQuery(jdqb)
     )
       ) => {
       translateJoin(rightExpressions,
         leftExpressions,
+        otherJoinPredicate,
         jdqb,
         projectList,
         filters,
@@ -309,13 +377,14 @@ trait JoinTransform {
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     JoinDruidQuery(jdqb),
     JoinNode(jN)
     )
       ) => {
       translateJoin(leftExpressions,
         rightExpressions,
+        otherJoinPredicate,
         jdqb,
         jN
       )
@@ -324,13 +393,14 @@ trait JoinTransform {
     Inner,
     leftExpressions,
     rightExpressions,
-    None,
+    otherJoinPredicate,
     JoinNode(jN),
     JoinDruidQuery(jdqb)
     )
       ) => {
       translateJoin(rightExpressions,
         leftExpressions,
+        otherJoinPredicate,
         jdqb,
         jN
       )

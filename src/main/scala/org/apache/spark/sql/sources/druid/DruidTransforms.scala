@@ -66,7 +66,7 @@ trait LimitTransfom {
 
 abstract class DruidTransforms extends DruidPlannerHelper
 with ProjectFilterTransfom with AggregateTransform with JoinTransform with LimitTransfom
-with Logging  {
+with PredicateHelper with Logging  {
   self: DruidPlanner =>
 
   type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan), Seq[DruidQueryBuilder]]
