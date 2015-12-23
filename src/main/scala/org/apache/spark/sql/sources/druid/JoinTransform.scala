@@ -266,7 +266,7 @@ trait JoinTransform {
     translateProjectFilter(dqb1,
       dimProjectList,
       dimFilters,
-      false,
+      true,
       rightJoinAttrs)
   }
 
@@ -341,7 +341,7 @@ trait JoinTransform {
       var dqbO: Option[DruidQueryBuilder] = Some(jdqb)
       val joinAttrs = Set[String]()
       dqbO = joinProjectList.foldLeft(dqbO) { (dqB, e) =>
-        dqB.flatMap(projectExpression(_, e, joinAttrs))
+        dqB.flatMap(projectExpression(_, e, joinAttrs, true))
       }
       dqbO.toSeq
     }

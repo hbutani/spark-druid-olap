@@ -36,7 +36,7 @@ trait ProjectFilterTransfom {
       dqb1
     } else {
       projectList.foldLeft(dqb1) { (dqB, e) =>
-        dqB.flatMap(projectExpression(_, e, joinAttrs))
+        dqB.flatMap(projectExpression(_, e, joinAttrs, ignoreProjectList))
       }
     }
 
@@ -85,8 +85,10 @@ trait ProjectFilterTransfom {
   }
 
   def projectExpression(dqb: DruidQueryBuilder, pe: Expression,
-                        joinAttrs: Set[String] = Set()):
+                        joinAttrs: Set[String] = Set(),
+                       ignoreProjectList : Boolean = false):
   Option[DruidQueryBuilder] = pe match {
+    case _ if ignoreProjectList => Some(dqb)
     case AttributeReference(nm, dT, _, _) if dqb.druidColumn(nm).isDefined
     => Some(dqb)
     /*
@@ -97,7 +99,7 @@ trait ProjectFilterTransfom {
     case AttributeReference(nm, dT, _, _) if joinAttrs.contains(nm)
     => Some(dqb)
     case Alias(ar@AttributeReference(nm1, dT, _, _), nm) => {
-      for (dqbc <- projectExpression(dqb, ar))
+      for (dqbc <- projectExpression(dqb, ar, joinAttrs, ignoreProjectList))
         yield dqbc.addAlias(nm, nm1)
     }
     case _ => None
