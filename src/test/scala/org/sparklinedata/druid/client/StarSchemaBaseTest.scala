@@ -60,35 +60,28 @@ object StarSchemaTpchQueries {
   val q5orderDtPredicateLower = dateTime('o_orderdate) >= dateTime("1994-01-01")
   val q5OrderDtPredicateUpper= dateTime('o_orderdate) < (dateTime("1994-01-01") + 1.year)
 
-  val q5Orig =  date"""
-      select s_nation,
+  /**
+    * Changes from original query:
+    * - join in ''partsupp''. Because we don't support multiple join paths to a table(supplier
+    * in this case), the StarSchema doesn't know about the join between ''lineitem'' and
+    * ''supplier''
+    * - use suppnation and suppregion instead of nation and region.
+    */
+  val q5 =  date"""
+      select sn_name,
       sum(l_extendedprice) as extendedPrice
-      from customer, orders, lineitem, supplier, suppnation, suppregion
+      from customer, orders, lineitem, partsupp, supplier, suppnation, suppregion
       where c_custkey = o_custkey
                     |and l_orderkey = o_orderkey
-                    |and l_suppkey = s_suppkey
-                    |and c_nationkey = s_nationkey
+                    |and l_suppkey = ps_suppkey
+                    |and l_partkey = ps_partkey
+                    |and ps_suppkey = s_suppkey
                     |and s_nationkey = sn_nationkey
                     |and sn_regionkey = sr_regionkey
-                    |and s_region = 'ASIA'
+                    |and sr_name = 'ASIA'
       and $q5orderDtPredicateLower
       and $q5OrderDtPredicateUpper
-      group by s_nation
-      """.stripMargin
-
-  val q5Altered =  date"""
-      select s_nation,
-      sum(l_extendedprice) as extendedPrice
-      from customer, orders, lineitem, supplier, suppnation, suppregion
-      where c_custkey = o_custkey
-                   |and l_orderkey = o_orderkey
-                   |and l_suppkey = s_suppkey
-                   |and s_nationkey = sn_nationkey
-                   |and sn_regionkey = sr_regionkey
-                   |and s_region = 'ASIA'
-      and $q5orderDtPredicateLower
-      and $q5OrderDtPredicateUpper
-      group by s_nation
+      group by sn_name
       """.stripMargin
 
   val q7ShipDtYear = dateTime('l_shipdate) year
@@ -149,7 +142,7 @@ object StarSchemaTpchQueries {
 
 class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
 
-  val TPCH_BASE_DIR = sys.env("HOME") + "tpch/datascale1"
+  val TPCH_BASE_DIR = sys.env("HOME") + "/tpch/datascale1"
 
   def tpchDataFolder(tableName : String) = s"$TPCH_BASE_DIR/$tableName/"
 
