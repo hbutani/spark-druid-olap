@@ -31,7 +31,11 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
   val colMapping =
     """{
       | "l_quantity" : "sum_l_quantity",
-      | "ps_availqty" : "sum_ps_availqty"
+      | "ps_availqty" : "sum_ps_availqty",
+      | "cn_name" : "c_nation",
+      | "cr_name" : "c_region",
+      |  "sn_name" : "s_nation",
+      | "sr_name" : "s_region"
       |}
     """.stripMargin.replace('\n', ' ')
 
