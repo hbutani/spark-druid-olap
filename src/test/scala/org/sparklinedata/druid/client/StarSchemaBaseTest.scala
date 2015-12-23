@@ -86,15 +86,24 @@ object StarSchemaTpchQueries {
 
   val q7ShipDtYear = dateTime('l_shipdate) year
 
+  /**
+    * Changes from original query:
+    * - join in ''partsupp''. Because we don't support multiple join paths to a table(supplier
+    * in this case), the StarSchema doesn't know about the join between ''lineitem'' and
+    * ''supplier''
+    * - use suppnation and custnation instead of 'nation n1' and 'nation n2'
+    */
   val q7 = date"""
-    select s_nation, c_nation, $q7ShipDtYear as l_year,
+    select sn_name, cn_name, $q7ShipDtYear as l_year,
     sum(l_extendedprice) as extendedPrice
-    from supplier,
-                   |lineitem, orders, customer, suppnation n1, custnation n2
-    where s_suppkey = l_suppkey
-                   |and o_orderkey = l_orderkey
-                   |and c_custkey = o_custkey
-                   |and s_nationkey = n1.sn_nationkey and c_nationkey = n2.cn_nationkey and
+    from partsupp, supplier,
+              |lineitem, orders, customer, suppnation n1, custnation n2
+    where ps_suppkey = s_suppkey
+              |and l_suppkey = ps_suppkey
+              |and l_partkey = ps_partkey
+              |and o_orderkey = l_orderkey
+              |and c_custkey = o_custkey
+              |and s_nationkey = n1.sn_nationkey and c_nationkey = n2.cn_nationkey and
     ((sn_name = 'FRANCE' and cn_name = 'GERMANY') or
            (cn_name = 'FRANCE' and sn_name = 'GERMANY')
            )
