@@ -115,37 +115,50 @@ object StarSchemaTpchQueries {
   val q8DtP1 = dateTime('o_orderdate) >= dateTime("1995-01-01")
   val q8DtP2 = dateTime('o_orderdate) <= dateTime("1996-12-31")
 
+  /**
+    * Changes from original query:
+    * - join in ''partsupp''. Because we don't support multiple join paths to a table(supplier
+    * in this case), the StarSchema doesn't know about the join between ''lineitem'' and
+    * ''supplier''
+    * - use suppnation and custnation instead of 'nation n1' and 'nation n2'
+    */
   val q8 = date"""
       select $q8OrderDtYear as o_year,
       sum(l_extendedprice) as price
-      from part,
+      from partsupp, part,
       supplier, lineitem, orders, customer, custnation n1, suppnation n2, custregion
-      where p_partkey = l_partkey
-                   |and s_suppkey = l_suppkey
+      where ps_partkey = l_partkey
+                   |and ps_suppkey = l_suppkey
+                   |and ps_partkey = p_partkey
+                   |and ps_suppkey = s_suppkey
                    |and l_orderkey = o_orderkey
                    |and o_custkey = c_custkey
                    |and c_nationkey = n1.cn_nationkey and
                    |n1.cn_regionkey = cr_regionkey and
-                   |s_nationkey = n2.sn_nationkey
-      c_region = 'AMERICA' and p_type = 'ECONOMY ANODIZED STEEL' and $q8DtP1 and $q8DtP2
+                   |s_nationkey = n2.sn_nationkey and
+      cr_name = 'AMERICA' and p_type = 'ECONOMY ANODIZED STEEL' and $q8DtP1 and $q8DtP2
       group by $q8OrderDtYear
       """.stripMargin
 
   val q10DtP1 = dateTime('o_orderdate) >= dateTime("1993-10-01")
   val q10DtP2 = dateTime('o_orderdate) < (dateTime("1993-10-01") + 3.month)
 
+  /**
+    * Changes from original query:
+    * - use custnation instead of 'nation'
+    */
   val q10 = date"""
-    select c_name, c_nation, c_address, c_phone, c_comment,
+    select c_name, cn_name, c_address, c_phone, c_comment,
            sum(l_extendedprice) as price
     from customer,
     orders, lineitem, custnation
     where c_custkey = o_custkey
                     |and l_orderkey = o_orderkey
-                    |and c_nationkey = cn_nationkey
+                    |and c_nationkey = cn_nationkey and
       $q10DtP1 and
       $q10DtP2 and
       l_returnflag = 'R'
-    group by c_name, c_nation, c_address, c_phone, c_comment
+    group by c_name, cn_name, c_address, c_phone, c_comment
     """.stripMargin
 }
 
