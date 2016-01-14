@@ -121,9 +121,11 @@ The Druid Query executed for this rewritten plan is [here](https://github.com/Sp
 ## Use Case: BI Acceleration using an OLAP index
 Consider the same TPCH Dataset. We also support linking a Druid Index with a **Star Schema**. 
 In this case the Druid Index is used to answer __Slice and Dice__ BI queries quickly. Answering such queries is the
-reason for using Druid so the /acceleration/ should come as no surprise. What this package does is enables Users and Tools
-to continue to Query the Star Schema using SQL, the DruidPlanner figures out __parts__ of the plan that can be
-pushed to Druid for very fast execution.
+reason for using Druid so the _acceleration_ should come as no surprise. 
+
+What this package does is, it enables Users and Tools to continue to Query the Star Schema using SQL;
+the [Druid Planner](https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/apache/spark/sql/sources/druid/DruidPlanner.scala)
+ figures out __parts__ of the plan that can be pushed to Druid for very fast execution.
 
 Here are the steps to define and query Star Schemas, the example is for the TPCH dataset:
 
