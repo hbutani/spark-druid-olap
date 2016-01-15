@@ -1,0 +1,202 @@
+{
+  "type": "index",
+  "spec": {
+    "dataSchema": {
+      "dataSource": "tpch",
+      "parser": {
+        "type": "string",
+        "parseSpec": {
+          "format": "tsv",
+          "timestampSpec": {
+            "column": "l_shipdate",
+            "format": "iso"
+          },
+          "columns": [
+            "o_orderkey",
+            "o_custkey",
+            "o_orderstatus",
+            "o_totalprice",
+            "o_orderdate",
+            "o_orderpriority",
+            "o_clerk",
+            "o_shippriority",
+            "o_comment",
+            "l_partkey",
+            "l_suppkey",
+            "l_linenumber",
+            "l_quantity",
+            "l_extendedprice",
+            "l_discount",
+            "l_tax",
+            "l_returnflag",
+            "l_linestatus",
+            "l_shipdate",
+            "l_commitdate",
+            "l_receiptdate",
+            "l_shipinstruct",
+            "l_shipmode",
+            "l_comment",
+            "order_year",
+            "ps_partkey",
+            "ps_suppkey",
+            "ps_availqty",
+            "ps_supplycost",
+            "ps_comment",
+            "s_name",
+            "s_address",
+            "s_phone",
+            "s_acctbal",
+            "s_comment",
+            "s_nation",
+            "s_region",
+            "p_name",
+            "p_mfgr",
+            "p_brand",
+            "p_type",
+            "p_size",
+            "p_container",
+            "p_retailprice",
+            "p_comment",
+            "c_name",
+            "c_address",
+            "c_phone",
+            "c_acctbal",
+            "c_mktsegment",
+            "c_comment",
+            "c_nation",
+            "c_region"
+          ],
+          "delimiter": "|",
+          "dimensionsSpec": {
+            "dimension": [
+              "o_orderkey",
+              "o_orderdate",
+              "o_orderstatus",
+              "o_orderpriority",
+              "o_clerk",
+              "o_shippriority",
+              "o_comment",
+              "l_returnflag",
+              "l_linestatus",
+              "l_commitdate",
+              "l_receiptdate",
+              "l_shipinstruct",
+              "l_shipmode",
+              "l_comment",
+              "ps_comment",
+              "s_name",
+              "s_address",
+              "s_phone",
+              "s_comment",
+              "s_nation",
+              "s_region",
+              "p_name",
+              "p_mfgr",
+              "p_brand",
+              "p_type",
+              "p_size",
+              "p_container",
+              "p_retailprice",
+              "p_comment",
+              "c_name",
+              "c_address",
+              "c_phone",
+              "c_mktsegment",
+              "c_comment",
+              "c_nation",
+              "c_region"
+            ],
+            "dimensionExclusions": [],
+            "spatialDimensions": []
+          }
+        }
+      },
+      "metricsSpec": [
+        {
+          "type": "count",
+          "name": "count"
+        },
+        {
+          "type": "doubleSum",
+          "name": "o_totalprice",
+          "fieldName": "o_totalprice"
+        },
+        {
+          "type": "longSum",
+          "name": "sum_l_quantity",
+          "fieldName": "l_quantity"
+        },
+        {
+          "type": "doubleSum",
+          "name": "l_extendedprice",
+          "fieldName": "l_extendedprice"
+        },
+        {
+          "type": "javascript",
+          "name": "l_tax",
+          "fieldNames": [
+            "l_extendedprice",
+            "l_discount",
+            "l_tax"
+          ],
+          "fnAggregate": "function(current, l_extendedprice, l_discount, l_tax) { return current + (l_extendedprice *(1 - l_discount) * l_tax); }",
+          "fnCombine": "function(partialA, partialB) { return partialA + partialB; }",
+          "fnReset": "function()                   { return 0; }"
+        },
+        {
+          "type": "javascript",
+          "name": "l_discount",
+          "fieldNames": [
+            "l_extendedprice",
+            "l_discount"
+          ],
+          "fnAggregate": "function(current, l_extendedprice, l_discount) { return current + (l_extendedprice * l_discount); }",
+          "fnCombine": "function(partialA, partialB) { return partialA + partialB; }",
+          "fnReset": "function()                   { return 0; }"
+        },
+        {
+          "type": "longSum",
+          "name": "sum_ps_availqty",
+          "fieldName": "ps_availqty"
+        },
+        {
+          "type": "doubleSum",
+          "name": "ps_supplycost",
+          "fieldName": "ps_supplycost"
+        },
+        {
+          "type": "doubleSum",
+          "name": "c_acctbal",
+          "fieldName": "c_acctbal"
+        }
+      ],
+      "granularitySpec": {
+        "type": "uniform",
+        "segmentGranularity": "MONTH",
+        "queryGranularity": "DAY",
+        "intervals": [
+          "1993-01-01/1997-12-31"
+        ]
+      }
+    },
+    "ioConfig": {
+      "type": "index",
+      "firehose": {
+        "type": "local",
+        "baseDir": "<location of flattened dataset>",
+        "filter": "part*"
+      }
+    },
+    "tuningConfig": {
+      "type": "index",
+      "partitionsSpec": {
+        "type": "hashed",
+        "targetPartitionSize": 5000000
+      },
+      "leaveIntermediate": false,
+      "cleanupOnFailure": true,
+      "overwriteFiles": false,
+      "ignoreInvalidRows": false
+    }
+  }
+}
