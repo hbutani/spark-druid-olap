@@ -32,6 +32,10 @@ and an analysis are in the Design document(a more detailed description of the be
 We now support Rewrites for __Star Joins__, __Aggregates__ including _Cubes_ and _Rollups_, __Order Bys__, __Filters__
 with special handling for Date Predicates. 
 
+The [Quick Start Guide](https://github.com/SparklineData/spark-druid-olap/wiki/Quick-Start-Guide)
+has detail instructions on how to setup a demo environment for the TPCH flattened and Star Schema
+use cases. 
+
 ## Use Case 1: Indexing a Flat/Denormalized Dataset
 If you have your raw event store is in **Deep Storage**(hdfs/s3) and you have a Druid index for this 
 dataset, you can use the Spark-Druid package in the following way. Here we give the example of
@@ -73,7 +77,10 @@ CREATE temporary TABLE orderlineitempartsupplier
     timedimensioncolumn "l_shipdate", 
     druiddatasource "tpch", 
     druidhost "localhost", 
-    druidport "8082"
+    druidport "8082",
+    columnMapping '{  "l_quantity" : "sum_l_quantity",  "ps_availqty" : "sum_ps_availqty",  "cn_name" : "c_nation",  "cr_name" : "c_region",   "sn_name" : "s_nation",  "sr_name" : "s_region" }     ',
+     functionalDependencies '[   {"col1" : "c_name", "col2" : "c_address", "type" : "1-1"},   {"col1" : "c_phone", "col2" : "c_address", "type" : "1-1"},   {"col1" : "c_name", "col2" : "c_mktsegment", "type" : "n-1"},   {"col1" : "c_name", "col2" : "c_comment", "type" : "1-1"},   {"col1" : "c_name", "col2" : "c_nation", "type" : "n-1"},   {"col1" : "c_nation", "col2" : "c_region", "type" : "n-1"} ]     ',
+    starSchema ' {   "factTable" : "orderLineItemPartSupplier",   "relations" : []  }     ')
 )
 ```
 
@@ -118,7 +125,7 @@ Project [s_nation#88,c_nation#104,CAST(l_shipdate#172, IntegerType) AS...
 The Druid Query executed for this rewritten plan is [here](https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/q7.json)
 
 
-## Use Case: BI Acceleration using an OLAP index
+## Use Case 2: BI Acceleration using an OLAP index
 Consider the same TPCH Dataset. We also support linking a Druid Index with a **Star Schema**. 
 In this case the Druid Index is used to answer __Slice and Dice__ BI queries quickly. Answering such queries is the
 reason for using Druid so the _acceleration_ should come as no surprise. 
