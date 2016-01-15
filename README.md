@@ -78,9 +78,9 @@ CREATE temporary TABLE orderlineitempartsupplier
     druiddatasource "tpch", 
     druidhost "localhost", 
     druidport "8082",
-    columnMapping '{  "l_quantity" : "sum_l_quantity",  "ps_availqty" : "sum_ps_availqty",  "cn_name" : "c_nation",  "cr_name" : "c_region",   "sn_name" : "s_nation",  "sr_name" : "s_region" }     ',
-     functionalDependencies '[   {"col1" : "c_name", "col2" : "c_address", "type" : "1-1"},   {"col1" : "c_phone", "col2" : "c_address", "type" : "1-1"},   {"col1" : "c_name", "col2" : "c_mktsegment", "type" : "n-1"},   {"col1" : "c_name", "col2" : "c_comment", "type" : "1-1"},   {"col1" : "c_name", "col2" : "c_nation", "type" : "n-1"},   {"col1" : "c_nation", "col2" : "c_region", "type" : "n-1"} ]     ',
-    starSchema ' {   "factTable" : "orderLineItemPartSupplier",   "relations" : []  }     ')
+    columnMapping '$colMapping',
+    functionalDependencies '$functionalDependencies',
+    starSchema '$starSchema'
 )
 ```
 
