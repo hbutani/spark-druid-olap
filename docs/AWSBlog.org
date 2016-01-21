@@ -1,0 +1,406 @@
+#+TITLE:    Deploying Interactive and Flexible Analytics at Scale on Amazon AWS using Spark and Druid.
+#+AUTHOR:    Harish Butani, Srikanth Desikan
+#+EMAIL:     hbutani@apache.org
+#+LANGUAGE:  en
+#+INFOJS_OPT: view:showall toc:t ltoc:t mouse:underline path:http://orgmode.org/org-info.js
+#+LINK_HOME: http://home.fnal.gov/~neilsen
+#+LINK_UP: http://home.fnal.gov/~neilsen/notebook
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="http://orgmode.org/org-manual.css" />
+
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [pdftex,10pt,a4paper]
+
+#+LaTeX_HEADER: \usepackage{sectsty}
+#+LaTeX_HEADER: \usepackage{fancyvrb}
+
+#+LaTeX_HEADER: \usepackage{hyperref}
+#+LaTeX_HEADER: \usepackage{listings}
+#+LaTeX_HEADER: \usepackage{xyling}
+#+LaTeX_HEADER: \usepackage{ctable}
+#+LaTeX_HEADER: \usepackage{float}
+#+LaTeX_HEADER: \usepackage{url}
+
+#+LaTeX_HEADER: \input xy
+#+LaTeX_HEADER: \xyoption{all}
+
+#+LaTeX_HEADER: \usepackage[backend=bibtex,sorting=none]{biblatex}
+#+LaTeX_HEADER: \addbibresource{SparkDruid.bib}
+
+#+EXPORT_SELECT_TAGS: export
+#+EXPORT_EXCLUDE_TAGS: noexport
+#+OPTIONS: H:4 num:nil toc:nil \n:nil @:t ::t |:t ^:{} _:{} *:t TeX:t LaTeX:t
+#+STARTUP: showall
+#+OPTIONS: html-postamble:nil
+
+The data infrastructure space has seen tremendous growth and innovation over the last few
+years. With the rapid adoption of open source technologies, organizations are now able to
+process and analyze data at volumes that were unfathomable a decade earlier. However, given
+the rapid growth of the space, it can be difficult to keep up with all the new systems that have
+been created, and more difficult to understand what problems a system is great at solving. Two
+popular open source technologies, [[http://druid.io/][Druid]] and [[http://spark.apache.org/][Spark]], are
+often mentioned as viable solutions for
+large-scale analytics. Spark is a platform for advanced analytics, and
+Druid excels at low latency,
+interactive queries. Although the high level messaging presented by both projects may
+lead you to believe they are competitors in the same space, the technologies are in fact
+extremely complementary solutions. By combining the rich query model of Spark with the
+powerful indexing technology of Druid, we can build a more powerful, flexible, and extremely low
+latency analytics solution. [ /Need to add a line or two about EMR/ ]
+
+** Apache Spark
+
+Apache Spark is an in-memory, general-purpose cluster computing system where the
+programming model is based on a [[http://research.microsoft.com/pubs/102137/sigmod09.pdf][LINQ]]
+ style API. Spark provides rich APIs in Java, Scala,
+Python, and R. The fundamental programming abstraction in Spark is the Resilient Distributed
+Dataset (RDD), a collection of data that can be transformed (mapped, filtered, joined, or
+reduced). By caching RDDs at the input and output at the various stages of data computations,
+Spark is able to avoid unnecessary re-computation, and for certain workflows, most notably
+iterative workflows, this can be have tremendous performance improvements over vanilla
+MapReduce.
+
+** Druid
+Druid is a relative newcomer to the data infrastructure space, but has already seen adoption by
+some [[http://druid.io/druid-powered.html][major technology players]]. Druid is a column-oriented distributed data store that is ideal for
+powering user-facing data applications. Because interactive user-facing applications require
+very low query latencies, most Druid queries complete in less than a second. Druid gets its
+speed from the custom format (known as Druid segments) in which data is stored, which is a
+combination of a traditional column store, fused with ideas from search infrastructure. Druid also
+supports streaming data ingestion and batch data loads.
+
+** Amazon EMR
+[[https://aws.amazon.com/elasticmapreduce/][Amazon EMR]] makes it easy to launch a Hadoop cluster and install many
+of the Hadoop ecosystem applications, such as Druid, Hive, HBase, and
+Spark. EMR makes it easy for  companies to create clusters
+quickly and process vast amounts of data in a few clicks.  EMR also
+integrates with other AWS big data services such as Amazon  S3 for
+low-cost durable storage, Amazon Kinesis for streaming data, and  Amazon DynamoDB as a noSQL datastore.
+
+EMR allows you the flexibility of [[http://docs.aws.amazon.com/ElasticMapReduce/latest/ManagementGuide/emr-plan-instances.html][choosing optimal instance types]] to
+fit different applications. For example, Spark caches  data in memory
+for faster processing,  so it is best to use instances with more
+memory (such as the [[https://aws.amazon.com/blogs/aws/now-available-new-memory-optimized-ec2-instances/][R3 instance family]]). Also,  EMR’s ability to use
+Amazon EC2 Spot capacity can dramatically  reduce the cost of training
+and retraining ML models. Most of the time,  the Spot market price for
+larger instances such as the r3.4xl is around  10%-20% of the On-Demand price.
+
+The combination of EMR to create a Hadoop cluster and install Spark
+and Druid on it, the ability to scale-up/down based on need make it a
+compelling platform to deploy large-scale Analytical solutions.
+
+** Why combine the Technologies?
+
+The World is awash in [[https://en.wikipedia.org/wiki/Machine-generated_data#cite_note-sciencelogic-6][machine-generated]] data  and
+ it is growing at a rapid pace.  A
+large portion of this is *Raw Event* data. Event data captures
+activity (human or machine) at a very fine grained level. Event
+datasets are also characterized by the recording of large amount of
+*context* about the Event. It is not uncommon to capture 10s to 100s
+of contextual Attributes, across many Dimensions: Geography, Time,
+Customer/User, Product etc. From an Analysis perspective a /Event Dataset/ is a like a very large
+multi-dimensional Cube that is stored at the grain that the events are
+captured.
+
+*** Analyzing Raw Event Data
+What do companies want to do with this data? This data drives a myriad
+of Analysis like User Targeting, Campaign Attribution and Site
+Optimization in the Ad. Tech. space; to Smart Cities, Smart Environment,
+Smart Water Applications in the [[http://www.libelium.com/top_50_iot_sensor_applications_ranking/][IOT space]]. To solve
+these problems they architect solutions that contain many of these
+components: a Data collection component(Apache Kafka or Flume), a Stream Processing Layer(Apache
+Storm. Samza or Spark Streaming), a Storage Layer(HDFS or S3), a Batch
+Processing Layer(Apache Hive/Tez, Spark, Cascading etc) and a
+Data Layer for driving Interactive/low-latency analysis(a traditional
+RDBMS like Redhsift/Vertica, or a materialized view layer like Apache
+Kylin or a OLAP index like Apache Druid).
+
+Borrowing from the [[http://static.druid.io/docs/radstack.pdf][RADStack]] paper an Analytical solution at the Event grain
+may look like the following:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.9\linewidth]{./radstack.png}
+\caption{\label{fig:RADStack}RADStack Architecture}
+\end{figure}
+
+The RADStack architecture leverages Druid for a separate serving layer for fast low
+latency Interactive Analytics. Whereas Spark's powerful programming
+model offers much tighter integration between relational and
+procedural processing enabling users to express complex ETL, Reporting
+and Advanced Analytics(graph and machine learning) through a single
+interface.
+
+*** Building Analytical Solutions on top of Raw Event Data
+Companies don't stop at providing Analysis Services at the raw Event grain, they build
+higher level Analytical solutions on top of the Raw Event Store for specific business needs: for example
+we are working with a large Ad. Tech company to build a *Campaign Performance* management solution
+to help their customers understand the efficacy of Campaigns sliced and diced by Geography, Time,
+User Demographic, User Behavior etc. These solutions typically involve providing Analyst access
+via a Application specific interface built using a BI + Visualization layer like Tableau.
+A Datamart with App. specific Dimensions, Star-Schemas/Cubes drive this BI+Visualization Layer, and
+batch ETL processing populates the Datamart on a regular schedule.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.9\linewidth]{./CampaignPerformanceSoln.png}
+\caption{\label{fig:CampaignPerf}Campaign Performance Solution}
+\end{figure}
+
+The focus here is on the *Business Analyst*: how can we empower him to express Business questions
+and semantics like Hierarchies/Classifications, Entity semantics,
+KPIs, Metrics, Rules etc.
+
+*** Spark + Druid a perfect match
+Spark’s programming model is used to build analytical solutions that combine SQL, machine
+learning, and graph processing. Spark is a great general system for data processing, and it is
+often used by organizations for reporting and large-scale and/or complex data manipulation
+workflows. What Spark isn’t necessarily optimized for is interactive queries, where computations
+complete as fast as a user is able to navigate through the data using an application (think pivot
+tables in Microsoft Excel and other tools).
+
+Druid is designed for workflows where the output result set of computations is much smaller
+than the input set, for example when filtering or aggregating data. These workflows are most
+commonly found in [[https://en.wikipedia.org/wiki/Online_analytical_processing][OLAP queries]]. Low-latency OLAP queries are extremely useful in business
+intelligence as enterprises leverage OLAP to develop numerous performance management
+solutions to analyze KPIs around cost, supply, and activity, broken down by different
+dimensions.
+
+By combining the analytic capabilities of Spark and the OLAP and low latency capabilities of
+Druid, we gain several key advantages:
+1. Complex analytics endeavors often require examining different
+   aspects of data. By introducing Druid to the equation, we gain the
+   ability to slice-and-dice data at varied levels of data
+   granularity. This enables data inspection from an arbitrary number
+   of views.
+2. For scenarios where Druid is already deployed, Spark’s richer
+   programming interface enables industry standard BI tools such as
+   Tableau and MicroStrategy to be connected to the infrastructure,
+   providing complex visualizations with very fast response times.
+3. For any project already built on top of Spark’s ecosystem, the
+   addition of Druid provides the ability to greatly accelerate
+   existing workloads.
+
+** What is the Benefit? A Benchmark of Druid and Spark.
+
+Before diving into the details around integrating Druid and Spark, let’s examine how Druid can
+accelerate workloads. We conducted a benchmark on the
+[[http://www.tpc.org/tpch/spec/tpch2.8.0.pdf][TPCH 10G benchmark data set]].
+We picked a mixture of business intelligence queries for our benchmarks: slice-and-dice queries
+common in OLAP scenarios, and aggregation queries common in reporting workloads.
+We converted the star schema of the original data set into a flattened (denormalized)
+transaction table to simulate an event dataset. The benchmark showed that these queries were
+sped up to 50 times. We have published
+[[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/BenchMarkDetails.pdf][a detailed Benchmark Report]] and a [[https://www.linkedin.com/pulse/combining-druid-spark-interactive-flexible-analytics-scale-butani][Blog post]].
+The benchmark was conducted on the Flattened/Raw Datasets Use Case; it should
+be obvious that for the Star-Schema query rewrites Users should
+expect significantly larger gains in performance as the rewrites
+eliminate costly Joins from the original Spark execution Plans.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.9\linewidth]{./benchmark.png}
+\caption{\label{fig:Benchmark}TPCH Denormalized Dataset Benchmark}
+\end{figure}
+
+** Combining Spark and Druid: the Sparkline BI Accelerator
+The [[https://github.com/SparklineData/spark-druid-olap][Sparkline BI Accelerator]] is an open source Spark Package that
+when configured in a Spark DataFrame seamlessly accelerates Spark
+SQL queries(actually any Spark Catalyst Plan). The User's experience
+is very similar to defining an *OLAP index* in an *RDBMS*.
+
+In terms of how we did the Druid/Spark integration, the key component we used was
+[[http://people.csail.mit.edu/matei/papers/2015/sigmod_spark_sql.pdf][Spark SQL]]. Spark SQL enables SQL queries within Spark programs and consists of the DataSources
+API, the DataFrames data model, and the Catalyst Optimizer to provide a powerful language
+and translation toolkit. The DataSources API provides a mechanism for Spark SQL to access
+structured data in external systems, and expose this data as a DataFrame in Spark. A
+DataFrame is the equivalent of a relational table. DataFrames lie at the core of Spark’s
+extensible data platform. Different language and API builders can plug into this platform by
+translating their queries down to DataFrames, and lower level features such as optimizations,
+security enforcements, and data placement policies can all be easily plugged into the system.
+Since these lower level components are a part of the DataFrames abstraction, they become
+available to all higher-level components that are built on top of the
+abstraction.
+
+The *Accelerator* enables Logical Plans written against a *raw event
+dataset* or a *star schema* to be rewritten to take advantage of a
+*Druid Index* of the data. It consists of 2 main components:
+
+1. [[https://github.com/SparklineData/spark-druid-olap/blob/54d0ebe2d946767fa4b554cfde7c356e1e1c1de9/src/main/scala/org/sparklinedata/druid/metadata/DruidDataSource.scala][DruidDataSource]] is a Spark Datasource that wraps a DataFrame that
+   exposes the raw data set and also has information about the Druid segments for the data set.
+2. During query planning, the [[https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/apache/spark/sql/sources/druid/DruidPlanner.scala][DruidPlanner]] applies a set of
+   Rewrite Rules to convert to convert
+   'Project-Filter-Aggregation-Having-Sort-Limit' plans to Druid Queries.
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.9\linewidth]{./druidSparkOverall.png}
+\caption{\label{fig:Overall}Spark Druid Overall Picture}
+\end{figure}
+
+Following are couple of examples on how to configure the DataFrames to
+use the Accelerator:
+
+*** Use Case 1: Indexing a Flat/Denormalized Dataset
+If you have your raw event store is in *Deep Storage*(hdfs/s3) and you
+have a Druid index for this dataset, you can use the *Accelerator* in
+the following way. Here we give the example of the
+*flattened* TPCH dataset. 
+
+\begin{small}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+  \label{dDSdef}
+   \begin{lstlisting}[caption={Defining an Accelerated DataFrame},frame=shadowbox, numbers=left]
+// 1. create table /register the Raw Event DataSet
+CREATE TEMPORARY TABLE orderlineitempartsupplierbase 
+  ( 
+     o_orderkey      INTEGER, 
+     o_custkey       INTEGER, 
+     o_orderstatus   STRING, 
+...
+  ) 
+using com.databricks.spark.csv options (
+     path "orderLineItemPartSupplierCustomer.sample/", 
+     header "false", 
+     delimiter "|"
+     ) 
+
+// 2. create temporary table using the Druid DataSource
+CREATE temporary TABLE orderlineitempartsupplier 
+   using org.sparklinedata.druid options (
+    sourcedataframe "orderLineItemPartSupplierBase", 
+    timedimensioncolumn "l_shipdate", 
+    druiddatasource "tpch", 
+    druidhost "localhost", 
+    druidport "8082",
+    columnMapping '$colMapping',
+    functionalDependencies '$functionalDependencies',
+    starSchema '$starSchema'
+)
+\end{lstlisting}
+\end{small}
+
+The *orderlineitempartsupplier* is a DataFrame in Spark that you can
+query as though it has the same Schema as the DataFrame it wraps,
+/orderLineItemPartSupplierBase/. It's defintions contains information
+about the Druid Index: connection information, column mapping
+information, rewrites allowed etc. So a Query like:
+
+\begin{small}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+  \label{dDSdef}
+   \begin{lstlisting}[caption={Sample Query against Flat Accelerated DataFrame},frame=shadowbox, numbers=left]
+SELECT s_nation,
+       c_nation,
+       Year(Datetime( ` l_shipdate ` )) AS l_year,
+       Sum(l_extendedprice)             AS extendedPrice
+FROM   orderlineitempartsupplier
+WHERE  ( ( s_nation = 'FRANCE'
+           AND c_nation = 'GERMANY' )
+          OR ( c_nation = 'FRANCE'
+               AND s_nation = 'GERMANY' ) )
+GROUP  BY s_nation,
+          c_nation,
+          Year(Datetime( ` l_shipdate ` ))
+\end{lstlisting}
+\end{small}
+
+with a Logical Plan:
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+  \label{dDSdef}
+   \begin{lstlisting}[caption={Original Execution Plan},frame=shadowbox, numbers=left]
+Aggregate [s_nation#88,c_nation#104,scalaUDF(scalaUDF(l_shipdate#71))], ...
+ Project [s_nation#88,c_nation#104,l_shipdate#71,l_extendedprice#66]
+  Filter (((s_nation#88 = FRANCE) && (c_nation#104 = GERMANY)) || ...
+   Relation[o_orderkey#53,o_custkey#54,o_orderstatus#55,o_totalprice#56,o_orderdate#57,....
+\end{lstlisting}
+\end{tiny}
+
+is rewritten to a Spark Plan:
+
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+  \label{dDSdef}
+   \begin{lstlisting}[caption={Accelerated Execution Plan},frame=shadowbox, numbers=left]
+Project [s_nation#88,c_nation#104,CAST(l_shipdate#172, IntegerType) AS...
+ PhysicalRDD [s_nation#88,...], DruidRDD[12] at RDD at DruidRDD.scala:34
+\end{lstlisting}
+\end{tiny}
+
+The Druid Query executed for this rewritten plan is [[https://github.com/SparklineData/spark-druid-olap/blob/master/docs/benchmark/druid/queries/q7.json][here]].
+
+*** Use Case 2: BI Acceleration using an OLAP index
+Consider the same TPCH Dataset. In this example we show how to link a Druid Index
+with a *Star Schema*.  We will go over details on how to setup this scenario in the Quick
+Start section; for the following /TPCH Q3/ the rewritten plan is shown
+below:
+
+\begin{small}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+  \label{dDSdef}
+   \begin{lstlisting}[caption={Sample Star-Schema Query},frame=shadowbox, numbers=left]
+select
+      o_orderkey,
+      sum(l_extendedprice) as price, o_orderdate,
+      o_shippriority
+      from customer,
+orders, lineitem
+where c_mktsegment = 'BUILDING' and 
+   dateIsBefore(dateTime(`o_orderdate`),dateTime("1995-03-15")) and 
+   dateIsAfter(dateTime(`l_shipdate`),dateTime("1995-03-15"))
+   and c_custkey = o_custkey
+   and l_orderkey = o_orderkey
+group by o_orderkey,
+      o_orderdate,
+      o_shippriority
+\end{lstlisting}
+\end{small}
+
+\begin{tiny}
+   \lstset{keywordstyle=\bfseries\underbar, emphstyle=\underbar,
+     language=SQL, showspaces=false, showstringspaces=false}
+  \label{dDSdef}
+   \begin{lstlisting}[caption={Accelerated Query Plan},frame=shadowbox, numbers=left]
+Project [cast(o_orderkey#122 as int) AS o_orderkey#122,alias-1#197 AS price#195, ...
+ Scan DruidRelation(DruidRelationInfo(DruidClientInfo(localhost,8082),lineItemBase,...
+\end{lstlisting}
+\end{tiny}
+
+** Getting Started with the Sparkline BI Accelerator on AWS
+
+We have packaged an AMI with the TPCH dataset(datascale1) to
+demonstrate both the Flattened and Star-Schema Use cases. The AMI
+comes with Druid, Spark and the Accelerator pre-installed. Here are
+the instructions on how to try it out:
+
+
+.....
+
+*** Instructions on how to setup a system for your dataset
+If you want to put together a system with the Accelerator in place
+then our [[https://github.com/SparklineData/spark-druid-olap/wiki/Quick-Start-Guide][Quick Start Guide]] for TPCH dataset will be useful. The
+overall steps involved are:
+- Setup Spark and Druid on your cluster. Reference AWS EMR...
+- Index your Dataset. Details/references to Hadoop Indexer, our work
+  on Spark-Druid Indexer.
+- Define the Star-Schema and Sparkline Druid Datasource that links the
+  underlying dataset and the Druid Index.
+
+** Conclusion
+ Combining Spark and Druid can enable both interactive and flexible
+ analytics at scale. We make this integration happen by leveraging the
+ Spark SQL vision of a plug-in architecture for languages and
+ transformations. The resulting stack is something that combines the
+ low latency OLAP capabilities of Druid with the general-purpose
+ analytic capabilities of Spark. This work is available as an open
+ source [[http://spark-packages.org/package/SparklineData/spark-druid-olap][Spark package]]. We hope to build on these ideas to provide even
+ more powerful OLAP analytics in the future, including support for
+ dimensional metadata, MDX, and additional tool connectivity.
+
+
