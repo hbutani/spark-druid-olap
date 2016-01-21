@@ -17,6 +17,8 @@
 
 package org.sparklinedata.druid.client
 
+import org.apache.spark.sql.hive.test.TestHive
+
 class JoinTest extends StarSchemaBaseTest {
 
   test("2tableJoin") {
@@ -96,6 +98,22 @@ class JoinTest extends StarSchemaBaseTest {
     //df.show()
 
     df.explain(true)
+  }
+
+  test("dfPlan1") {
+    val df = TestHive.table("lineitem").groupBy("l_linestatus").count()
+    logPlan("basicAggOrderByDimension", df)
+    df.show()
+  }
+
+  test("dfPlan2") {
+    val df = TestHive.table("lineitem").
+      join(TestHive.table("partsupp")).
+      join(TestHive.table("supplier")).
+      where("l_suppkey = ps_suppkey and l_partkey = ps_partkey and ps_suppkey = s_suppkey").
+      groupBy("s_name", "l_linestatus").sum("l_extendedprice")
+    logPlan("basicAggOrderByDimension", df)
+    df.show()
   }
 
 }
