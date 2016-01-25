@@ -1,6 +1,6 @@
 name := "spark-druid-olap"
 
-version := "0.0.2"
+version := "0.0.3"
 
 organization := "SparklineData"
 
@@ -24,7 +24,7 @@ licenses := Seq("Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0")
 
 
 // Add Spark components this package depends on, e.g, "mllib", ....
-sparkComponents ++= Seq("sql", "hive")
+sparkComponents ++= Seq("sql", "hive", "hive-thriftserver")
 
 credentials += Credentials(Path.userHome / ".github.cred")
 
