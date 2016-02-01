@@ -18,12 +18,15 @@
 package org.sparklinedata.druid
 
 import org.apache.spark.Logging
-import org.json4s.jackson.JsonMethods._
-import org.json4s.{Extraction, ShortTypeHints, FullTypeHints, DefaultFormats}
 import org.json4s.ext.EnumNameSerializer
+import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
+import org.json4s.{Extraction, ShortTypeHints}
 import org.sparklinedata.druid.client.QueryResultRowSerializer
-import org.sparklinedata.druid.metadata.{EqualityCondition, StarRelationInfo, StarSchemaInfo, FunctionalDependencyType}
+import org.sparklinedata.druid.metadata.{EqualityCondition, FunctionalDependencyType}
+import org.sparklinedata.druid.metadata.{StarRelationInfo, StarSchemaInfo}
+
+import scala.util.Random
 
 object Utils extends Logging {
 
@@ -78,29 +81,56 @@ object Utils extends Logging {
     new EnumNameSerializer(FunctionalDependencyType) + new QueryResultRowSerializer ++
     org.json4s.ext.JodaTimeSerializers.all
 
-  def logQuery(dq : DruidQuery) : Unit = {
+  def logQuery(dq: DruidQuery): Unit = {
     log.info("\nDruid Query:\n" + pretty(render(Extraction.decompose(dq))))
   }
 
-  def logQuery(qSpec : QuerySpec) : Unit = {
+  def logQuery(qSpec: QuerySpec): Unit = {
     log.info("\nDruid Query:\n" + pretty(render(Extraction.decompose(qSpec))))
   }
 
-  def logStarSchema(ss : StarSchemaInfo) : Unit = {
+  def logStarSchema(ss: StarSchemaInfo): Unit = {
     log.info("\nStar Schema:\n" + pretty(render(Extraction.decompose(ss))))
   }
 
-  def queryToString(dq : DruidQuery) : String = pretty(render(Extraction.decompose(dq)))
+  def queryToString(dq: DruidQuery): String = pretty(render(Extraction.decompose(dq)))
 
   /**
-   * from fpinscala book
-   * @param a
-   * @tparam A
-   * @return
-   */
+    * from fpinscala book
+    *
+    * @param a
+    * @tparam A
+    * @return
+    */
   def sequence[A](a: List[Option[A]]): Option[List[A]] =
     a match {
       case Nil => Some(Nil)
       case h :: t => h flatMap (hh => sequence(t) map (hh :: _))
     }
+
+  def permute(s: String): String = StringPermute.permute(s)
+}
+
+/**
+  * The [[https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle][Fischer Yates Algortihm]]
+  */
+private[sparklinedata] object StringPermute {
+
+  val r = new Random()
+
+  def permute(s: String): String = {
+
+    val c = s.toArray
+    val sz = c.length
+
+    for (i <- sz - 1 to 1 by -1) {
+      val j = r.nextInt(i)
+      val c1 = c(j)
+      c(j) = c(i)
+      c(i) = c1
+    }
+
+    c.mkString("")
+  }
+
 }
