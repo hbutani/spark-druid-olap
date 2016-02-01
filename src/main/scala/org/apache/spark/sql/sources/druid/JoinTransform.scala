@@ -43,7 +43,8 @@ sealed trait JoinNode {
   val otherJoinPredicate : Option[Expression]
 
   private def checkStarJoin(tables: Map[String, DimTableInfo])
-                           (implicit sSchema: StarSchema): Either[String, Map[String, DimTableInfo]] = {
+                           (implicit sSchema: StarSchema
+                           ): Either[String, Map[String, DimTableInfo]] = {
     (sSchema.isStarJoin(leftExpressions, rightExpressions), this) match {
       case (None, _) =>
         Left(s"Join condition is not a Star Schema " +
