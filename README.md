@@ -1,7 +1,7 @@
 # Spark Druid Package
 
 Spark-Druid package enables *Logical Plans* written against a **raw event dataset** or a **star schema** to be rewritten
-to take advantage of a **[Drud Index](http://druid.io/)** of the data. It comprises of a [Druid DataSource](https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/sparklinedata/druid/DefaultSource.scala) 
+to take advantage of a **[Druid Index](http://druid.io/)** of the data. It comprises of a [Druid DataSource](https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/sparklinedata/druid/DefaultSource.scala) 
 that wraps the _underlying dataset_, and a [Druid Planner](https://github.com/SparklineData/spark-druid-olap/blob/master/src/main/scala/org/apache/spark/sql/sources/druid/DruidPlanner.scala) 
 that contains a set of *Rewrite Rules* to convert 'Project-Filter-Aggregation-Having-Sort-Limit' plans to Druid Index 
 Rest calls.
