@@ -295,5 +295,15 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
+  test("noRewrite") {
+    val df = sqlAndLog("noRewrite",
+      """select *
+        |from orderLineItemPartSupplier
+        |limit 3""".stripMargin)
+    logPlan("basicAgg", df)
+
+    df.show()
+  }
+
 }
 
