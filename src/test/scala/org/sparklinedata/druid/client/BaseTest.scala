@@ -172,6 +172,8 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     println(cT)
     sql(cT)
 
+    TestHive.table("orderLineItemPartSupplierBase").cache()
+
     // sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
 
     val cTOlap = s"""CREATE TABLE if not exists orderLineItemPartSupplier
