@@ -177,6 +177,8 @@ abstract class BaseTest extends fixture.FunSuite with BeforeAndAfterAll with Tes
     println(cT)
     sql(cT)
 
+    TestHive.table("orderLineItemPartSupplierBase").cache()
+
     // sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
 
     val cTOlap = s"""CREATE TABLE if not exists orderLineItemPartSupplier
