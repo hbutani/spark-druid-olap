@@ -146,7 +146,7 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     register(TestHive)
     DruidPlanner(TestHive)
 
-    val cT = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplierBase(o_orderkey integer,
+    val cT = s"""CREATE TABLE if not exists orderLineItemPartSupplierBase(o_orderkey integer,
              o_custkey integer,
       o_orderstatus string, o_totalprice double, o_orderdate string, o_orderpriority string,
       o_clerk string,
@@ -174,7 +174,7 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
 
     // sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
 
-    val cTOlap = s"""CREATE TEMPORARY TABLE orderLineItemPartSupplier
+    val cTOlap = s"""CREATE TABLE if not exists orderLineItemPartSupplier
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "orderLineItemPartSupplierBase",
       timeDimensionColumn "l_shipdate",

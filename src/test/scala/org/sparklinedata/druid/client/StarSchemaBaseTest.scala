@@ -171,7 +171,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
   override def beforeAll() = {
     super.beforeAll()
 
-    sql(s"""CREATE TEMPORARY TABLE lineitembase(l_orderkey integer,
+    sql(s"""CREATE TABLE if not exists lineitembase(l_orderkey integer,
         l_partkey integer, l_suppkey integer,
       l_linenumber integer,
       l_quantity double, l_extendedprice double, l_discount double, l_tax double,
@@ -183,7 +183,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("lineitem")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE orders(
+    sql(s"""CREATE TABLE if not exists orders(
            |o_orderkey integer, o_custkey integer,
            |    o_orderstatus VARCHAR(1),
            |    o_totalprice double,
@@ -197,7 +197,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("orders")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE partsupp(
+    sql(s"""CREATE TABLE if not exists partsupp(
            | ps_partkey integer, ps_suppkey integer,
            |    ps_availqty integer, ps_supplycost double,
            |    ps_comment VARCHAR(199)
@@ -206,7 +206,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("partsupp")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE supplier(
+    sql(s"""CREATE TABLE if not exists supplier(
              s_suppkey integer, s_name string, s_address string,
              s_nationkey integer,
            |      s_phone string, s_acctbal double, s_comment string)
@@ -214,7 +214,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("supplier")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE part(p_partkey integer, p_name string,
+    sql(s"""CREATE TABLE if not exists part(p_partkey integer, p_name string,
            |      p_mfgr string, p_brand string, p_type string, p_size integer, p_container string,
            |      p_retailprice double,
            |      p_comment string)
@@ -222,7 +222,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("part")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE customer(
+    sql(s"""CREATE TABLE if not exists customer(
            | c_custkey INTEGER,
            |    c_name VARCHAR(25),
            |    c_address VARCHAR(40),
@@ -236,7 +236,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("customer")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE custnation(
+    sql(s"""CREATE TABLE if not exists custnation(
            | cn_nationkey integer, cn_name VARCHAR(25),
            |    cn_regionkey integer, cn_comment VARCHAR(152)
            |)
@@ -244,7 +244,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("nation")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE custregion(
+    sql(s"""CREATE TABLE if not exists custregion(
            | cr_regionkey integer, cr_name VARCHAR(25),
            |    cr_comment VARCHAR(152)
            |)
@@ -252,7 +252,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("region")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE suppnation(
+    sql(s"""CREATE TABLE if not exists suppnation(
            | sn_nationkey integer, sn_name VARCHAR(25),
            |    sn_regionkey integer, sn_comment VARCHAR(152)
            |)
@@ -260,7 +260,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("nation")}",
       header "false", delimiter "|")""".stripMargin)
 
-    sql(s"""CREATE TEMPORARY TABLE suppregion(
+    sql(s"""CREATE TABLE if not exists suppregion(
            | sr_regionkey integer, sr_name VARCHAR(25),
            |    sr_comment VARCHAR(152)
            |)
@@ -271,7 +271,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
     /*
      * for -ve testing only
      */
-    sql(s"""CREATE TEMPORARY TABLE partsupp2(
+    sql(s"""CREATE TABLE if not exists partsupp2(
            | ps_partkey integer, ps_suppkey integer,
            |    ps_availqty integer, ps_supplycost double,
            |    ps_comment VARCHAR(199)
@@ -282,7 +282,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
 
 
     sql(
-      s"""CREATE TEMPORARY TABLE lineitem
+      s"""CREATE TABLE if not exists lineitem
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "lineItemBase",
       timeDimensionColumn "l_shipdate",
