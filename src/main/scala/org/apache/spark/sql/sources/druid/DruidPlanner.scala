@@ -17,12 +17,15 @@
 
 package org.apache.spark.sql.sources.druid
 
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.SQLConf.SQLConfEntry._
+import org.apache.spark.sql.{CachedTablePattern, SQLContext}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.sparklinedata.druid.DruidQueryBuilder
 
 
 class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTransforms {
+
+  val cacheTablePatternMatch = new CachedTablePattern(sqlContext)
 
   sqlContext.experimental.extraStrategies =
     (new DruidStrategy(this) +: sqlContext.experimental.extraStrategies)
@@ -51,4 +54,13 @@ class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTran
 object DruidPlanner {
 
   def apply(sqlContext : SQLContext) = new DruidPlanner(sqlContext)
+
+  val SPARKLINEDATA_CACHE_TABLES_TOCHECK = stringSeqConf("spark.sparklinedata.cache.tables.tocheck",
+    defaultValue = None,
+    doc = "A comma separated list of tableNames that should be checked if they are cached." +
+      "For Star-Schemas with associated Druid Indexes, even if tables are cached, we " +
+      "attempt to rewrite the Query to Druid. In order to do this we need to convert an" +
+      "[[InMemoryRelation]] operator with its underlying Logical Plan. This value, will" +
+      "tell us to restrict our check to certain tables. Otherwise by default we will check" +
+      "all tables.  ")
 }

@@ -20,6 +20,7 @@ package org.sparklinedata.druid.client
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.dsl.expressions._
+import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.scalatest.BeforeAndAfterAll
 import org.sparklinedata.spark.dateTime.dsl.expressions._
@@ -183,6 +184,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("lineitem")}",
       header "false", delimiter "|")""".stripMargin)
 
+    TestHive.table("lineitembase").cache
+
     sql(s"""CREATE TABLE if not exists orders(
            |o_orderkey integer, o_custkey integer,
            |    o_orderstatus VARCHAR(1),
@@ -197,6 +200,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("orders")}",
       header "false", delimiter "|")""".stripMargin)
 
+    TestHive.table("orders").cache
+
     sql(s"""CREATE TABLE if not exists partsupp(
            | ps_partkey integer, ps_suppkey integer,
            |    ps_availqty integer, ps_supplycost double,
@@ -206,6 +211,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("partsupp")}",
       header "false", delimiter "|")""".stripMargin)
 
+    TestHive.table("partsupp").cache
+
     sql(s"""CREATE TABLE if not exists supplier(
              s_suppkey integer, s_name string, s_address string,
              s_nationkey integer,
@@ -214,6 +221,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("supplier")}",
       header "false", delimiter "|")""".stripMargin)
 
+    TestHive.table("supplier").cache
+
     sql(s"""CREATE TABLE if not exists part(p_partkey integer, p_name string,
            |      p_mfgr string, p_brand string, p_type string, p_size integer, p_container string,
            |      p_retailprice double,
@@ -221,6 +230,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       USING com.databricks.spark.csv
       OPTIONS (path "${tpchDataFolder("part")}",
       header "false", delimiter "|")""".stripMargin)
+
+    TestHive.table("part").cache
 
     sql(s"""CREATE TABLE if not exists customer(
            | c_custkey INTEGER,
@@ -236,6 +247,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("customer")}",
       header "false", delimiter "|")""".stripMargin)
 
+    TestHive.table("customer").cache
+
     sql(s"""CREATE TABLE if not exists custnation(
            | cn_nationkey integer, cn_name VARCHAR(25),
            |    cn_regionkey integer, cn_comment VARCHAR(152)
@@ -243,6 +256,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       USING com.databricks.spark.csv
       OPTIONS (path "${tpchDataFolder("nation")}",
       header "false", delimiter "|")""".stripMargin)
+
+    TestHive.table("custnation").cache
 
     sql(s"""CREATE TABLE if not exists custregion(
            | cr_regionkey integer, cr_name VARCHAR(25),
@@ -252,6 +267,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("region")}",
       header "false", delimiter "|")""".stripMargin)
 
+    TestHive.table("custregion").cache
+
     sql(s"""CREATE TABLE if not exists suppnation(
            | sn_nationkey integer, sn_name VARCHAR(25),
            |    sn_regionkey integer, sn_comment VARCHAR(152)
@@ -260,6 +277,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (path "${tpchDataFolder("nation")}",
       header "false", delimiter "|")""".stripMargin)
 
+    TestHive.table("suppnation").cache
+
     sql(s"""CREATE TABLE if not exists suppregion(
            | sr_regionkey integer, sr_name VARCHAR(25),
            |    sr_comment VARCHAR(152)
@@ -267,6 +286,8 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       USING com.databricks.spark.csv
       OPTIONS (path "${tpchDataFolder("region")}",
       header "false", delimiter "|")""".stripMargin)
+
+    TestHive.table("suppregion").cache
 
     /*
      * for -ve testing only

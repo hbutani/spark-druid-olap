@@ -73,7 +73,7 @@ trait ProjectFilterTransfom {
    * the final join will be checked.
    */
   val druidRelationTransformForJoin: DruidTransform = {
-    case (_, PhysicalOperation(projectList, filters,
+    case (_, cacheTablePatternMatch(projectList, filters,
     l@LogicalRelation(d@DruidRelation(info, None)))) => {
       val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
       translateProjectFilter(dqb,
