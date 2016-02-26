@@ -25,7 +25,7 @@ class DruidRewriteCubeTest extends BaseTest {
 
 
   test("basicCube") {td =>
-    val df = sqlAndLog("basicAggOrderByDimension",
+    val df = sqlAndLog("basicCube",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
@@ -36,7 +36,7 @@ class DruidRewriteCubeTest extends BaseTest {
   }
 
   test("testUnion") {td =>
-    val df = sqlAndLog("basicAggOrderByDimension",
+    val df = sqlAndLog("testUnion",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
@@ -82,7 +82,7 @@ class DruidRewriteCubeTest extends BaseTest {
   }
 
   test("basicFilterCube") {td =>
-    val df = sqlAndLog("basicAggOrderByDimension",
+    val df = sqlAndLog("basicFilterCube",
       "select s_nation, l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
@@ -96,7 +96,7 @@ class DruidRewriteCubeTest extends BaseTest {
   }
 
   test("basicFilterRollup") {td =>
-    val df = sqlAndLog("basicAggOrderByDimension",
+    val df = sqlAndLog("basicFilterRollup",
       "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
@@ -108,7 +108,7 @@ class DruidRewriteCubeTest extends BaseTest {
   }
 
   test("basicFilterGroupingSet") {td =>
-    val df = sqlAndLog("basicAggOrderByDimension",
+    val df = sqlAndLog("basicFilterGroupingSet",
       "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
@@ -120,7 +120,7 @@ class DruidRewriteCubeTest extends BaseTest {
   }
 
   test("basicCubeWithExpr") {td =>
-    val df = sqlAndLog("basicAggOrderByDimension",
+    val df = sqlAndLog("basicCubeWithExpr",
       "select lower(l_returnflag), l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
