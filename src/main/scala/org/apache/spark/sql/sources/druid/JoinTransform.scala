@@ -17,10 +17,12 @@
 
 package org.apache.spark.sql.sources.druid
 
+import org.apache.spark.sql.CachedTablePattern
 import org.apache.spark.sql.catalyst.expressions.{PredicateHelper, AttributeReference, NamedExpression, Expression}
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ExtractEquiJoinKeys}
-import org.apache.spark.sql.catalyst.plans.Inner
+import org.apache.spark.sql.catalyst.plans.{JoinType, Inner}
 import org.apache.spark.sql.catalyst.plans.logical.{Project, LogicalPlan}
+import org.apache.spark.sql.columnar.InMemoryRelation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.sources.BaseRelation
 import org.sparklinedata.druid.DruidQueryBuilder
@@ -77,7 +79,8 @@ sealed trait JoinNode {
    * Ensure that this JoinTree is a subGraph of the StarSchema's join tree.
    * - every join must be a [[StarSchema.isStarJoin valid star join]]
    * - a StarSchema table must appear only once in the JoinTree
-   * @param sSchema
+    *
+    * @param sSchema
    * @return
    */
   def validate(implicit sSchema: StarSchema):
@@ -127,61 +130,6 @@ case class BushyJoinNode(left: JoinNode,
                          leftExpressions: Seq[Expression],
                          rightExpressions: Seq[Expression],
                          otherJoinPredicate : Option[Expression]) extends JoinNode
-
-object JoinNode {
-
-  def unapply(lp: LogicalPlan): Option[JoinNode] = lp match {
-    case ExtractEquiJoinKeys(
-    Inner,
-    leftExpressions,
-    rightExpressions,
-    otherJoinPredicate,
-    PhysicalOperation(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
-    PhysicalOperation(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
-      Some(LeafJoinNode(leftExpressions,
-        DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
-        rightExpressions,
-        DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
-      otherJoinPredicate))
-
-    case ExtractEquiJoinKeys(
-    Inner,
-    leftExpressions,
-    rightExpressions,
-    otherJoinPredicate,
-    JoinNode(lJT),
-    PhysicalOperation(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
-      Some(LeftJoinNode(lJT, leftExpressions,
-        rightExpressions,
-        DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
-      otherJoinPredicate))
-
-    case ExtractEquiJoinKeys(
-    Inner,
-    leftExpressions,
-    rightExpressions,
-    otherJoinPredicate,
-    PhysicalOperation(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
-    JoinNode(rJT)
-    ) => Some(RightJoinNode(rJT,
-      leftExpressions, DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
-      rightExpressions,
-    otherJoinPredicate))
-
-    case ExtractEquiJoinKeys(
-    Inner,
-    leftExpressions,
-    rightExpressions,
-    otherJoinPredicate,
-    JoinNode(lJT),
-    JoinNode(rJT)
-    ) => Some(BushyJoinNode(lJT, rJT, leftExpressions, rightExpressions, otherJoinPredicate))
-
-    case Project(_, JoinNode(jt)) => Some(jt)
-
-    case _ => None
-  }
-}
 
 /**
  * A translatable JoinTree must have one of the following forms:
@@ -344,7 +292,7 @@ trait JoinTransform {
     rightExpressions,
     otherJoinPredicate,
     JoinDruidQuery(jdqb),
-    PhysicalOperation(projectList, filters, l@LogicalRelation(dimRelation))
+    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation))
     )
       ) => {
       translateJoin(leftExpressions,
@@ -361,7 +309,7 @@ trait JoinTransform {
     leftExpressions,
     rightExpressions,
     otherJoinPredicate,
-    PhysicalOperation(projectList, filters, l@LogicalRelation(dimRelation)),
+    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation)),
     JoinDruidQuery(jdqb)
     )
       ) => {
@@ -417,6 +365,61 @@ trait JoinTransform {
       dqbO.toSeq
     }
     case _ => Seq()
+  }
+
+  object JoinNode {
+
+    def unapply(lp: LogicalPlan): Option[JoinNode] = lp match {
+      case ExtractEquiJoinKeys(
+      Inner,
+      leftExpressions,
+      rightExpressions,
+      otherJoinPredicate,
+      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
+      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
+        Some(LeafJoinNode(leftExpressions,
+          DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
+          rightExpressions,
+          DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
+          otherJoinPredicate))
+
+      case ExtractEquiJoinKeys(
+      Inner,
+      leftExpressions,
+      rightExpressions,
+      otherJoinPredicate,
+      JoinNode(lJT),
+      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
+        Some(LeftJoinNode(lJT, leftExpressions,
+          rightExpressions,
+          DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
+          otherJoinPredicate))
+
+      case ExtractEquiJoinKeys(
+      Inner,
+      leftExpressions,
+      rightExpressions,
+      otherJoinPredicate,
+      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
+      JoinNode(rJT)
+      ) => Some(RightJoinNode(rJT,
+        leftExpressions, DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
+        rightExpressions,
+        otherJoinPredicate))
+
+      case ExtractEquiJoinKeys(
+      Inner,
+      leftExpressions,
+      rightExpressions,
+      otherJoinPredicate,
+      JoinNode(lJT),
+      JoinNode(rJT)
+      ) => Some(BushyJoinNode(lJT, rJT, leftExpressions, rightExpressions, otherJoinPredicate))
+
+      case Project(_, JoinNode(jt)) => Some(jt)
+
+      case _ => None
+    }
   }
 
 }
