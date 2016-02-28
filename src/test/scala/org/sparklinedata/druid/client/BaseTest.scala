@@ -208,7 +208,7 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     cleaned.trim
   }
 
-  def compareLogicalPlan(df: DataFrame, goldenFilePath: String): Boolean = {
+  def compareLogicalPlan(df: DataFrame, goldenFilePath: String) : Boolean = {
     val goldenFileContents = Source.fromURL(getClass.getResource("/" + goldenFilePath)).getLines().mkString("\n")
     val logicalPlan = df.queryExecution.optimizedPlan.toString()
 
@@ -216,9 +216,10 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     val cleanedLogical = removeTags(logicalPlan)
     
     cleanedGolden == cleanedLogical
+    
   }
 
-  def comparePhysicalPlan(df: DataFrame, goldenFilePath: String): Boolean = {
+  def comparePhysicalPlan(df: DataFrame, goldenFilePath: String) : Boolean = {
     val goldenFileContents = Source.fromURL(getClass.getResource("/" + goldenFilePath)).getLines().mkString("\n")
     val physicalPlan = df.queryExecution.sparkPlan.toString()
 
