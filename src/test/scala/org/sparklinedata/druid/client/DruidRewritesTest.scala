@@ -36,6 +36,17 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
+  test("noAggs") {
+    val df = sqlAndLog("noAggs",
+      "select l_returnflag, l_linestatus " +
+        "from orderLineItemPartSupplier " +
+        "group by l_returnflag, l_linestatus")
+
+    logPlan("noAggs", df)
+
+    df.show()
+  }
+
   test("basicAggWithProject") {
 
     /*

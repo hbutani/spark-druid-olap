@@ -116,4 +116,26 @@ class JoinTest extends StarSchemaBaseTest {
     df.show()
   }
 
+  test("dimensionOnlyQuery") {
+    val df = sqlAndLog("dimensionOnlyQuery",
+    """SELECT customer.c_mktsegment AS c_mktsegment
+      |FROM   (SELECT *
+      |        FROM   lineitem) lineitem
+      |       JOIN (SELECT *
+      |             FROM   orders) orders
+      |         ON ( lineitem.l_orderkey = orders.o_orderkey )
+      |       JOIN (SELECT *
+      |             FROM   customer) customer
+      |         ON ( orders.o_custkey = customer.c_custkey )
+      |       JOIN (SELECT *
+      |             FROM   custnation) custnation
+      |         ON ( customer.c_nationkey = custnation.cn_nationkey )
+      |       JOIN (SELECT *
+      |             FROM   custregion) custregion
+      |         ON ( custnation.cn_regionkey = custregion.cr_regionkey )
+      |GROUP  BY customer.c_mktsegment """.stripMargin)
+    logPlan("basicAggOrderByDimension", df)
+    df.show()
+  }
+
 }

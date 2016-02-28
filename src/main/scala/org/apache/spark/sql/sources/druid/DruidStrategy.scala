@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
 import org.apache.spark.sql.execution.{PhysicalRDD, Project, SparkPlan, Union}
 import org.sparklinedata.druid._
+import org.sparklinedata.druid.query.QuerySpecTransforms
 
 private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
 with PredicateHelper with DruidPlannerHelper with Logging {
@@ -48,7 +49,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           /*
            * 3. Setup GroupByQuerySpec
            */
-          val qs = new GroupByQuerySpec(dqb.drInfo.druidDS.name,
+          var qs : QuerySpec = new GroupByQuerySpec(dqb.drInfo.druidDS.name,
             dqb.dimensions,
             dqb.limitSpec,
             dqb.havingSpec,
@@ -60,7 +61,12 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           )
 
           /*
-           * 4. Setup DruidRelation
+           * 4. apply QuerySpec transforms
+           */
+          qs = QuerySpecTransforms.transform(dqb.drInfo, qs)
+
+          /*
+           * 5. Setup DruidRelation
            */
           val dq = DruidQuery(qs, intervals, Some(exprToDruidOutput.values.toList))
 
@@ -69,7 +75,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           val dR: DruidRelation = DruidRelation(dqb.drInfo, Some(dq))(planner.sqlContext)
 
           /*
-           * 5. Setup SparkPlan = PhysicalRDD + Projection
+           * 6. Setup SparkPlan = PhysicalRDD + Projection
            */
           val druidOpAttrs = exprToDruidOutput.values.map {
             case DruidOperatorAttribute(eId, nm, dT) => AttributeReference(nm, dT)(eId)
