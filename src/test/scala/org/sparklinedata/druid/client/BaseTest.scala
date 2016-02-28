@@ -22,9 +22,12 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
-
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.{ BeforeAndAfterAll, FunSuite }
 import org.sparklinedata.spark.dateTime.Functions._
+import scala.io.Source
+import java.io.PrintWriter
+import java.io.File
+import java.math.BigInteger
 
 abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
 
@@ -59,7 +62,7 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     """.stripMargin.replace('\n', ' ')
 
   val starSchema =
-  """
+    """
     |{
     |  "factTable" : "lineitem",
     |  "relations" : [ {
@@ -189,16 +192,41 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     sql(cTOlap)
   }
 
-  def sqlAndLog(nm : String, sqlStr : String) : DataFrame = {
+  def sqlAndLog(nm: String, sqlStr: String): DataFrame = {
     logInfo(s"\n$nm SQL:\n" + sqlStr)
     sql(sqlStr)
   }
 
-  def logPlan(nm : String, df : DataFrame) : Unit = {
+  def logPlan(nm: String, df: DataFrame): Unit = {
     logInfo(s"\n$nm Plan:")
     logInfo(s"\nLogical Plan:\n" + df.queryExecution.optimizedPlan.toString)
     logInfo(s"\nPhysical Plan:\n" + df.queryExecution.sparkPlan.toString)
   }
 
+  def removeTags(plan: String): String = {
+    val cleaned = plan.replaceAll("#\\d+|@\\w+", "")
+    cleaned.trim
+  }
+
+  def compareLogicalPlan(df: DataFrame, goldenFilePath: String): Boolean = {
+    val goldenFileContents = Source.fromURL(getClass.getResource("/" + goldenFilePath)).getLines().mkString("\n")
+    val logicalPlan = df.queryExecution.optimizedPlan.toString()
+
+    val cleanedGolden = removeTags(goldenFileContents)
+    val cleanedLogical = removeTags(logicalPlan)
+    
+    cleanedGolden == cleanedLogical
+  }
+
+  def comparePhysicalPlan(df: DataFrame, goldenFilePath: String): Boolean = {
+    val goldenFileContents = Source.fromURL(getClass.getResource("/" + goldenFilePath)).getLines().mkString("\n")
+    val physicalPlan = df.queryExecution.sparkPlan.toString()
+
+    val cleanedGolden = removeTags(goldenFileContents)
+    val cleanedPhysical = removeTags(physicalPlan)
+    
+    cleanedGolden == cleanedPhysical
+  }
+  
 }
 
