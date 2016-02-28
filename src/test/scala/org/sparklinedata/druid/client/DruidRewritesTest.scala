@@ -37,13 +37,24 @@ class DruidRewritesTest extends BaseTest {
   }
 
   test("basicAggWithProject") {
-    val df = sqlAndLog("basicAggWithProject",
-      "select f, s, " +
-      "count(*)  " +
-      "from (select l_returnflag f, l_linestatus s from orderLineItemPartSupplier) t group by f, s")
-    logPlan("basicAggWithProject", df)
 
+    /*
+     * use `turnOnTransformDebugging` and `turnOnTransformDebugging` to see
+     * the transformations happening in a query. Use this judiciously as the
+     * output can be large
+     */
+    try {
+      turnOnTransformDebugging
 
+      val df = sqlAndLog("basicAggWithProject",
+        "select f, s, " +
+          "count(*)  " +
+          "from (select l_returnflag f, l_linestatus s " +
+          "from orderLineItemPartSupplier) t group by f, s")
+      logPlan("basicAggWithProject", df)
+    } finally {
+      turnOffTransformDebugging
+    }
     // df.show()
   }
 

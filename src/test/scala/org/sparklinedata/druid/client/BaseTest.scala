@@ -202,5 +202,13 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     logInfo(s"\nPhysical Plan:\n" + df.queryExecution.sparkPlan.toString)
   }
 
+  def turnOnTransformDebugging : Unit = {
+    TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "true")
+  }
+
+  def turnOffTransformDebugging : Unit = {
+    TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "false")
+  }
+
 }
 

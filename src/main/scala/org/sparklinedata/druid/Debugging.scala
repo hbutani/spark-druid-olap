@@ -17,12 +17,19 @@
 
 package org.sparklinedata.druid
 
+import org.apache.spark.Logging
+
 import scala.language.implicitConversions
 
-object Debugging {
+object Debugging extends Logging {
 
   final class Debug[A](val __resultOfDebug: A) extends AnyVal {
     def debug : A = __resultOfDebug
+
+    def debugLog(msg : => String) : A = {
+      logDebug(msg)
+      __resultOfDebug
+    }
   }
 
   @inline implicit def any2Debug[A](x: A): Debug[A] = new Debug(x)
