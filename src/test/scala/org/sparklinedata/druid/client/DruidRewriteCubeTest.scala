@@ -83,7 +83,7 @@ class DruidRewriteCubeTest extends BaseTest {
   }
 
   test("basicFilterCube") {
-    val df = sqlAndLog("basicFilterCube",
+    val df = sqlAndLog("basicAggOrderByDimension",
       "select s_nation, l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
@@ -91,7 +91,7 @@ class DruidRewriteCubeTest extends BaseTest {
         "group by s_nation, l_returnflag, l_linestatus with cube")
     logPlan("basicAggOrderByDimension", df)
     
-    assert(compareLogicalPlan(df, "test1.txt") && comparePhysicalPlan(df, "test2.txt") )
+    assert(compareLogicalPlan(df, "DruidRewriteCubeTest_ basicFilterCube.logicalPlan") && comparePhysicalPlan(df, "DruidRewriteCubeTest_ basicFilterCube.physicalPlan") )
     //df.show()
   }
 
