@@ -35,15 +35,37 @@ class DruidRewritesTest extends BaseTest {
 
     // df.show()
   }
+  
+  test("noAggs") {td =>
+    val df = sqlAndLog("noAggs",
+      "select l_returnflag, l_linestatus " +
+        "from orderLineItemPartSupplier " +
+        "group by l_returnflag, l_linestatus")
+
+    logPlan("noAggs", df)
+
+    df.show()
+  }
 
   test("basicAggWithProject") {td =>
-    val df = sqlAndLog("basicAggWithProject",
-      "select f, s, " +
-      "count(*)  " +
-      "from (select l_returnflag f, l_linestatus s from orderLineItemPartSupplier) t group by f, s")
-    logPlan("basicAggWithProject", df)
 
+    /*
+     * use `turnOnTransformDebugging` and `turnOnTransformDebugging` to see
+     * the transformations happening in a query. Use this judiciously as the
+     * output can be large
+     */
+    try {
+      turnOnTransformDebugging
 
+      val df = sqlAndLog("basicAggWithProject",
+        "select f, s, " +
+          "count(*)  " +
+          "from (select l_returnflag f, l_linestatus s " +
+          "from orderLineItemPartSupplier) t group by f, s")
+      logPlan("basicAggWithProject", df)
+    } finally {
+      turnOffTransformDebugging
+    }
     // df.show()
   }
 
@@ -295,7 +317,7 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
-  test("noRewrite") {
+  test("noRewrite") {td =>
     val df = sqlAndLog("noRewrite",
       """select *
         |from orderLineItemPartSupplier

@@ -246,5 +246,13 @@ abstract class BaseTest extends fixture.FunSuite with BeforeAndAfterAll with Tes
     cleanedGolden == cleanedPhysical
   }
   
+  def turnOnTransformDebugging : Unit = {
+    TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "true")
+  }
+
+  def turnOffTransformDebugging : Unit = {
+    TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "false")
+  }
+
 }
 

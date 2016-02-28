@@ -85,9 +85,28 @@ with PredicateHelper with Logging  {
     }
   }
 
+  case class DebugTransform(transformName : String,
+                            t : DruidTransform) extends DruidTransform {
+
+    def apply(i : (Seq[DruidQueryBuilder], LogicalPlan)) : Seq[DruidQueryBuilder] = {
+      val iDQBs : Seq[DruidQueryBuilder] = i._1
+      val lP : LogicalPlan = i._2
+      val oDQBs = t(iDQBs, lP)
+      if (sqlContext.getConf(DruidPlanner.DEBUG_TRANSFORMATIONS)) {
+        log.info(s"$transformName transform invoked:\n" +
+          s"Input DruidQueryBuilders : $iDQBs \n" +
+          s"Input LogicalPlan : $lP" +
+          s"Output DruidQueryBuilders : $oDQBs\n")
+      }
+      oDQBs
+    }
+  }
+
   case class TransformHolder(t : DruidTransform) {
 
     def or(t2 : DruidTransform) = ORTransform(t, t2)
+
+    def debug(name : String) : DruidTransform = new DebugTransform(name, t)
   }
 
   implicit def transformToHolder(t : DruidTransform) = TransformHolder(t)

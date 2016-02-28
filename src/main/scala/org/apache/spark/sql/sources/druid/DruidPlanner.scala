@@ -31,13 +31,15 @@ class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTran
     (new DruidStrategy(this) +: sqlContext.experimental.extraStrategies)
 
   val joinGraphTransforms : Seq[DruidTransform] = Seq(
-    druidRelationTransformForJoin or joinTransform
+    druidRelationTransformForJoin.debug("druidRelationTransformForJoin") or
+      joinTransform.debug("join")
   )
 
   val transforms : Seq[DruidTransform] = Seq(
-    druidRelationTransform or joinTransform,
-    aggregateTransform,
-    limitTransform
+    druidRelationTransform.debug("druidRelationTransform") or
+      joinTransform.debug("join"),
+    aggregateTransform.debug("aggregate"),
+    limitTransform.debug("limit")
   )
 
   def plan(db : Seq[DruidQueryBuilder], plan: LogicalPlan): Seq[DruidQueryBuilder] = {
@@ -63,4 +65,8 @@ object DruidPlanner {
       "[[InMemoryRelation]] operator with its underlying Logical Plan. This value, will" +
       "tell us to restrict our check to certain tables. Otherwise by default we will check" +
       "all tables.  ")
+
+  val DEBUG_TRANSFORMATIONS = booleanConf("spark.sparklinedata.debug.transformations",
+    defaultValue = Some(false),
+    doc = "When set to true each transformation is logged.")
 }
