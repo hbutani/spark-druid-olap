@@ -17,6 +17,7 @@
 
 package org.sparklinedata.druid
 
+import scala.collection.breakOut
 import org.apache.spark.sql.types.{DoubleType, LongType, StringType, DataType}
 import org.joda.time.Interval
 
@@ -28,7 +29,8 @@ sealed trait ExtractionFunctionSpec {
 
 /**
  * In SQL this is an 'like' or rlike' predicate on a column being grouped on.
- * @param `type`
+  *
+  * @param `type`
  * @param expr
  */
 case class RegexExtractionFunctionSpec(val `type`: String, val expr: String)
@@ -36,7 +38,8 @@ case class RegexExtractionFunctionSpec(val `type`: String, val expr: String)
 
 /**
  * In SQL this is a grouping expression of the form 'if col rlike regex then regex else null'
- * @param `type`
+  *
+  * @param `type`
  * @param expr
  */
 case class PartialExtractionFunctionSpec(val `type`: String, val expr: String)
@@ -44,7 +47,8 @@ case class PartialExtractionFunctionSpec(val `type`: String, val expr: String)
 
 /**
  * In SQL this is a contains predicate on a column being grouped on.
- * @param `type`
+  *
+  * @param `type`
  * @param query
  */
 case class SearchQueryExtractionFunctionSpec(val `type`: String, val query: String)
@@ -54,7 +58,8 @@ case class SearchQueryExtractionFunctionSpec(val `type`: String, val query: Stri
  * In SQL this is a withTimeZone and field extraction functions applied to the time dimension
  * columns. Assume time functions are expressed using
  * [[https://github.com/SparklineData/spark-datetime SparklineData-sparkdatetime package]].
- * @param `type`
+  *
+  * @param `type`
  * @param format
  * @param timeZone
  * @param locale
@@ -78,10 +83,16 @@ case class JavaScriptExtractionFunctionSpec(val `type`: String,
                                             val injective: Boolean = false)
   extends ExtractionFunctionSpec
 
-// TODO ExplicitLookupExtractionFunctionSpec
+case class LookUpMap(val `type`: String, val `map`: Map[String, String])
+
+case class InExtractionFnSpec(val `type`: String, lookup: LookUpMap)
+  extends ExtractionFunctionSpec {
+  def this(valLst: List[String]) = this("lookup",
+    LookUpMap("map", valLst.map(x => (x, "true"))(breakOut)))
+}
 
 /**
- * As defined in [[http://druid.io/docs/latest/querying/dimensionspecs.html]]
+  * As defined in [[http://druid.io/docs/latest/querying/dimensionspecs.html]]
  */
 sealed trait DimensionSpec {
   val `type`: String
@@ -93,7 +104,8 @@ sealed trait DimensionSpec {
 
 /**
  * In SQL these are columns being grouped on.
- * @param `type`
+  *
+  * @param `type`
  * @param dimension
  * @param outputName
  */
@@ -147,10 +159,19 @@ case class LogicalFilterSpec(`type`: String,
 case class NotFilterSpec(`type`: String,
                          field: FilterSpec) extends FilterSpec
 
+case class ExtractionFilterSpec(`type`: String,
+                                dimension: String,
+                                value: String,
+                                extractionFn: InExtractionFnSpec) extends FilterSpec {
+  def this(dimension: String, valList: List[String]) = this("extraction", dimension, "true",
+    new InExtractionFnSpec(valList))
+}
+
 /**
  * In SQL an invocation on a special JSPredicate is translated to this FilterSpec.
  * JSPredicate has the signature jspredicate(colum, jsFuncCodeAsString)
- * @param `type`
+  *
+  * @param `type`
  * @param dimension
  * @param function
  */
@@ -184,7 +205,8 @@ sealed trait AggregationSpec {
 
 /**
  * In SQL an aggregation expression on a metric is translated to this Spec.
- * @param `type` can be "count", "longSum", "doubleSum", "min", "max", "hyperUnique"
+  *
+  * @param `type` can be "count", "longSum", "doubleSum", "min", "max", "hyperUnique"
  * @param name
  * @param fieldName
  */
@@ -200,7 +222,8 @@ case class FunctionAggregationSpec(val `type`: String,
 
 /**
  * In SQL a count(distinct dimColumn) is translated to this Spec.
- * @param `type`
+  *
+  * @param `type`
  * @param name
  * @param fieldNames
  * @param byRow
@@ -220,7 +243,8 @@ case class CardinalityAggregationSpec(val `type`: String,
  * In SQL this is an invocation on a special JSAgg function. Its signature is
  * JSAggLong(metricCol, aggFnCode, combineFnCode, resetFnCode). Similar kind of
  * function double metrics: JSAggDouble.
- * @param `type`
+  *
+  * @param `type`
  * @param name
  * @param fieldNames
  * @param fnAggregate
@@ -242,7 +266,8 @@ case class JavascriptAggregationSpec(val `type`: String,
 /**
  * In SQL this is an aggregation on an If condition. For example
  * sum(if dimCol = value then metric else null end)
- * @param `type`
+  *
+  * @param `type`
  * @param filter
  * @param aggregator
  */
@@ -283,7 +308,8 @@ case class HyperUniqueCardinalityPostAggregationSpec(val `type`: String,
 
 /**
  * In SQL this is an expression involving at least 1 aggregation expression
- * @param `type`
+  *
+  * @param `type`
  * @param name
  * @param fn can be +, -, *, /
  * @param fields

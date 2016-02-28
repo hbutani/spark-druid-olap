@@ -173,6 +173,11 @@ trait ProjectFilterTransfom {
           LogicalFilterSpec("and", args.toList)
         }
       }
+      case In(AttributeReference(nm, dT, _, _), vl: Seq[Expression]) => {
+        val allLiterals = vl.forall(e => e.isInstanceOf[Literal])
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] && allLiterals)
+          yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
+    }
       case _ => None
     }
   }

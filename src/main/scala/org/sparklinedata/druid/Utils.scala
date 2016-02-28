@@ -74,7 +74,10 @@ object Utils extends Logging {
         classOf[TopNQuerySpec],
         classOf[StarSchemaInfo],
         classOf[StarRelationInfo],
-        classOf[EqualityCondition]
+        classOf[EqualityCondition],
+        classOf[LookUpMap],
+        classOf[InExtractionFnSpec],
+        classOf[ExtractionFilterSpec]
       )
     )
   ) +
