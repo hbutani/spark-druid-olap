@@ -90,7 +90,8 @@ class DruidRewriteCubeTest extends BaseTest {
         "where s_nation = 'FRANCE' " +
         "group by s_nation, l_returnflag, l_linestatus with cube")
     logPlan("basicAggOrderByDimension", df)
-
+    
+    assert(compareLogicalPlan(df, "test1.txt") && comparePhysicalPlan(df, "test2.txt") )
     //df.show()
   }
 
