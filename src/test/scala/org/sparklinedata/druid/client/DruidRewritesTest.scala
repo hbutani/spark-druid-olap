@@ -25,7 +25,7 @@ import scala.language.postfixOps
 
 class DruidRewritesTest extends BaseTest {
 
-  test("basicAgg") {
+  test("basicAgg") {td =>
     val df = sqlAndLog("basicAgg",
       "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
@@ -36,7 +36,7 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
-  test("basicAggWithProject") {
+  test("basicAggWithProject") {td =>
     val df = sqlAndLog("basicAggWithProject",
       "select f, s, " +
       "count(*)  " +
@@ -47,7 +47,7 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
-  test("dateFilter") {
+  test("dateFilter") {td =>
 
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
@@ -69,7 +69,7 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
-  test("intervalFilter") {
+  test("intervalFilter") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
     val df = sqlAndLog("intervalFilter",
@@ -93,7 +93,7 @@ class DruidRewritesTest extends BaseTest {
 
   }
 
-  test("intervalFilter2") {
+  test("intervalFilter2") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) > (dateTime("1995-12-01"))
 
@@ -116,7 +116,7 @@ class DruidRewritesTest extends BaseTest {
 
   }
 
-  test("intervalFilter3") {
+  test("intervalFilter3") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) < (dateTime("1995-12-01"))
 
@@ -139,7 +139,7 @@ class DruidRewritesTest extends BaseTest {
 
   }
 
-  test("intervalFilter4") {
+  test("intervalFilter4") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) > (dateTime("1997-12-02"))
 
@@ -162,7 +162,7 @@ class DruidRewritesTest extends BaseTest {
 
   }
 
-  test("dimFilter2") {
+  test("dimFilter2") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
     val df = sqlAndLog("dimFilter2",
@@ -187,7 +187,7 @@ class DruidRewritesTest extends BaseTest {
 
   }
 
-  test("dimFilter3") {
+  test("dimFilter3") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
     val df = sqlAndLog("dimFilter3",
@@ -212,7 +212,7 @@ class DruidRewritesTest extends BaseTest {
 
   }
 
-  test("dimFilter4") {
+  test("dimFilter4") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
     val df = sqlAndLog("dimFilter4",
@@ -235,7 +235,7 @@ class DruidRewritesTest extends BaseTest {
 
   }
 
-  test("projFilterAgg") {
+  test("projFilterAgg") {td =>
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) > (dateTime("1995-12-01"))
 
@@ -267,7 +267,7 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
-  test("ShipDateYearAgg") {
+  test("ShipDateYearAgg") {td =>
 
     val shipDtYrGroup = dateTime('l_shipdate) year
 
@@ -281,7 +281,7 @@ class DruidRewritesTest extends BaseTest {
     // df.show()
   }
 
-  test("OrderDateYearAgg") {
+  test("OrderDateYearAgg") {td =>
 
     val orderDtYrGroup = dateTime('o_orderdate) year
 

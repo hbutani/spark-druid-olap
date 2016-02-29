@@ -24,7 +24,7 @@ import org.sparklinedata.druid.metadata.{StarSchema, StarRelationInfo, StarSchem
 
 class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
-  test("simpleStar") {
+  test("simpleStar") {td =>
 
     val starInfo = StarSchemaInfo("lineitem",
       StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey"))
@@ -36,7 +36,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   }
 
-  test("salesStar") {
+  test("salesStar") {td =>
 
     val starInfo = StarSchemaInfo("lineitem",
       StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),
@@ -50,7 +50,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   }
 
-  test("tpch") {
+  test("tpch") {td =>
 
     val starInfo = StarSchemaInfo("lineitem",
       StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),
@@ -73,7 +73,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   }
 
-  test("multiPathsNotAllowed") {
+  test("multiPathsNotAllowed") {td =>
 
     val starInfo = StarSchemaInfo("lineitem",
       StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),
@@ -90,7 +90,7 @@ class StarSchemaMetadataTest  extends StarSchemaBaseTest {
 
   }
 
-  test("nonUniqueColumnsNotAllowed") {
+  test("nonUniqueColumnsNotAllowed") {td =>
 
     val starInfo = StarSchemaInfo("lineitem",
       StarRelationInfo.manyToone("lineitem", "orders", ("l_orderkey", "o_orderkey")),

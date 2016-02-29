@@ -20,7 +20,7 @@ package org.sparklinedata.druid.client
 class DruidRewriteOrderTest extends BaseTest {
 
 
-  test("basicAggOrderByDimension") {
+  test("basicAggOrderByDimension") {td =>
     val df = sqlAndLog("basicAggOrderByDimension",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
@@ -32,7 +32,7 @@ class DruidRewriteOrderTest extends BaseTest {
     //df.show()
   }
 
-  test("basicAggOrderByDimensionLimit") {
+  test("basicAggOrderByDimensionLimit") {td =>
     val df = sqlAndLog("basicAggOrderByDimensionLimit",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
@@ -50,7 +50,7 @@ class DruidRewriteOrderTest extends BaseTest {
    * SPARK-10437 is only fixed in Spark-1.6, but the issue here was translation of
    * SortOrder clause.
    */
-  test("basicAggOrderByMetric") {
+  test("basicAggOrderByMetric") {td =>
     val df = sqlAndLog("basicAggOrderByMetric",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
@@ -62,7 +62,7 @@ class DruidRewriteOrderTest extends BaseTest {
     df.show()
   }
 
-  test("basicAggOrderByMetric2") {
+  test("basicAggOrderByMetric2") {td =>
     val df = sqlAndLog("basicAggOrderByMetric2",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
@@ -74,7 +74,7 @@ class DruidRewriteOrderTest extends BaseTest {
     //df.show()
   }
 
-  test("basicAggOrderByLimitFull") {
+  test("basicAggOrderByLimitFull") {td =>
     val df = sqlAndLog("basicAggOrderByLimitFull",
       "select l_returnflag as r, l_linestatus as ls, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
@@ -87,7 +87,7 @@ class DruidRewriteOrderTest extends BaseTest {
     //df.show()
   }
 
-  test("basicAggOrderByLimitFull2") {
+  test("basicAggOrderByLimitFull2") {td =>
     val df = sqlAndLog("basicAggOrderByLimitFull2",
       "select l_returnflag as r, l_linestatus as ls, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
@@ -101,7 +101,7 @@ class DruidRewriteOrderTest extends BaseTest {
     //df.show()
   }
 
-  test("sortNotPushed") {
+  test("sortNotPushed") {td =>
     val df = sqlAndLog("sortNotPushed",
       "select l_returnflag as r, l_linestatus as ls, " +
         "count(*) + 1 as c, sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
