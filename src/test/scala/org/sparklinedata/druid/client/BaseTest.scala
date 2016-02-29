@@ -22,14 +22,16 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
-import org.scalatest.{ BeforeAndAfterAll, FunSuite }
+import org.scalatest.{ BeforeAndAfterAll, fixture, TestData }
 import org.sparklinedata.spark.dateTime.Functions._
 import scala.io.Source
 import java.io.PrintWriter
 import java.io.File
 import java.math.BigInteger
+import java.io.FileNotFoundException
+import org.scalatest.fixture.TestDataFixture
 
-abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
+abstract class BaseTest extends fixture.FunSuite with BeforeAndAfterAll with TestDataFixture with Logging {
 
   val colMapping =
     """{
@@ -192,24 +194,34 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     sql(cTOlap)
   }
 
-  def sqlAndLog(nm: String, sqlStr: String): DataFrame = {
+  def sqlAndLog(nm: String, sqlStr: String) : DataFrame = {
     logInfo(s"\n$nm SQL:\n" + sqlStr)
     sql(sqlStr)
   }
 
-  def logPlan(nm: String, df: DataFrame): Unit = {
+  def logPlan(nm: String, df: DataFrame) : Unit = {
     logInfo(s"\n$nm Plan:")
     logInfo(s"\nLogical Plan:\n" + df.queryExecution.optimizedPlan.toString)
     logInfo(s"\nPhysical Plan:\n" + df.queryExecution.sparkPlan.toString)
   }
 
-  def removeTags(plan: String): String = {
+  val LOGICAL_PLAN_EXT = ".logicalplan"
+  val PHYSICAL_PLAN_EXT = ".physicalplan"
+  
+  def removeTags(plan: String) : String = {
     val cleaned = plan.replaceAll("#\\d+|@\\w+", "")
     cleaned.trim
   }
 
-  def compareLogicalPlan(df: DataFrame, goldenFilePath: String) : Boolean = {
-    val goldenFileContents = Source.fromURL(getClass.getResource("/" + goldenFilePath)).getLines().mkString("\n")
+  def readFileContents(fileName: String) : String = {
+    Source.fromURL(getClass.getResource("/" + fileName)).getLines().mkString("\n")
+  }
+  
+  def compareLogicalPlan(df: DataFrame, td: TestData) : Boolean = {
+    //Get the calling class name. `this` will be bound for the concrete class  
+    val goldenFileName = this.getClass().getSimpleName + "_" + td.name + LOGICAL_PLAN_EXT
+    
+    val goldenFileContents = readFileContents(goldenFileName)
     val logicalPlan = df.queryExecution.optimizedPlan.toString()
 
     val cleanedGolden = removeTags(goldenFileContents)
@@ -219,8 +231,11 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     
   }
 
-  def comparePhysicalPlan(df: DataFrame, goldenFilePath: String) : Boolean = {
-    val goldenFileContents = Source.fromURL(getClass.getResource("/" + goldenFilePath)).getLines().mkString("\n")
+  def comparePhysicalPlan(df: DataFrame, td: TestData) : Boolean = {
+    //Get the calling class name. `this` will be bound for the concrete class
+    val goldenFileName = this.getClass().getSimpleName + "_" + td.name + PHYSICAL_PLAN_EXT
+    
+    val goldenFileContents = readFileContents(goldenFileName)
     val physicalPlan = df.queryExecution.sparkPlan.toString()
 
     val cleanedGolden = removeTags(goldenFileContents)
