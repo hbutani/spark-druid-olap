@@ -19,13 +19,12 @@ package org.sparklinedata.druid.client
 
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.sparklinedata.spark.dateTime.dsl.expressions._
-
 import scala.language.postfixOps
 
 class DruidRewriteCubeTest extends BaseTest {
 
 
-  test("basicCube") {
+  test("basicCube") {td =>
     val df = sqlAndLog("basicAggOrderByDimension",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -36,7 +35,7 @@ class DruidRewriteCubeTest extends BaseTest {
     df.show()
   }
 
-  test("testUnion") {
+  test("testUnion") {td =>
     val df = sqlAndLog("basicAggOrderByDimension",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -67,7 +66,7 @@ class DruidRewriteCubeTest extends BaseTest {
    * "concat(concat(l_linestatus, 'a'), 'b')". More than one level of function invocation is
    * needed, so "concat(l_linestatus, 'a')" works fine.
    */
-  ignore("ShipDateYearAggCube") {
+  ignore("ShipDateYearAggCube") {td =>
 
     val shipDtYrGroup = dateTime('l_shipdate) year
 
@@ -82,7 +81,7 @@ class DruidRewriteCubeTest extends BaseTest {
     //df.show()
   }
 
-  test("basicFilterCube") {
+  test("basicFilterCube") {td =>
     val df = sqlAndLog("basicAggOrderByDimension",
       "select s_nation, l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -91,11 +90,13 @@ class DruidRewriteCubeTest extends BaseTest {
         "group by s_nation, l_returnflag, l_linestatus with cube")
     logPlan("basicAggOrderByDimension", df)
     
-    assert(compareLogicalPlan(df, "DruidRewriteCubeTest_ basicFilterCube.logicalPlan") && comparePhysicalPlan(df, "DruidRewriteCubeTest_ basicFilterCube.physicalPlan") )
+    val testName = this.getClass.getName + td.name
+    
+    assert(compareLogicalPlan(df, td) && comparePhysicalPlan(df, td) )
     //df.show()
   }
 
-  test("basicFilterRollup") {
+  test("basicFilterRollup") {td =>
     val df = sqlAndLog("basicAggOrderByDimension",
       "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -107,7 +108,7 @@ class DruidRewriteCubeTest extends BaseTest {
     //df.show()
   }
 
-  test("basicFilterGroupingSet") {
+  test("basicFilterGroupingSet") {td =>
     val df = sqlAndLog("basicAggOrderByDimension",
       "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -119,7 +120,7 @@ class DruidRewriteCubeTest extends BaseTest {
     //df.show()
   }
 
-  test("basicCubeWithExpr") {
+  test("basicCubeWithExpr") {td =>
     val df = sqlAndLog("basicAggOrderByDimension",
       "select lower(l_returnflag), l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
