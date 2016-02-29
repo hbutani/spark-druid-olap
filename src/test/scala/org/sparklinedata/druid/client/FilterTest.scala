@@ -21,9 +21,6 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.hive.test.TestHive
 import org.scalatest.BeforeAndAfterAll
 
-/**
-  * Created by jpullokk on 2/25/16.
-  */
 class FilterTest extends BaseTest with BeforeAndAfterAll with Logging{
   test("inclauseTest1") {
     val df = sqlAndLog("inclauseTest1", "select c_name, sum(c_acctbal) as bal " +
@@ -31,16 +28,6 @@ class FilterTest extends BaseTest with BeforeAndAfterAll with Logging{
       "where c_mktsegment in ('MACHINERY', 'HOUSEHOLD') " +
       "group by c_name")
     logPlan("inclauseTest1", df)
-    df.explain(true)
-  }
-
-  test("inclauseStructTest1") {
-    val df = sqlAndLog("inclauseStructTest1", "select c_name, sum(c_acctbal) as bal " +
-      "from orderLineItemPartSupplier " +
-      "where struct(c_mktsegment, c_nation)  in (struct('MACHINERY', 'JAPAN'), " +
-      "struct('HOUSEHOLD', 'BRAZIL')) " +
-      "group by c_name")
-    logPlan("inclauseStructTest1", df)
     df.explain(true)
   }
 }
