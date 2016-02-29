@@ -58,7 +58,7 @@ object DruidPlanner {
   def apply(sqlContext : SQLContext) = new DruidPlanner(sqlContext)
 
   val SPARKLINEDATA_CACHE_TABLES_TOCHECK = stringSeqConf("spark.sparklinedata.cache.tables.tocheck",
-    defaultValue = None,
+    defaultValue = Some(List()),
     doc = "A comma separated list of tableNames that should be checked if they are cached." +
       "For Star-Schemas with associated Druid Indexes, even if tables are cached, we " +
       "attempt to rewrite the Query to Druid. In order to do this we need to convert an" +

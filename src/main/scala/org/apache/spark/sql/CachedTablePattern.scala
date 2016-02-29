@@ -17,12 +17,17 @@
 
 package org.apache.spark.sql
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import org.apache.spark.sql.catalyst.expressions.{PredicateHelper, Attribute, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Subquery, Filter, Project, LogicalPlan}
 import org.apache.spark.sql.columnar.InMemoryRelation
 
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation.{ReturnType, substitute, collectAliases}
+import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sources.druid.DruidPlanner
+
+import scala.collection.mutable.{Map => mMap}
 
 /**
   * A thin wrapper on [[org.apache.spark.sql.catalyst.planning.PhysicalOperation]], that
@@ -35,19 +40,61 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
 
   def cacheManager = sqlContext.cacheManager
 
+  @transient
+  private val cacheLock = new ReentrantReadWriteLock
+
+  private var associationCache : mMap[SparkPlan, LogicalPlan] = mMap()
+
+  private def readLock[A](f: => A): A = {
+    val lock = cacheLock.readLock()
+    lock.lock()
+    try f finally {
+      lock.unlock()
+    }
+  }
+
+  /** Acquires a write lock on the cache for the duration of `f`. */
+  private def writeLock[A](f: => A): A = {
+    val lock = cacheLock.writeLock()
+    lock.lock()
+    try f finally {
+      lock.unlock()
+    }
+  }
+
+  private def getFromCache(inMemPlan: InMemoryRelation) : Option[LogicalPlan] = readLock {
+    associationCache.get(inMemPlan.child)
+  }
+
+  private def putInCache(inMemPlan: InMemoryRelation, lP : Option[LogicalPlan]) : Unit = writeLock {
+    lP.foreach { lP =>
+      associationCache.put(inMemPlan.child, lP)
+    }
+  }
+
   def tablesToCheck : Array[String] = {
     val l = sqlContext.getConf(DruidPlanner.SPARKLINEDATA_CACHE_TABLES_TOCHECK)
-    if (l.isEmpty)  sqlContext.tableNames() else l.toArray
+    l match {
+      case l if l.isEmpty => sqlContext.tableNames()
+      case l if l.size == 1 && l(0).trim == "" => Array()
+      case _ => l.toArray
+    }
   }
 
   def logicalPlan(inMemPlan: InMemoryRelation): Option[LogicalPlan] = {
+      var lP: Option[LogicalPlan] = getFromCache(inMemPlan)
 
-    (
-      for (t <- sqlContext.tableNames() if cacheManager.isCached(t);
-           ce <- cacheManager.lookupCachedData(sqlContext.table(t))
-           if (ce.cachedRepresentation.child == inMemPlan.child)
-      ) yield ce.plan
-      ).headOption
+      if (lP.isEmpty) {
+        lP = (
+          for (t <- tablesToCheck;
+               ce <- cacheManager.lookupCachedData(sqlContext.table(t)) if cacheManager.isCached(t);
+               if (ce.cachedRepresentation.child == inMemPlan.child)
+          ) yield ce.plan
+          ).headOption
+        putInCache(inMemPlan, lP)
+      }
+
+      lP
   }
 
   def unapply(plan: LogicalPlan): Option[ReturnType] = {
