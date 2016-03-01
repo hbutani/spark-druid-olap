@@ -22,7 +22,7 @@ import org.apache.spark.sql.hive.test.TestHive
 import org.scalatest.BeforeAndAfterAll
 
 class FilterTest extends BaseTest with BeforeAndAfterAll with Logging{
-  test("inclauseTest1") {
+  test("inclauseTest1") {td =>
     val df = sqlAndLog("inclauseTest1", "select c_name, sum(c_acctbal) as bal " +
       "from orderLineItemPartSupplier " +
       "where c_mktsegment in ('MACHINERY', 'HOUSEHOLD') " +

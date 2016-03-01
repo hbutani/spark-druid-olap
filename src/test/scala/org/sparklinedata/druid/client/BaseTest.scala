@@ -23,10 +23,12 @@ import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.{BeforeAndAfterAll, fixture, TestData }
 import org.sparklinedata.spark.dateTime.Functions._
+import scala.io.Source
+import org.scalatest.fixture.TestDataFixture
 
-abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
+abstract class BaseTest extends fixture.FunSuite with BeforeAndAfterAll with TestDataFixture with Logging {
 
   val colMapping =
     """{
@@ -208,6 +210,45 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
 
   def turnOffTransformDebugging : Unit = {
     TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "false")
+  }
+  
+  val LOGICAL_PLAN_EXT = ".logicalplan"
+  val PHYSICAL_PLAN_EXT = ".physicalplan"
+  
+  def removeTags(plan: String) : String = {
+    val cleaned = plan.replaceAll("#\\d+|@\\w+", "")
+    cleaned.trim
+  }
+
+  def readFileContents(fileName: String) : String = {
+    Source.fromURL(getClass.getResource("/" + fileName)).getLines().mkString("\n")
+  }
+  
+  def compareLogicalPlan(df: DataFrame, td: TestData) : Boolean = {
+    //Get the calling class name. `this` will be bound for the concrete class  
+    val goldenFileName = this.getClass().getSimpleName + "_" + td.name + LOGICAL_PLAN_EXT
+    
+    val goldenFileContents = readFileContents(goldenFileName)
+    val logicalPlan = df.queryExecution.optimizedPlan.toString()
+
+    val cleanedGolden = removeTags(goldenFileContents)
+    val cleanedLogical = removeTags(logicalPlan)
+    
+    cleanedGolden == cleanedLogical
+    
+  }
+
+  def comparePhysicalPlan(df: DataFrame, td: TestData) : Boolean = {
+    //Get the calling class name. `this` will be bound for the concrete class
+    val goldenFileName = this.getClass().getSimpleName + "_" + td.name + PHYSICAL_PLAN_EXT
+    
+    val goldenFileContents = readFileContents(goldenFileName)
+    val physicalPlan = df.queryExecution.sparkPlan.toString()
+
+    val cleanedGolden = removeTags(goldenFileContents)
+    val cleanedPhysical = removeTags(physicalPlan)
+    
+    cleanedGolden == cleanedPhysical
   }
 
 }
