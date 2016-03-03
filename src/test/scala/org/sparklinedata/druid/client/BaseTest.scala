@@ -34,7 +34,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import java.util.UUID
 import org.apache.spark.sql.types._
-import ScalaReflection._
+//import ScalaReflection._
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import scala.language.implicitConversions
@@ -111,7 +111,7 @@ abstract class AbstractTreeNode[BaseType <: AbstractTreeNode[BaseType]] extends 
     case p: Product => try {
       
       val fieldValues = p.productIterator.toSeq
-      val fieldNames = getConstructorParameterNames(p.getClass) //Seq.fill(fieldValues.length)("")
+      val fieldNames = Seq.fill(fieldValues.length)("") //getConstructorParameterNames(p.getClass) 
       assert(fieldNames.length == fieldValues.length)
       ("product-class" -> JString(p.getClass.getName)) :: fieldNames.zip(fieldValues).map {
         case (name, value) => name -> parseToJson(value)
