@@ -177,7 +177,12 @@ trait ProjectFilterTransfom {
         val allLiterals = vl.forall(e => e.isInstanceOf[Literal])
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] && allLiterals)
           yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
-    }
+      }
+      case Not(e) => {
+        val fil = dimFilterExpression(dqb, e)
+        for (f <- fil)
+          yield NotFilterSpec("not", f)
+      }
       case _ => None
     }
   }
