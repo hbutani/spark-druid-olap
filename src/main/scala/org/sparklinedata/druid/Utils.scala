@@ -98,6 +98,8 @@ object Utils extends Logging {
 
   def queryToString(dq: DruidQuery): String = pretty(render(Extraction.decompose(dq)))
 
+  def queryToString(qSpec: QuerySpec): String = pretty(render(Extraction.decompose(qSpec)))
+
   /**
     * from fpinscala book
     *
