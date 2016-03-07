@@ -21,7 +21,7 @@ import org.apache.spark.sql.hive.test.TestHive
 
 class JoinTest extends StarSchemaBaseTest {
 
-  test("2tableJoin") {
+  test("2tableJoin") {td =>
     val df = sqlAndLog("li-partsupp",
       "select  l_linestatus, sum(ps_availqty) " +
         "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
@@ -32,7 +32,7 @@ class JoinTest extends StarSchemaBaseTest {
     //df.show()
   }
 
-  test("2tableJoinFactTableIsRight") {
+  test("2tableJoinFactTableIsRight") {td =>
     val df = sqlAndLog("partsupp-li",
       "select  l_linestatus, sum(ps_availqty) " +
         "from partsupp ps join lineitem li  on  li.l_suppkey = ps.ps_suppkey " +
@@ -42,7 +42,7 @@ class JoinTest extends StarSchemaBaseTest {
     //df.show()
   }
 
-  test("3tableJoin") {
+  test("3tableJoin") {td =>
     val df = sqlAndLog("li-partsupp-supp",
       "select  s_name, sum(ps_availqty) " +
         "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
@@ -53,37 +53,37 @@ class JoinTest extends StarSchemaBaseTest {
     //df.show()
   }
 
-  test("tpchQ3") {
+  test("tpchQ3") {td =>
     val df = sqlAndLog("tpchQ3", StarSchemaTpchQueries.q3)
     df.explain(true)
     df.show()
   }
 
-  test("tpchQ5") {
+  test("tpchQ5") {td =>
     val df = sqlAndLog("tpchQ5", StarSchemaTpchQueries.q5)
     df.explain(true)
     df.show()
   }
 
-  test("tpchQ7") {
+  test("tpchQ7") {td =>
     val df = sqlAndLog("tpchQ7", StarSchemaTpchQueries.q7)
     df.explain(true)
     df.show()
   }
 
-  test("tpchQ8") {
+  test("tpchQ8") {td =>
     val df = sqlAndLog("tpchQ8", StarSchemaTpchQueries.q8)
     df.explain(true)
     df.show()
   }
 
-  test("tpchQ10") {
+  test("tpchQ10") {td =>
     val df = sqlAndLog("tpchQ10", StarSchemaTpchQueries.q10)
     df.explain(true)
     df.show()
   }
 
-  test("basicJoinAgg") {
+  test("basicJoinAgg") {td =>
     val df = sqlAndLog("li-supp-join",
       "select s_name, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -100,13 +100,13 @@ class JoinTest extends StarSchemaBaseTest {
     df.explain(true)
   }
 
-  test("dfPlan1") {
+  test("dfPlan1") {td =>
     val df = TestHive.table("lineitem").groupBy("l_linestatus").count()
     logPlan("basicAggOrderByDimension", df)
     df.show()
   }
 
-  test("dfPlan2") {
+  test("dfPlan2") {td =>
     val df = TestHive.table("lineitem").
       join(TestHive.table("partsupp")).
       join(TestHive.table("supplier")).
@@ -116,7 +116,7 @@ class JoinTest extends StarSchemaBaseTest {
     df.show()
   }
 
-  test("dimensionOnlyQuery") {
+  test("dimensionOnlyQuery") {td =>
     val df = sqlAndLog("dimensionOnlyQuery",
     """SELECT customer.c_mktsegment AS c_mktsegment
       |FROM   (SELECT *

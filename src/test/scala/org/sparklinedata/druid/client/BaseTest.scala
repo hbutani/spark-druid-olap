@@ -22,11 +22,121 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
-
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.{ BeforeAndAfterAll, fixture, TestData }
 import org.sparklinedata.spark.dateTime.Functions._
+import scala.io.Source
+import org.scalatest.fixture.TestDataFixture
+import org.apache.spark.sql.catalyst.trees.TreeNode
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
+import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
+import java.util.UUID
+import org.apache.spark.sql.types._
+//import ScalaReflection._
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import scala.language.implicitConversions
 
-abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
+
+abstract class AbstractTreeNode[BaseType <: AbstractTreeNode[BaseType]] extends TreeNode[BaseType] with Logging {
+  self: BaseType =>
+    
+  protected def jsonFields: List[JField] = {
+    
+    val fieldValues = productIterator.toSeq ++ otherCopyArgs
+    val fieldNames =  Seq.fill(fieldValues.length)("sparkline")//getConstructorParameterNames(getClass) 
+    
+    logInfo("FieldValues\n" + fieldValues.toString)
+    assert(fieldNames.length == fieldValues.length, s"${getClass.getSimpleName} fields: " +
+      fieldNames.mkString(", ") + s", values: " + fieldValues.map(_.toString).mkString(", "))
+    fieldNames.zip(fieldValues).map {
+      // If the field value is a child, then use an int to encode it, represents the index of
+      // this child in all children.
+      case (name, value: TreeNode[_]) if containsChild(value) =>
+        name -> JInt(children.indexOf(value))
+      case (name, value: Seq[BaseType]) if value.toSet.subsetOf(containsChild) =>
+        name -> JArray(
+          value.map(v => JInt(children.indexOf(v.asInstanceOf[TreeNode[_]]))).toList)
+      case (name, value) => name -> parseToJson(value)
+    }.toList
+  }
+
+  def toJSON: String = compact(render(jsonValue))
+
+  def prettyJson: String = pretty(render(jsonValue))
+
+  private def jsonValue: JValue = {
+    val jsonValues = scala.collection.mutable.ArrayBuffer.empty[JValue]
+    def collectJsonValue(tn: BaseType): Unit = {
+      val jsonFields = ("class" -> JString(tn.getClass.getName)) ::
+        ("num-children" -> JInt(tn.children.length)) :: tn.jsonFields
+      jsonValues += JObject(jsonFields)
+      tn.children.foreach(collectJsonValue)
+    }
+    collectJsonValue(this)
+    jsonValues
+  }
+
+  private def parseToJson(obj: Any): JValue = obj match {
+    case b: Boolean   => JBool(b)
+    case b: Byte      => JInt(b.toInt)
+    case s: Short     => JInt(s.toInt)
+    case i: Int       => JInt(i)
+    case l: Long      => JInt(l)
+    case f: Float     => JDouble(f)
+    case d: Double    => JDouble(d)
+    case b: BigInt    => JInt(b)
+    case null         => JNull
+    case s: String    => JString(s)
+    case u: UUID      => JString(u.toString)
+    case dt: DataType => dt.typeName
+    //case m: Metadata  => m.jsonValue
+    case s: StorageLevel =>
+      ("useDisk" -> s.useDisk) ~ ("useMemory" -> s.useMemory) ~ ("useOffHeap" -> s.useOffHeap) ~
+        ("deserialized" -> s.deserialized) ~ ("replication" -> s.replication)
+    case n: AbstractTreeNode[_] => n.jsonValue
+    case o: Option[_]           => o.map(parseToJson)
+    case t: Seq[_]              => JArray(t.map(parseToJson).toList)
+    case m: Map[_, _] =>
+      val fields = m.toList.map { case (k: String, v) => (k, parseToJson(v)) }
+      JObject(fields)
+    case r: RDD[_]                                 => JNothing
+    // if it's a scala object, we can simply keep the full class path.
+    // TODO: currently if the class name ends with "$", we think it's a scala object, there is
+    // probably a better way to check it.
+    case obj if obj.getClass.getName.endsWith("$") => "object" -> obj.getClass.getName
+    // returns null if the product type doesn't have a primary constructor, e.g. HiveFunctionWrapper
+    case p: Product => try {
+      
+      val fieldValues = p.productIterator.toSeq
+      val fieldNames = Seq.fill(fieldValues.length)("") //getConstructorParameterNames(p.getClass) 
+      assert(fieldNames.length == fieldValues.length)
+      ("product-class" -> JString(p.getClass.getName)) :: fieldNames.zip(fieldValues).map {
+        case (name, value) => name -> parseToJson(value)
+      }.toList
+    } catch {
+      case _: RuntimeException => null
+    }
+    case _ => JNull
+  }
+}
+
+class Plan(lp: List[LogicalPlan]) extends AbstractTreeNode[Plan]{
+    
+  override def children = Seq.empty
+    
+  
+  def canEqual(that: Any): Boolean = lp.canEqual(that)
+
+  def productArity: Int = lp.length 
+
+  def productElement(n: Int): Any = lp(n)
+  
+}
+
+abstract class BaseTest extends fixture.FunSuite with BeforeAndAfterAll with TestDataFixture with Logging {
 
   val colMapping =
     """{
@@ -59,7 +169,7 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     """.stripMargin.replace('\n', ' ')
 
   val starSchema =
-  """
+    """
     |{
     |  "factTable" : "lineitem",
     |  "relations" : [ {
@@ -191,23 +301,72 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     sql(cTOlap)
   }
 
-  def sqlAndLog(nm : String, sqlStr : String) : DataFrame = {
+  def sqlAndLog(nm: String, sqlStr: String): DataFrame = {
     logInfo(s"\n$nm SQL:\n" + sqlStr)
     sql(sqlStr)
   }
 
-  def logPlan(nm : String, df : DataFrame) : Unit = {
+  def logPlan(nm: String, df: DataFrame): Unit = {
     logInfo(s"\n$nm Plan:")
-    logInfo(s"\nLogical Plan:\n" + df.queryExecution.optimizedPlan.toString)
-    logInfo(s"\nPhysical Plan:\n" + df.queryExecution.sparkPlan.toString)
+    //logInfo(s"\nLogical Plan:\n" + df.queryExecution.optimizedPlan.toString)
+    //logInfo(s"\nPhysical Plan:\n" + df.queryExecution.sparkPlan.toString)
   }
 
-  def turnOnTransformDebugging : Unit = {
+  def turnOnTransformDebugging: Unit = {
     TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "true")
   }
 
-  def turnOffTransformDebugging : Unit = {
+  def turnOffTransformDebugging: Unit = {
     TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "false")
+  }
+
+  val LOGICAL_PLAN_EXT = ".logicalplan"
+  val PHYSICAL_PLAN_EXT = ".physicalplan"
+
+  def removeTags(plan: String): String = {
+    val cleaned = plan.replaceAll("#\\d+|@\\w+", "")
+    cleaned.trim
+  }
+
+  def readFileContents(fileName: String): String = {
+    Source.fromURL(getClass.getResource("/" + fileName)).getLines().mkString("\n")
+  }
+
+  //implicit def plan2Json(logicalPlan: LogicalPlan) = new Plan(logicalPlan.children.toList)
+
+  def compareLogicalPlan(df: DataFrame, td: TestData): Boolean = {
+
+    //Get the calling class name. `this` will be bound for the concrete class  
+    val goldenFileName = this.getClass().getSimpleName + "_" + td.name + LOGICAL_PLAN_EXT
+
+    val goldenFileContents = readFileContents(goldenFileName)
+    val logicalPlan = df.queryExecution.optimizedPlan.toString
+    logInfo("Children \n" + df.queryExecution.optimizedPlan.children.toList)
+    
+    val p = new Plan(df.queryExecution.optimizedPlan.children.toList)
+    p.children
+    logInfo("Converting Logical to Json\n" + p.toJSON)
+    
+   //logInfo("Json DUMP \n" + df.queryExecution.optimizedPlan.toJSON)
+
+    val cleanedGolden = removeTags(goldenFileContents)
+    val cleanedLogical = removeTags(logicalPlan)
+
+    cleanedGolden == cleanedLogical
+
+  }
+
+  def comparePhysicalPlan(df: DataFrame, td: TestData): Boolean = {
+    //Get the calling class name. `this` will be bound for the concrete class
+    val goldenFileName = this.getClass().getSimpleName + "_" + td.name + PHYSICAL_PLAN_EXT
+
+    val goldenFileContents = readFileContents(goldenFileName)
+    val physicalPlan = df.queryExecution.sparkPlan.toString()
+    
+    val cleanedGolden = removeTags(goldenFileContents)
+    val cleanedPhysical = removeTags(physicalPlan)
+
+    cleanedGolden == cleanedPhysical
   }
 
 }

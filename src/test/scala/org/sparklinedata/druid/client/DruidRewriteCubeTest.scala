@@ -25,7 +25,7 @@ import scala.language.postfixOps
 class DruidRewriteCubeTest extends BaseTest {
 
 
-  test("basicCube") {
+  test("basicCube") {td =>
     val df = sqlAndLog("basicCube",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -36,7 +36,7 @@ class DruidRewriteCubeTest extends BaseTest {
     df.show()
   }
 
-  test("testUnion") {
+  test("testUnion") {td =>
     val df = sqlAndLog("testUnion",
       "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -67,7 +67,7 @@ class DruidRewriteCubeTest extends BaseTest {
    * "concat(concat(l_linestatus, 'a'), 'b')". More than one level of function invocation is
    * needed, so "concat(l_linestatus, 'a')" works fine.
    */
-  ignore("ShipDateYearAggCube") {
+  ignore("ShipDateYearAggCube") {td =>
 
     val shipDtYrGroup = dateTime('l_shipdate) year
 
@@ -82,7 +82,7 @@ class DruidRewriteCubeTest extends BaseTest {
     //df.show()
   }
 
-  test("basicFilterCube") {
+  test("basicFilterCube") {td =>
     val df = sqlAndLog("basicFilterCube",
       "select s_nation, l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -90,11 +90,13 @@ class DruidRewriteCubeTest extends BaseTest {
         "where s_nation = 'FRANCE' " +
         "group by s_nation, l_returnflag, l_linestatus with cube")
     logPlan("basicAggOrderByDimension", df)
+    
+    assert(compareLogicalPlan(df, td) && comparePhysicalPlan(df, td) )
 
     //df.show()
   }
 
-  test("basicFilterRollup") {
+  test("basicFilterRollup") {td =>
     val df = sqlAndLog("basicFilterRollup",
       "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -106,7 +108,7 @@ class DruidRewriteCubeTest extends BaseTest {
     //df.show()
   }
 
-  test("basicFilterGroupingSet") {
+  test("basicFilterGroupingSet") {td =>
     val df = sqlAndLog("basicFilterGroupingSet",
       "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
@@ -118,7 +120,7 @@ class DruidRewriteCubeTest extends BaseTest {
     //df.show()
   }
 
-  test("basicCubeWithExpr") {
+  test("basicCubeWithExpr") {td =>
     val df = sqlAndLog("basicCubeWithExpr",
       "select lower(l_returnflag), l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
