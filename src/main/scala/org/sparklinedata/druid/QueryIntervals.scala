@@ -64,10 +64,26 @@ case class QueryIntervals(drInfo : DruidRelationInfo,
     }
   }
 
+  private def outsideRange(dT : DateTime, checkStart : Boolean) : Option[QueryIntervals] = {
+    if (indexIntervals.size == 1 ) {
+      if ( !checkStart && indexIntervals(0).isBefore(dT) ) {
+        Some(add(indexIntervals(0)))
+      } else if ( checkStart && indexIntervals(0).isAfter(dT) ) {
+        Some(add(indexIntervals(0)))
+      } else {
+        None
+      }
+    } else {
+      None
+    }
+  }
+
   def gtCond(dT : DateTime) : Option[QueryIntervals] = {
     indexInterval(dT).map { i =>
       val cI =  i.withStart(dT + 1.millis)
       add(cI)
+    }.orElse {
+      outsideRange(dT, true)
     }
   }
 
@@ -75,6 +91,8 @@ case class QueryIntervals(drInfo : DruidRelationInfo,
     indexInterval(dT).map { i =>
       val cI =  i.withStart(dT)
       add(cI)
+    }.orElse {
+      outsideRange(dT, true)
     }
   }
 
@@ -82,6 +100,8 @@ case class QueryIntervals(drInfo : DruidRelationInfo,
     indexInterval(dT).map { i =>
       val cI =  i.withEnd(dT)
       add(cI)
+    }.orElse {
+      outsideRange(dT, false)
     }
   }
 
@@ -89,6 +109,8 @@ case class QueryIntervals(drInfo : DruidRelationInfo,
     indexInterval(dT).map { i =>
       val cI =  i.withEnd(dT + 1.millis)
       add(cI)
+    }.orElse {
+      outsideRange(dT, false)
     }
   }
 

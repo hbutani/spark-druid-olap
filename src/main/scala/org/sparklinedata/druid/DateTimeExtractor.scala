@@ -19,7 +19,8 @@ package org.sparklinedata.druid
 
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.types.{TimestampType, DateType, StringType}
+import org.apache.spark.sql.types.{LongType, TimestampType, DateType, StringType}
+import org.joda.time.DateTime
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataSource}
 import org.sparklinedata.spark.dateTime.Functions._
 
@@ -228,26 +229,6 @@ class SparkNativeTimeElementExtractor(val dqb : DruidQueryBuilder) {
   val dcExtractor = new DruidColumnExtractor(dqb)
   val timeExtractor = this
 
-  /*
-  // datetime functions
-
-
-    expression[FromUnixTime]("from_unixtime"),
-    expression[FromUTCTimestamp]("from_utc_timestamp"),
-    expression[ToUTCTimestamp]("to_utc_timestamp"),
-    expression[UnixTimestamp]("unix_timestamp"),
-
-
-
-    expression[LastDay]("last_day"),
-    expression[TruncDate]("trunc"),
-
-    expression[MonthsBetween]("months_between"),
-    expression[NextDay]("next_day"),
-    expression[Quarter]("quarter"),
-
-
-   */
 
   def unapply(e : Expression) : Option[DateTimeGroupingElem] = e match {
     case Cast(c@dcExtractor(dc), DateType) =>
@@ -360,7 +341,7 @@ class SparkNativeTimeElementExtractor(val dqb : DruidQueryBuilder) {
     TimestampType)
       if dtGrp.formatToApply == DATE_FORMAT && " 00:00:00" == v.toString =>
       Some(DateTimeGroupingElem(dtGrp.outputName,
-        dtGrp.druidColumn, dtGrp.formatToApply + " 00:00:00",
+        dtGrp.druidColumn, TIMESTAMP_DATEZERO_FORMAT,
         dtGrp.tzForFormat, e))
     case _ => None
   }
@@ -369,6 +350,7 @@ class SparkNativeTimeElementExtractor(val dqb : DruidQueryBuilder) {
 object SparkNativeTimeElementExtractor {
   val DATE_FORMAT = "YYYY-MM-dd"
   val TIMESTAMP_FORMAT = "YYYY-MM-dd HH:mm:ss"
+  val TIMESTAMP_DATEZERO_FORMAT = "YYYY-MM-dd 00:00:00"
 
   val YEAR_FORMAT = "YYYY"
   val MONTH_FORMAT = "MM"
@@ -379,4 +361,58 @@ object SparkNativeTimeElementExtractor {
   val HOUR_FORMAT = "HH"
   val MINUTE_FORMAT = "mm"
   val SECOND_FORMAT = "ss"
+}
+
+class SparkIntervalConditionExtractor(val dqb : DruidQueryBuilder) {
+
+  import SparkNativeTimeElementExtractor._
+
+  val timeRefExtractor = new SparkNativeTimeElementExtractor(dqb)
+
+  private def millisSinceEpoch(value : Any) : DateTime =
+    new DateTime(value.toString.toLong / 1000)
+
+  def unapply(e : Expression) : Option[IntervalCondition] = e match {
+    case LessThan(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.LT, millisSinceEpoch(value)))
+    case LessThan(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.GT, millisSinceEpoch(value)))
+    case LessThanOrEqual(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.LTE, millisSinceEpoch(value)))
+    case LessThanOrEqual(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.GTE, millisSinceEpoch(value)))
+    case GreaterThan(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.GT, millisSinceEpoch(value)))
+    case GreaterThan(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.LT, millisSinceEpoch(value)))
+    case GreaterThanOrEqual(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.GTE, millisSinceEpoch(value)))
+    case GreaterThanOrEqual(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
+        (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
+          dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
+      Some(IntervalCondition(IntervalConditionType.LTE, millisSinceEpoch(value)))
+    case _ => None
+  }
 }

@@ -248,4 +248,33 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
     logPlan("dateFilter", df)
   }
 
+  test("intervalFilter") {
+    //turnOnTransformDebugging
+
+    val df = sqlAndLog("dateFilter",
+      """
+        |SELECT Sum(lineitem.l_extendedprice)                                         AS
+        |       sum_l_extendedprice_ok,
+        |       Cast(Concat(To_date(Cast(
+        |                   Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
+        |                        TIMESTAMP)), ' 00:00:00') AS TIMESTAMP) AS
+        |       tdy_l_shipdate_ok
+        |FROM   (SELECT *
+        |        FROM   lineitem) lineitem
+        |
+        |WHERE  ( ( Cast(Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS TIMESTAMP)
+        |           >= Cast(
+        |                    '1993-05-19 00:00:00' AS TIMESTAMP) )
+        |         AND ( Cast(Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
+        |                    TIMESTAMP) <=
+        |               Cast(
+        |                   '1998-08-02 00:00:00' AS TIMESTAMP) ) )
+        |GROUP  BY Cast(Concat(To_date(Cast(
+        |                      Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
+        |                                     TIMESTAMP)), ' 00:00:00') AS TIMESTAMP)
+      """.stripMargin)
+    logPlan("intervalFilter", df)
+    logDruidQuery("intervalFIlter", df)
+  }
+
 }
