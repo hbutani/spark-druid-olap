@@ -34,13 +34,15 @@ trait AggregateTransform {
    * - an AttributeReference, these are translated to a [[DefaultDimensionSpec]]
    * - a [[TimeElementExtractor]] expression, these are translated to [[ExtractionDimensionSpec]]
    * with a [[TimeFormatExtractionFunctionSpec]]
-   * @param dqb
+    *
+    * @param dqb
    * @param timeElemExtractor
    * @param ge
    * @return
    */
   def groupingExpression(dqb: DruidQueryBuilder,
                          timeElemExtractor: TimeElementExtractor,
+                         timeElemExtractor2 : SparkNativeTimeElementExtractor,
                          ge: Expression):
   Option[DruidQueryBuilder] = {
     ge match {
@@ -56,6 +58,24 @@ trait AggregateTransform {
             outputAttribute(nm, ge, ge.dataType, StringType)
         )
       }
+      case timeElemExtractor2(dtGrpElem) => {
+        val timeFmtExtractFunc : ExtractionFunctionSpec = {
+          if (dtGrpElem.inputFormat.isDefined) {
+            new TimeParsingExtractionFunctionSpec(dtGrpElem.inputFormat.get,
+              dtGrpElem.formatToApply)
+          } else {
+            new TimeFormatExtractionFunctionSpec(dtGrpElem.formatToApply,
+              dtGrpElem.tzForFormat)
+          }
+        }
+        Some(
+          dqb.dimension(new ExtractionDimensionSpec(dtGrpElem.druidColumn.name,
+            dtGrpElem.outputName, timeFmtExtractFunc)
+          ).
+            outputAttribute(dtGrpElem.outputName, dtGrpElem.pushedExpression,
+              dtGrpElem.pushedExpression.dataType, StringType)
+        )
+      }
       case _ => None
     }
   }
@@ -63,6 +83,7 @@ trait AggregateTransform {
                                       aggOp: Aggregate,
                                       grpInfo: GroupingInfo): Option[DruidQueryBuilder] = {
     val timeElemExtractor = new TimeElementExtractor(dqb)
+    val timeElemExtractor2 = new SparkNativeTimeElementExtractor(dqb)
 
     /*
      * For pushing down to Druid only consider the GrpExprs that don't have a override
@@ -80,7 +101,7 @@ trait AggregateTransform {
     val dqb1 =
       gEsToDruid.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) {
         (dqb, e) =>
-          dqb.flatMap(groupingExpression(_, timeElemExtractor, e))
+          dqb.flatMap(groupingExpression(_, timeElemExtractor, timeElemExtractor2, e))
       }
 
     val allAggregates =
