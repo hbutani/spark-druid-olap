@@ -20,8 +20,10 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.types.LongType
+import org.joda.time.DateTime
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.DruidDimension
+import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDimension}
 import Debugging._
 
 trait ProjectFilterTransfom {
@@ -47,9 +49,10 @@ trait ProjectFilterTransfom {
        * - A expression containing comparisons on Dim Columns.
        */
       val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb.get)
+      val iCE2: SparkIntervalConditionExtractor = new SparkIntervalConditionExtractor(dqb.get)
       filters.foldLeft(dqb) { (dqB, e) =>
         dqB.flatMap { b =>
-          intervalFilterExpression(b, iCE, e).orElse(
+          intervalFilterExpression(b, iCE, iCE2, e).orElse(
             dimFilterExpression(b, e).map(p => b.filter(p))
           )
         }
@@ -106,16 +109,21 @@ trait ProjectFilterTransfom {
   }
 
   def intervalFilterExpression(dqb: DruidQueryBuilder,
-                               iCE: IntervalConditionExtractor, fe: Expression):
+                               iCE: IntervalConditionExtractor,
+                               iCE2 : SparkIntervalConditionExtractor,
+                               fe: Expression):
   Option[DruidQueryBuilder] = fe match {
     case iCE(iC) => dqb.interval(iC)
+    case iCE2(iC) => dqb.interval(iC)
     case _ => None
   }
 
   def dimFilterExpression(dqb: DruidQueryBuilder, fe: Expression):
   Option[FilterSpec] = {
 
+    import SparkNativeTimeElementExtractor._
     val dtTimeCond = new DateTimeConditionExtractor(dqb)
+    val timeRefExtractor = new SparkNativeTimeElementExtractor(dqb)
 
     fe match {
       case EqualTo(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
@@ -134,6 +142,11 @@ trait ProjectFilterTransfom {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
           yield JavascriptFilterSpec.create(dD.name, ">", value.toString)
       }
+      case LessThan(timeRefExtractor(dtGrp), Literal(value, LongType))
+        if dtGrp.druidColumn.name != DruidDataSource.TIME_COLUMN_NAME &&
+          dtGrp.formatToApply == TIMESTAMP_FORMAT =>
+        None // TODO convert this to a JavascriptFilter ?
+        // TODO handle all other comparision fns (lte, gt, gte, eq)
       case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
           yield JavascriptFilterSpec.create(dD.name, "<=", value.toString)
