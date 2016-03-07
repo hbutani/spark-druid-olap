@@ -76,7 +76,10 @@ case class TimeFormatExtractionFunctionSpec(val `type`: String,
 case class TimeParsingExtractionFunctionSpec(val `type`: String,
                                              val timeFormat: String,
                                              val resultFormat: String)
-  extends ExtractionFunctionSpec
+  extends ExtractionFunctionSpec {
+  def this(timeFormat: String, resultFormat: String) =
+    this("time", timeFormat, resultFormat)
+}
 
 case class JavaScriptExtractionFunctionSpec(val `type`: String,
                                             val `function`: String,

@@ -19,34 +19,51 @@ package org.sparklinedata.druid.client
 
 class SparkDateTimeTest extends StarSchemaBaseTest {
 
+
   test("dateBasic") {
-    val df = sqlAndLog("dateBasic",
+    //turnOnTransformDebugging
+
+    val df = sqlAndLog("dateBasic2",
       """SELECT
-      |sn_name,
-      |sum(l_extendedprice) as revenue
-      |FROM
-      |customer,
-      |orders,
-      |lineitem,
-      |supplier,
-      |suppnation,
-      |suppregion
-      |WHERE
-      |c_custkey = o_custkey
-      |AND l_orderkey = o_orderkey
-      |AND l_suppkey = s_suppkey
-      |AND c_nationkey = sn_nationkey
-      |AND sn_regionkey = sr_regionkey
-      |AND sr_name = 'ASIA'
-      |AND o_orderdate >= date '1994-01-01'
-      |AND o_orderdate < date '1994-01-01' + interval '1' year
-      |GROUP BY
-      |sn_name
-      |ORDER BY
-      |revenue desc""".stripMargin
+        |sn_name,
+        |sum(l_extendedprice) as revenue
+        |FROM
+        |customer,
+        |orders,
+        |lineitem,
+        |partsupp,
+        |supplier,
+        |suppnation,
+        |suppregion
+        |WHERE
+        |c_custkey = o_custkey
+        |AND l_orderkey = o_orderkey
+        |and l_suppkey = ps_suppkey
+        |and l_partkey = ps_partkey
+        |and ps_suppkey = s_suppkey
+        |AND s_nationkey = sn_nationkey
+        |AND sn_regionkey = sr_regionkey
+        |AND sr_name = 'ASIA'
+        |AND o_orderdate >= date '1994-01-01'
+        |AND o_orderdate < date '1994-01-01' + interval '1' year
+        |GROUP BY
+        |sn_name
+        |ORDER BY
+        |revenue desc""".stripMargin
     )
-    logPlan("basicJoin", df)
-    df.explain(true)
+    logDruidQuery("basicJoin", df)
+  }
+
+  test("castDate") {
+    val df=sqlAndLog("castDate",
+      "select cast(o_orderdate as date) " +
+        "from orderLineItemPartSupplier " +
+        "group by cast(o_orderdate as date)"
+    )
+    logDruidQuery("castDate", df)
+    //logPlan("castDate", df)
+
+    df.show()
   }
 
   test("showByYear") {
@@ -55,7 +72,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |       ) AS
         |       yr_l_shipdate_ok
         |FROM   (SELECT *
-        |        FROM   lineitembase) lineitem
+        |        FROM   lineitem) lineitem
         |       JOIN (SELECT *
         |             FROM   orders) orders
         |         ON ( lineitem.l_orderkey = orders.o_orderkey )
@@ -71,7 +88,10 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |GROUP  BY Year(Cast(Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
         |                    TIMESTAMP)) """.stripMargin
     )
+    logDruidQuery("castDate", df)
     logPlan("showByYear", df)
+
+    //df.show()
   }
 
   test("showByQuarter") {
@@ -137,7 +157,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
       |                                        TIMESTAMP)), 'yyyy-MM-01 00:00:00')
       |                   AS TIMESTAMP) AS tmn_l_shipdate_ok
       |FROM   (SELECT *
-      |        FROM   lineitembase) lineitem
+      |        FROM   lineitem) lineitem
       |       JOIN (SELECT *
       |             FROM   orders) orders
       |         ON ( lineitem.l_orderkey = orders.o_orderkey )
@@ -157,6 +177,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
       |               TIMESTAMP)
     """.stripMargin)
     logPlan("fromUnixTimestamp", df)
+    logDruidQuery("fromUnixTimestamp", df)
   }
 
   test("toDate") {
@@ -169,7 +190,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |                        TIMESTAMP)), ' 00:00:00') AS TIMESTAMP) AS
         |       tdy_l_shipdate_ok
         |FROM   (SELECT *
-        |        FROM   lineitembase) lineitem
+        |        FROM   lineitem) lineitem
         |       JOIN (SELECT *
         |             FROM   orders) orders
         |         ON ( lineitem.l_orderkey = orders.o_orderkey )
@@ -187,6 +208,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |                                     TIMESTAMP)), ' 00:00:00') AS TIMESTAMP )
       """.stripMargin)
     logPlan("toDate", df)
+    logDruidQuery("toDate", df)
   }
 
   test("dateFilter") {
@@ -199,7 +221,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |                        TIMESTAMP)), ' 00:00:00') AS TIMESTAMP) AS
         |       tdy_l_shipdate_ok
         |FROM   (SELECT *
-        |        FROM   lineitembase) lineitem
+        |        FROM   lineitem) lineitem
         |       JOIN (SELECT *
         |             FROM   orders) orders
         |         ON ( lineitem.l_orderkey = orders.o_orderkey )

@@ -18,8 +18,8 @@
 package org.sparklinedata.druid
 
 import com.github.nscala_time.time.Imports._
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, Literal, ScalaUDF}
-import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.types.{TimestampType, DateType, StringType}
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataSource}
 import org.sparklinedata.spark.dateTime.Functions._
 
@@ -99,7 +99,8 @@ class IntervalConditionExtractor(val dqb : DruidQueryBuilder) {
 
 /**
  * Return (DruidColumn, ComparisonOperator, DateTimeValue)
- * @param dqb
+  *
+  * @param dqb
  */
 class DateTimeConditionExtractor(val dqb : DruidQueryBuilder) {
 
@@ -122,7 +123,8 @@ class DateTimeConditionExtractor(val dqb : DruidQueryBuilder) {
  * Extract expressions of the form:
  * - dateTime(dimCol)
  * - withZone(dateTime(dimCol))
- * @param dqb
+  *
+  * @param dqb
  */
 class DateTimeWithZoneExtractor(val dqb : DruidQueryBuilder) {
 
@@ -181,4 +183,200 @@ class TimeElementExtractor(val dqb : DruidQueryBuilder) {
     case _ => None
   }
 
+}
+
+/**
+  *
+  * @param outputName the name of the column in the Druid resultset
+  * @param druidColumn the Druid Dimension this is mapped to
+  * @param formatToApply in Druid Spark DateTime Expressions handled
+  *                      as [[TimeFormatExtractionFunctionSpec]]; this specifies
+  *                      the format to apply on the Druid Dimension.
+  * @param tzForFormat see above
+  * @param pushedExpression this controls the expression evlaution that happens
+  *                         on return from Druid. So for expression like
+  *                         {{{to_date(cast(dateCol as DateType))}}},
+  *                         {{{to_date(cast(DruidValue, DatetYpe))}}} is evaluated
+  *                         on the resultset of Druid. This is required because
+  *                         Dates are Ints and Timestamps are Longs in Spark, whereas
+  *                         the value coming out of Druid is an ISO DateTime String.
+  * @param inputFormat  format to use to parse input value.
+  */
+case class DateTimeGroupingElem(
+                               outputName : String,
+                               druidColumn : DruidColumn,
+                               formatToApply : String,
+                               tzForFormat : Option[String],
+                               pushedExpression : Expression,
+                               inputFormat : Option[String] = None
+                               )
+
+class DruidColumnExtractor(val dqb : DruidQueryBuilder) {
+  def unapply(e : Expression) : Option[DruidColumn] = e match {
+    case AttributeReference(nm, _, _, _) => {
+      val dC = dqb.druidColumn(nm)
+      dC.filter(_.isDimension())
+    }
+    case _ => None
+  }
+}
+
+class SparkNativeTimeElementExtractor(val dqb : DruidQueryBuilder) {
+
+  import SparkNativeTimeElementExtractor._
+
+  val dcExtractor = new DruidColumnExtractor(dqb)
+  val timeExtractor = this
+
+  /*
+  // datetime functions
+
+
+    expression[FromUnixTime]("from_unixtime"),
+    expression[FromUTCTimestamp]("from_utc_timestamp"),
+    expression[ToUTCTimestamp]("to_utc_timestamp"),
+    expression[UnixTimestamp]("unix_timestamp"),
+
+
+
+    expression[LastDay]("last_day"),
+    expression[TruncDate]("trunc"),
+
+    expression[MonthsBetween]("months_between"),
+    expression[NextDay]("next_day"),
+    expression[Quarter]("quarter"),
+
+
+   */
+
+  def unapply(e : Expression) : Option[DateTimeGroupingElem] = e match {
+    case Cast(c@dcExtractor(dc), DateType) =>
+      Some(DateTimeGroupingElem(dqb.nextAlias, dc, DATE_FORMAT, None, c))
+    case Cast(timeExtractor(dtGrp), DateType) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, DATE_FORMAT,
+        dtGrp.tzForFormat, dtGrp.pushedExpression))
+    case Cast(c@dcExtractor(dc), TimestampType) =>
+      // TODO: handle a tsFmt coming from below, see test fromUnixTimestamp
+      Some(DateTimeGroupingElem(dqb.nextAlias, dc, TIMESTAMP_FORMAT, None, c))
+    case Cast(timeExtractor(dtGrp), TimestampType) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, TIMESTAMP_FORMAT,
+        dtGrp.tzForFormat, dtGrp.pushedExpression))
+    case ToDate(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, DATE_FORMAT,
+        dtGrp.tzForFormat, dtGrp.pushedExpression)
+      )
+    case e@Year(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, YEAR_FORMAT,
+        dtGrp.tzForFormat, e))
+    case e@DayOfMonth(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, DAY_OF_MONTH_FORMAT,
+        dtGrp.tzForFormat, e))
+    case e@DayOfYear(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, DAY_OF_YEAR_FORMAT,
+        dtGrp.tzForFormat, e))
+    case e@Month(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, MONTH_FORMAT,
+        dtGrp.tzForFormat, e))
+    case e@WeekOfYear(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, WEEKOFYEAR_FORMAT,
+        dtGrp.tzForFormat, e))
+    case e@Hour(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, HOUR_FORMAT,
+        dtGrp.tzForFormat, e))
+    case e@Minute(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, MINUTE_FORMAT,
+        dtGrp.tzForFormat, e))
+    case e@Second(timeExtractor(dtGrp)) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, SECOND_FORMAT,
+        dtGrp.tzForFormat, e))
+    case UnixTimestamp(timeExtractor(dtGrp), Literal(iFmt, StringType)) =>
+      Some(
+        DateTimeGroupingElem(dtGrp.outputName,
+          dtGrp.druidColumn, TIMESTAMP_FORMAT,
+          dtGrp.tzForFormat, dtGrp.pushedExpression,
+          Some(iFmt.toString))
+      )
+    case UnixTimestamp(c@dcExtractor(dc), Literal(iFmt, StringType)) =>
+      Some(
+        DateTimeGroupingElem(dqb.nextAlias,
+          dc, TIMESTAMP_FORMAT,
+          None, c,
+          Some(iFmt.toString))
+      )
+    case FromUnixTime(timeExtractor(dtGrp), Literal(oFmt, StringType)) =>
+      Some(
+        DateTimeGroupingElem(dtGrp.outputName,
+          dtGrp.druidColumn, oFmt.toString,
+          dtGrp.tzForFormat, e)
+      )
+    case FromUnixTime(c@dcExtractor(dc), Literal(oFmt, StringType)) =>
+      Some(
+        DateTimeGroupingElem(dqb.nextAlias,
+          dc, oFmt.toString,
+          None, e)
+      )
+
+    case FromUTCTimestamp(timeExtractor(dtGrp), Literal(oTZ, StringType)) =>
+      Some(
+        DateTimeGroupingElem(dtGrp.outputName,
+          dtGrp.druidColumn, TIMESTAMP_FORMAT,
+          Some(oTZ.toString), dtGrp.pushedExpression)
+      )
+    case FromUTCTimestamp(c@dcExtractor(dc), Literal(oTZ, StringType)) =>
+      Some(
+        DateTimeGroupingElem(dqb.nextAlias,
+          dc, TIMESTAMP_FORMAT,
+          Some(oTZ.toString), e)
+      )
+    case ToUTCTimestamp(timeExtractor(dtGrp), _) =>
+      Some(
+        DateTimeGroupingElem(dtGrp.outputName,
+          dtGrp.druidColumn, TIMESTAMP_FORMAT,
+          None, dtGrp.pushedExpression)
+      )
+    case ToUTCTimestamp(c@dcExtractor(dc), _) =>
+      Some(
+        DateTimeGroupingElem(dqb.nextAlias,
+          dc, TIMESTAMP_FORMAT,
+          None, e)
+      )
+    case e@Cast(timeExtractor(dtGrp), StringType) =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, dtGrp.formatToApply,
+        dtGrp.tzForFormat, e))
+      // tableau timestamp
+    case e@Cast(Concat(Seq(timeExtractor(dtGrp), Literal(v, StringType))),
+    TimestampType)
+      if dtGrp.formatToApply == DATE_FORMAT && " 00:00:00" == v.toString =>
+      Some(DateTimeGroupingElem(dtGrp.outputName,
+        dtGrp.druidColumn, dtGrp.formatToApply + " 00:00:00",
+        dtGrp.tzForFormat, e))
+    case _ => None
+  }
+}
+
+object SparkNativeTimeElementExtractor {
+  val DATE_FORMAT = "YYYY-MM-dd"
+  val TIMESTAMP_FORMAT = "YYYY-MM-dd HH:mm:ss"
+
+  val YEAR_FORMAT = "YYYY"
+  val MONTH_FORMAT = "MM"
+  val WEEKOFYEAR_FORMAT = "ww"
+  val DAY_OF_MONTH_FORMAT = "dd"
+  val DAY_OF_YEAR_FORMAT = "DD"
+
+  val HOUR_FORMAT = "HH"
+  val MINUTE_FORMAT = "mm"
+  val SECOND_FORMAT = "ss"
 }
