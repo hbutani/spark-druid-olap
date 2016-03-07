@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.{PredicateHelper, AttributeRefe
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ExtractEquiJoinKeys}
 import org.apache.spark.sql.catalyst.plans.{JoinType, Inner}
 import org.apache.spark.sql.catalyst.plans.logical.{Project, LogicalPlan}
-import org.apache.spark.sql.columnar.InMemoryRelation
+import org.apache.spark.sql.execution.columnar.InMemoryRelation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.sources.BaseRelation
 import org.sparklinedata.druid.DruidQueryBuilder
@@ -292,7 +292,7 @@ trait JoinTransform {
     rightExpressions,
     otherJoinPredicate,
     JoinDruidQuery(jdqb),
-    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation))
+    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _))
     )
       ) => {
       translateJoin(leftExpressions,
@@ -309,7 +309,7 @@ trait JoinTransform {
     leftExpressions,
     rightExpressions,
     otherJoinPredicate,
-    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation)),
+    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _)),
     JoinDruidQuery(jdqb)
     )
       ) => {
@@ -375,8 +375,8 @@ trait JoinTransform {
       leftExpressions,
       rightExpressions,
       otherJoinPredicate,
-      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
-      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
+      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation, _)),
+      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation, _))) =>
         Some(LeafJoinNode(leftExpressions,
           DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
           rightExpressions,
@@ -389,7 +389,7 @@ trait JoinTransform {
       rightExpressions,
       otherJoinPredicate,
       JoinNode(lJT),
-      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation))) =>
+      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation, _))) =>
         Some(LeftJoinNode(lJT, leftExpressions,
           rightExpressions,
           DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
@@ -400,7 +400,7 @@ trait JoinTransform {
       leftExpressions,
       rightExpressions,
       otherJoinPredicate,
-      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation)),
+      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation, _)),
       JoinNode(rJT)
       ) => Some(RightJoinNode(rJT,
         leftExpressions, DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),

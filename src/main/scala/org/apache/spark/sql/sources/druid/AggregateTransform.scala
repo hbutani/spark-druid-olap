@@ -19,6 +19,7 @@ package org.apache.spark.sql.sources.druid
 
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.logical.{Expand, Project, Aggregate}
 import org.apache.spark.sql.types.{DoubleType, LongType, IntegerType, StringType}
 import org.sparklinedata.druid.metadata.{DruidMetric, DruidColumn, DruidDataType, DruidDimension}

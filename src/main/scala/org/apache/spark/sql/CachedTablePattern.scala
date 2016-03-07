@@ -19,11 +19,11 @@ package org.apache.spark.sql
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import org.apache.spark.sql.catalyst.expressions.{PredicateHelper, Attribute, Expression, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Subquery, Filter, Project, LogicalPlan}
-import org.apache.spark.sql.columnar.InMemoryRelation
+import org.apache.spark.sql.execution.columnar.InMemoryRelation
 
-import org.apache.spark.sql.catalyst.planning.PhysicalOperation.{ReturnType, substitute, collectAliases}
+import org.apache.spark.sql.catalyst.planning.PhysicalOperation.{ReturnType}
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sources.druid.DruidPlanner
 
@@ -31,7 +31,7 @@ import scala.collection.mutable.{Map => mMap}
 
 /**
   * A thin wrapper on [[org.apache.spark.sql.catalyst.planning.PhysicalOperation]], that
-  * replaces an [[org.apache.spark.sql.columnar.InMemoryRelation]] with its original
+  * replaces an [[org.apache.spark.sql.execution.columnar.InMemoryRelation]] with its original
   * [[LogicalPlan]]
   *
   * @param sqlContext
@@ -87,7 +87,7 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
       if (lP.isEmpty) {
         lP = (
           for (t <- tablesToCheck;
-               ce <- cacheManager.lookupCachedData(sqlContext.table(t)) if cacheManager.isCached(t);
+               ce <- cacheManager.lookupCachedData(sqlContext.table(t)) if sqlContext.isCached(t);
                if (ce.cachedRepresentation.child == inMemPlan.child)
           ) yield ce.plan
           ).headOption
@@ -140,4 +140,18 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
       case other =>
         (None, Nil, other, Map.empty)
     }
+
+  private def collectAliases(fields: Seq[Expression]): Map[Attribute, Expression] = fields.collect {
+    case a @ Alias(child, _) => a.toAttribute -> child
+  }.toMap
+
+  private def substitute(aliases: Map[Attribute, Expression])(expr: Expression): Expression = {
+    expr.transform {
+      case a @ Alias(ref: AttributeReference, name) =>
+        aliases.get(ref).map(Alias(_, name)(a.exprId, a.qualifiers)).getOrElse(a)
+
+      case a: AttributeReference =>
+        aliases.get(a).map(Alias(_, a.name)(a.exprId, a.qualifiers)).getOrElse(a)
+    }
+  }
 }
