@@ -73,7 +73,7 @@ object DruidPlanner {
 
   def getDruidQuerySpec(plan : SparkPlan) : Option[String] = {
     plan.collectFirst {
-      case PhysicalRDD(_, r : DruidRDD, _) =>
+      case PhysicalRDD(_, r : DruidRDD, _, _, _) =>
         Utils.queryToString(r.dQuery.q)
     }
   }
