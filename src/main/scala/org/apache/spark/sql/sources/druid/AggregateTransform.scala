@@ -20,7 +20,7 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.logical.{Expand, Project, Aggregate}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Expand, Project, Aggregate}
 import org.apache.spark.sql.types.{DoubleType, LongType, IntegerType, StringType}
 import org.sparklinedata.druid.metadata.{DruidMetric, DruidColumn, DruidDataType, DruidDimension}
 import org.sparklinedata.druid._
@@ -95,7 +95,7 @@ trait AggregateTransform {
     val gEsToDruid = grpInfo.gEs.filter {
       case x if grpInfo.aEToLiteralExpr.contains(x) => false
       case AttributeReference(
-      VirtualColumn.groupingIdName, IntegerType, _, _) => false
+      GroupingColumnName(_), IntegerType, _, _) => false
       case _ => true
     }
 
@@ -107,13 +107,10 @@ trait AggregateTransform {
 
     val allAggregates =
       grpInfo.aEs.flatMap(_ collect { case a: AggregateExpression => a })
-    // Collect all aggregate expressions that can be computed partially.
-    val partialAggregates =
-      grpInfo.aEs.flatMap(_ collect { case p: PartialAggregate1 => p })
 
     // Only do partial aggregation if supported by all aggregate expressions.
-    if (allAggregates.size == partialAggregates.size) {
-      val dqb2 = partialAggregates.foldLeft(dqb1) {
+   {
+      val dqb2 = allAggregates.foldLeft(dqb1) {
         (dqb, ne) =>
           dqb.flatMap(aggregateExpression(_, ne))
       }
@@ -121,18 +118,15 @@ trait AggregateTransform {
       dqb2.map(_.aggregateOp(aggOp)).map(
         _.copy(aggExprToLiteralExpr = grpInfo.aEToLiteralExpr)
       )
-    } else {
-      None
     }
   }
 
 
   val aggregateTransform: DruidTransform = {
-    case (dqb, agg@Aggregate(gEs, aEs,
-    expandOp@Expand(bitmasks, _, _, child))) => {
+    case (dqb,
+    AggregateMatch((agg, gEs, aEs, projectList, expandOp, projections, child))) => {
       plan(dqb, child).flatMap { dqb =>
 
-        val projections = expandOp.projections
         /*
          * First check if the GroupBy and Aggregate Expressions are pushable to
          * Druid.
@@ -191,10 +185,10 @@ trait AggregateTransform {
 
                 (aE, grpingExpr) match {
                   case (AttributeReference(
-                  VirtualColumn.groupingIdName, IntegerType, _, _), _) =>
+                  GroupingColumnName(_), IntegerType, _, _), _) =>
                     literlVals += ((aE, transformedGExpr))
                   case (Alias(AttributeReference(
-                  VirtualColumn.groupingIdName, IntegerType, _, _), _), _) =>
+                  GroupingColumnName(_), IntegerType, _, _), _), _) =>
                     literlVals += ((aE, transformedGExpr))
                   case (_, Literal(null, gExprDT)) => literlVals += ((aE, transformedGExpr))
                   case _ => ()
@@ -229,19 +223,24 @@ trait AggregateTransform {
     case _ => Seq()
   }
 
-  def aggregateExpression(dqb: DruidQueryBuilder, pa: PartialAggregate1):
-  Option[DruidQueryBuilder] = pa match {
-    case Count(Literal(1, IntegerType)) => {
+  def aggregateExpression(dqb: DruidQueryBuilder, aggExp: AggregateExpression):
+  Option[DruidQueryBuilder] = aggExp.aggregateFunction match {
+    case Count(Literal(1, IntegerType) :: Nil) => {
       val a = dqb.nextAlias
       Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
-        outputAttribute(a, pa, pa.dataType, LongType))
+        outputAttribute(a, aggExp, aggExp.dataType, LongType))
+    }
+    case Count(AttributeReference("1", _, _, _) :: Nil) => {
+      val a = dqb.nextAlias
+      Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
+        outputAttribute(a, aggExp, aggExp.dataType, LongType))
     }
     case c => {
       val a = dqb.nextAlias
       (dqb, c) match {
         case CountDistinctAggregate(dN) =>
           Some(dqb.aggregate(new CardinalityAggregationSpec(a, List(dN))).
-            outputAttribute(a, pa, pa.dataType, DoubleType))
+            outputAttribute(a, aggExp, aggExp.dataType, DoubleType))
         case SumMinMaxAvgAggregate(t) => t._1 match {
           case "avg" => {
             val dC: DruidColumn = t._2
@@ -258,13 +257,13 @@ trait AggregateTransform {
                 postAggregate(new ArithmeticPostAggregationSpec(a, "/",
                   List(new FieldAccessPostAggregationSpec(sumAlias),
                     new FieldAccessPostAggregationSpec(countAlias)), None)).
-                outputAttribute(a, pa, pa.dataType, DoubleType)
+                outputAttribute(a, aggExp, aggExp.dataType, DoubleType)
             )
           }
           case _ => {
             val dC: DruidColumn = t._2
             Some(dqb.aggregate(FunctionAggregationSpec(t._1, a, dC.name)).
-              outputAttribute(a, pa, pa.dataType, DruidDataType.sparkDataType(dC.dataType))
+              outputAttribute(a, aggExp, aggExp.dataType, DruidDataType.sparkDataType(dC.dataType))
             )
           }
         }
@@ -280,20 +279,19 @@ trait AggregateTransform {
   }
 
   private object CountDistinctAggregate {
-    def unapply(t: (DruidQueryBuilder, PartialAggregate1)): Option[(String)]
+    def unapply(t: (DruidQueryBuilder, AggregateFunction)): Option[(String)]
     = {
       val dqb = t._1
-      val pa = t._2
+      val aggFunc = t._2
 
-      val r = for (c <- pa.children.headOption if (pa.children.size == 1);
+      val r = for (c <- aggFunc.children.headOption if (aggFunc.children.size == 1);
                    dNm <- attributeRef(c);
                    dD <-
                    dqb.druidColumn(dNm) if dD.isInstanceOf[DruidDimension]
-      ) yield (pa, dD)
+      ) yield (aggFunc, dD)
 
       r flatMap {
-        case (p: CountDistinct, dD) if dqb.drInfo.allowCountDistinct => Some(dD.name)
-        case (p: ApproxCountDistinct, dD) if dqb.drInfo.allowCountDistinct => Some(dD.name)
+        case (p: HyperLogLogPlusPlus, dD) if dqb.drInfo.allowCountDistinct => Some(dD.name)
         case _ => None
       }
     }
@@ -307,18 +305,18 @@ trait AggregateTransform {
    */
   private object SumMinMaxAvgAggregate {
 
-    def unapply(t: (DruidQueryBuilder, PartialAggregate1)): Option[(String, DruidColumn)]
+    def unapply(t: (DruidQueryBuilder, AggregateFunction)): Option[(String, DruidColumn)]
     = {
       val dqb = t._1
-      val pa = t._2
+      val aggFunc = t._2
 
-      val r = for (c <- pa.children.headOption if (pa.children.size == 1);
+      val r = for (c <- aggFunc.children.headOption if (aggFunc.children.size == 1);
                    mNm <- attributeRef(c);
                    dM <- dqb.druidColumn(mNm) if dM.isInstanceOf[DruidMetric];
                    mDT <- Some(DruidDataType.sparkDataType(dM.dataType));
-                   commonType <- HiveTypeCoercion.findTightestCommonTypeOfTwo(pa.dataType, mDT)
-                   if (commonType == mDT || pa.isInstanceOf[Average])
-      ) yield (pa, commonType, dM)
+                   commonType <- HiveTypeCoercion.findTightestCommonTypeOfTwo(
+                     aggFunc.dataType, mDT) if (commonType == mDT || aggFunc.isInstanceOf[Average])
+      ) yield (aggFunc, commonType, dM)
 
       r flatMap {
         case (p: Sum, LongType, dM) => Some(("longSum", dM))
@@ -333,6 +331,31 @@ trait AggregateTransform {
       }
     }
 
+  }
+
+  private object GroupingColumnName {
+    def unapply(colName : String) : Option[String] = colName match {
+      case VirtualColumn.groupingIdName => Some(colName)
+      case "gid" => Some(colName)
+      case _ => None
+    }
+  }
+
+  private object AggregateMatch {
+    def unapply(plan: LogicalPlan) :
+    Option[(Aggregate,
+      Seq[Expression], Seq[NamedExpression],
+      Seq[NamedExpression],
+      Expand, Seq[Seq[Expression]], LogicalPlan )] =
+      plan match {
+        case agg@Aggregate(gEs, aEs,
+        expandOp@Expand(projections, _, child)) =>
+          Some((agg, gEs, aEs, Seq(), expandOp, projections, child))
+        case agg@Aggregate(gEs, aEs,
+        Project(projectList, expandOp@Expand(projections, _, child))) =>
+          Some((agg, gEs, aEs, projectList, expandOp, projections, child))
+      case _ => None
+    }
   }
 
 }
