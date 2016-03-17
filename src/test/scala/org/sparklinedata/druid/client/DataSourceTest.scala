@@ -27,17 +27,17 @@ class DataSourceTest extends BaseTest {
 
   import org.sparklinedata.druid.Utils._
 
-  test("baseTable") {
+  test("baseTable") { td =>
     sql("select * from orderLineItemPartSupplierBase").show(10)
   }
 
-  test("noQuery") {
+  test("noQuery") { td =>
     val df = sql("select * from orderLineItemPartSupplier")
     df.explain(true)
     df.show(10)
   }
 
-  test("tpchQ1") {
+  test("tpchQ1") { td =>
 
     val dq =
       compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1)))).replace('\n', ' ')
@@ -61,7 +61,7 @@ class DataSourceTest extends BaseTest {
     sql("select * from orderLineItemPartSupplier2").show(10)
   }
 
-  test("tpchQ1MonthGrain") {
+  test("tpchQ1MonthGrain") { td =>
 
     val dq =
       compact(render(Extraction.decompose(new DruidQuery(TPCHQueries.q1MonthGrain)))
@@ -85,7 +85,7 @@ class DataSourceTest extends BaseTest {
     sql("select * from orderLineItemPartSupplier2").show(10)
   }
 
-  test("t2") {
+  test("t2") { td =>
     import org.json4s._
     import org.json4s.jackson.JsonMethods._
 

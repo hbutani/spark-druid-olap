@@ -23,10 +23,12 @@ import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.{fixture, BeforeAndAfterAll}
+import org.sparklinedata.druid.Utils
 import org.sparklinedata.spark.dateTime.Functions._
 
-abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
+abstract class BaseTest extends fixture.FunSuite with
+  fixture.TestDataFixture with BeforeAndAfterAll with Logging {
 
   val colMapping =
     """{
@@ -191,6 +193,25 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     sql(cTOlap)
   }
 
+  def test(nm : String, sql : String,
+           numDruidQueries : Int = 1,
+           showPlan : Boolean = false,
+           showResults : Boolean = false,
+           debugTransforms : Boolean = false) : Unit = {
+    test(nm) {td =>
+      try {
+        if (debugTransforms) turnOnTransformDebugging
+        val df = sqlAndLog(nm, sql)
+        assertDruidQueries(td.name, df, numDruidQueries)
+        if (showPlan ) logPlan(nm, df)
+        logDruidQueries(td.name, df)
+        if (showResults ) { df.show() }
+      } finally {
+        turnOffTransformDebugging
+      }
+    }
+  }
+
   def sqlAndLog(nm : String, sqlStr : String) : DataFrame = {
     logInfo(s"\n$nm SQL:\n" + sqlStr)
     sql(sqlStr)
@@ -202,10 +223,15 @@ abstract class BaseTest extends FunSuite with BeforeAndAfterAll with Logging {
     logInfo(s"\nPhysical Plan:\n" + df.queryExecution.sparkPlan.toString)
   }
 
-  def logDruidQuery(nm : String, df : DataFrame) : Unit = {
-    logInfo(s"\n$nm Druid Query:")
-    logInfo(DruidPlanner.getDruidQuerySpec(
-      df.queryExecution.sparkPlan).getOrElse("<null>"))
+  def logDruidQueries(nm : String, df : DataFrame) : Unit = {
+    logInfo(s"\n$nm Druid Queries:")
+    DruidPlanner.getDruidQuerySpecs(df.queryExecution.sparkPlan).foreach {dq =>
+      logInfo(s"${Utils.queryToString(dq)}")
+    }
+  }
+
+  def assertDruidQueries(nm : String, df : DataFrame, numQueries : Int) : Unit = {
+    assert(DruidPlanner.getDruidQuerySpecs(df.queryExecution.sparkPlan).length == numQueries)
   }
 
   def turnOnTransformDebugging : Unit = {
