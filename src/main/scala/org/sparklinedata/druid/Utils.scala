@@ -113,6 +113,9 @@ object Utils extends Logging {
       case h :: t => h flatMap (hh => sequence(t) map (hh :: _))
     }
 
+  def filterSomes[A](a : List[Option[A]]) : List[Option[A]] =
+  a.filter{ case Some(x) => true; case _ => false }
+
   def permute(s: String): String = StringPermute.permute(s)
 }
 

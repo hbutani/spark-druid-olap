@@ -111,4 +111,10 @@ with PredicateHelper with Logging  {
 
   implicit def transformToHolder(t : DruidTransform) = TransformHolder(t)
 
+  def debugTranslation(msg : => String) : Unit = {
+    if (sqlContext.getConf(DruidPlanner.DEBUG_TRANSFORMATIONS)) {
+      logInfo(msg)
+    }
+  }
+
 }

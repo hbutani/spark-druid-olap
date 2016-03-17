@@ -68,17 +68,31 @@ trait DruidPlannerHelper {
       yield (e, (aR, attr._2))
   }
 
+  def exprIdToAttribute(e: Expression,
+                          plan: LogicalPlan): Option[(ExprId, Int)] = {
+    for (aR <- findAttribute(e);
+         attr <- plan.output.zipWithIndex.find(t => t._1.exprId == aR.exprId))
+      yield (aR.exprId, attr._2)
+  }
+
   /**
    *
    * @param gEs
+   * @param expandOpGExps if Expand is below this GBy, then the corresponding expression
+    *                      for each GE in the Expand projection.
    * @param aEs
+   * @param expandOpProjection if Expand is below this GBy, then this Expand projection
+   * @param aEExprIdToPos if Expand is below this GBy, the pos in the Expand projection
    * @param aEToLiteralExpr for expressions that represent a 'null' value for
    *                        a this GroupingSet or represent the 'grouping__id'
    *                        columns, this is a map to the Literal value that is
    *                        filled in the Projection above the DruidRDD.
    */
   case class GroupingInfo(gEs: Seq[Expression],
+                          expandOpGExps : Seq[Expression],
                           aEs: Seq[NamedExpression],
+                          expandOpProjection : Seq[Expression],
+                          aEExprIdToPos : Map[ExprId, Int],
                           aEToLiteralExpr: Map[Expression, Expression] = Map())
 
 }
