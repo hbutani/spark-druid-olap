@@ -76,7 +76,7 @@ class DruidRewriteCubeTest extends BaseTest {
       with Cube""")
     logPlan("basicAgg", df)
 
-    //df.show()
+    // df.show()
   }
 
   test("basicFilterCube",
