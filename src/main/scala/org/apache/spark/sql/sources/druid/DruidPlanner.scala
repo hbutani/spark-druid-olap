@@ -21,8 +21,7 @@ import org.apache.spark.sql.SQLConf.SQLConfEntry._
 import org.apache.spark.sql.execution.{SparkPlan, PhysicalRDD}
 import org.apache.spark.sql.{CachedTablePattern, SQLContext}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.sparklinedata.druid.{DruidRDD, DruidQueryBuilder}
-import org.sparklinedata.druid.Utils
+import org.sparklinedata.druid.{DruidQuery, DruidRDD, DruidQueryBuilder, Utils}
 
 class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTransforms {
 
@@ -71,10 +70,10 @@ object DruidPlanner {
     defaultValue = Some(false),
     doc = "When set to true each transformation is logged.")
 
-  def getDruidQuerySpec(plan : SparkPlan) : Option[String] = {
-    plan.collectFirst {
-      case PhysicalRDD(_, r : DruidRDD, _, _, _) =>
-        Utils.queryToString(r.dQuery.q)
+
+  def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
+    plan.collect {
+      case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery
     }
   }
 }

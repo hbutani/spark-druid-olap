@@ -19,11 +19,7 @@ package org.sparklinedata.druid.client
 
 class SparkDateTimeTest extends StarSchemaBaseTest {
 
-
-  test("dateBasic") {
-    //turnOnTransformDebugging
-
-    val df = sqlAndLog("dateBasic2",
+  test("dateBasic",
       """SELECT
         |sn_name,
         |sum(l_extendedprice) as revenue
@@ -51,23 +47,17 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |ORDER BY
         |revenue desc""".stripMargin
     )
-    logDruidQuery("basicJoin", df)
-  }
 
-  test("castDate") {
-    val df=sqlAndLog("castDate",
-      "select cast(o_orderdate as date) " +
+  test("castDate",
+    "select cast(o_orderdate as date) " +
         "from orderLineItemPartSupplier " +
-        "group by cast(o_orderdate as date)"
-    )
-    logDruidQuery("castDate", df)
-    //logPlan("castDate", df)
+        "group by cast(o_orderdate as date)",
+    1,
+    false,
+    true
+  )
 
-    df.show()
-  }
-
-  test("showByYear") {
-    val df = sqlAndLog("showByYear",
+  test("showByYear",
       """SELECT Year(Cast(Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS TIMESTAMP)
         |       ) AS
         |       yr_l_shipdate_ok
@@ -88,14 +78,8 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |GROUP  BY Year(Cast(Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
         |                    TIMESTAMP)) """.stripMargin
     )
-    logDruidQuery("castDate", df)
-    logPlan("showByYear", df)
 
-    //df.show()
-  }
-
-  test("showByQuarter") {
-    val df = sqlAndLog("showByQuarter",
+  test("showByQuarter",
     """
       |SELECT Cast(Concat(Year(Cast(Concat(To_date(lineitem.l_shipdate), ' 00:00:00')
       |                             AS
@@ -144,12 +128,11 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
       |                          )) < 10 THEN '-07'
       |               ELSE '-10'
       |               END ), '-01 00:00:00') AS TIMESTAMP)
-    """.stripMargin)
-    logPlan("showByQuarter", df)
-  }
+    """.stripMargin,
+    0
+  )
 
-  test("fromUnixTimestamp") {
-    val df = sqlAndLog("fromUnixTimestamp",
+  test("fromUnixTimestamp",
     """
       |SELECT Cast(From_unixtime(Unix_timestamp(Cast(
       |                          Concat(To_date(lineitem.l_shipdate), ' 00:00:00')
@@ -175,13 +158,10 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
       |                         AS
       |                                       TIMESTAMP)), 'yyyy-MM-01 00:00:00') AS
       |               TIMESTAMP)
-    """.stripMargin)
-    logPlan("fromUnixTimestamp", df)
-    logDruidQuery("fromUnixTimestamp", df)
-  }
+    """.stripMargin
+  )
 
-  test("toDate") {
-    val df = sqlAndLog("toDate",
+  test("toDate",
       """
         |SELECT Sum(lineitem.l_extendedprice)                                         AS
         |       sum_l_extendedprice_ok,
@@ -206,13 +186,10 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |GROUP  BY Cast(Concat(To_date(Cast(
         |                      Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
         |                                     TIMESTAMP)), ' 00:00:00') AS TIMESTAMP )
-      """.stripMargin)
-    logPlan("toDate", df)
-    logDruidQuery("toDate", df)
-  }
+      """.stripMargin
+  )
 
-  test("dateFilter") {
-    val df = sqlAndLog("dateFilter",
+  test("dateFilter",
       """
         |SELECT Sum(lineitem.l_extendedprice)                                         AS
         |       sum_l_extendedprice_ok,
@@ -244,14 +221,11 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |GROUP  BY Cast(Concat(To_date(Cast(
         |                      Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
         |                                     TIMESTAMP)), ' 00:00:00') AS TIMESTAMP)
-      """.stripMargin)
-    logPlan("dateFilter", df)
-  }
+      """.stripMargin,
+    0
+  )
 
-  test("intervalFilter") {
-    //turnOnTransformDebugging
-
-    val df = sqlAndLog("dateFilter",
+  test("intervalFilter",
       """
         |SELECT Sum(lineitem.l_extendedprice)                                         AS
         |       sum_l_extendedprice_ok,
@@ -272,9 +246,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |GROUP  BY Cast(Concat(To_date(Cast(
         |                      Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
         |                                     TIMESTAMP)), ' 00:00:00') AS TIMESTAMP)
-      """.stripMargin)
-    logPlan("intervalFilter", df)
-    logDruidQuery("intervalFIlter", df)
-  }
+      """.stripMargin
+  )
 
 }

@@ -21,92 +21,80 @@ import org.apache.spark.sql.hive.test.TestHive
 
 class JoinTest extends StarSchemaBaseTest {
 
-  test("2tableJoin") {
-    val df = sqlAndLog("li-partsupp",
-      "select  l_linestatus, sum(ps_availqty) " +
+  test("2tableJoin",
+    "select  l_linestatus, sum(ps_availqty) " +
         "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
         "and li.l_partkey = ps.ps_partkey " +
-        "group by l_linestatus")
-    logPlan("basicJoin", df)
-    df.explain(true)
-    //df.show()
-  }
+        "group by l_linestatus",
+    1,
+    true
+  )
 
-  test("2tableJoinFactTableIsRight") {
-    val df = sqlAndLog("partsupp-li",
-      "select  l_linestatus, sum(ps_availqty) " +
+  test("2tableJoinFactTableIsRight",
+    "select  l_linestatus, sum(ps_availqty) " +
         "from partsupp ps join lineitem li  on  li.l_suppkey = ps.ps_suppkey " +
         "and li.l_partkey = ps.ps_partkey " +
-        "group by l_linestatus")
-    df.explain(true)
-    //df.show()
-  }
+        "group by l_linestatus",
+    1,
+    true
+  )
 
-  test("3tableJoin") {
-    val df = sqlAndLog("li-partsupp-supp",
-      "select  s_name, sum(ps_availqty) " +
+  test("3tableJoin",
+    "select  s_name, sum(ps_availqty) " +
         "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
         "and li.l_partkey = ps.ps_partkey " +
         " join supplier s on ps.ps_suppkey = s.s_suppkey " +
-        "group by s_name")
-    df.explain(true)
-    //df.show()
-  }
+        "group by s_name",
+    1,
+    true
+  )
 
-  test("tpchQ3") {
-    val df = sqlAndLog("tpchQ3", StarSchemaTpchQueries.q3)
-    df.explain(true)
-    df.show()
-  }
+  test("tpchQ3",StarSchemaTpchQueries.q3,
+    1,
+    true,
+    true
+  )
 
-  test("tpchQ5") {
-    val df = sqlAndLog("tpchQ5", StarSchemaTpchQueries.q5)
-    df.explain(true)
-    df.show()
-  }
+  test("tpchQ5", StarSchemaTpchQueries.q5,
+    1,
+    true,
+    true
+  )
 
-  test("tpchQ7") {
-    val df = sqlAndLog("tpchQ7", StarSchemaTpchQueries.q7)
-    df.explain(true)
-    df.show()
-  }
+  test("tpchQ7", StarSchemaTpchQueries.q7,
+    1,
+    true,
+    true
+  )
 
-  test("tpchQ8") {
-    val df = sqlAndLog("tpchQ8", StarSchemaTpchQueries.q8)
-    df.explain(true)
-    df.show()
-  }
+  test("tpchQ8", StarSchemaTpchQueries.q8,
+    1,
+    true,
+    true
+  )
 
-  test("tpchQ10") {
-    val df = sqlAndLog("tpchQ10", StarSchemaTpchQueries.q10)
-    df.explain(true)
-    df.show()
-  }
+  test("tpchQ10", StarSchemaTpchQueries.q10,
+    1,
+    true,
+    true
+  )
 
-  test("basicJoinAgg") {
-    val df = sqlAndLog("li-supp-join",
-      "select s_name, l_linestatus, " +
+  test("basicJoinAgg",
+    "select s_name, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from lineitembase li join supplier s on  li.l_suppkey = s.s_suppkey " +
-        "group by s_name, l_linestatus")
-    logPlan("basicAggOrderByDimension", df)
+        "group by s_name, l_linestatus",
+    0,
+    true
+  )
 
-    val lp = df.queryExecution.optimizedPlan
-
-    val pp = df.queryExecution.sparkPlan
-
-    //df.show()
-
-    df.explain(true)
-  }
-
-  test("dfPlan1") {
+  test("dfPlan1") { td =>
     val df = TestHive.table("lineitem").groupBy("l_linestatus").count()
     logPlan("basicAggOrderByDimension", df)
     df.show()
   }
 
-  test("dfPlan2") {
+  test("dfPlan2") { td =>
     val df = TestHive.table("lineitem").
       join(TestHive.table("partsupp")).
       join(TestHive.table("supplier")).
@@ -116,8 +104,7 @@ class JoinTest extends StarSchemaBaseTest {
     df.show()
   }
 
-  test("dimensionOnlyQuery") {
-    val df = sqlAndLog("dimensionOnlyQuery",
+  test("dimensionOnlyQuery",
     """SELECT customer.c_mktsegment AS c_mktsegment
       |FROM   (SELECT *
       |        FROM   lineitem) lineitem
@@ -133,9 +120,9 @@ class JoinTest extends StarSchemaBaseTest {
       |       JOIN (SELECT *
       |             FROM   custregion) custregion
       |         ON ( custnation.cn_regionkey = custregion.cr_regionkey )
-      |GROUP  BY customer.c_mktsegment """.stripMargin)
-    logPlan("basicAggOrderByDimension", df)
-    df.show()
-  }
+      |GROUP  BY customer.c_mktsegment """.stripMargin,
+    1,
+    true
+  )
 
 }

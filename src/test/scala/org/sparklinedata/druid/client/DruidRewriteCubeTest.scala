@@ -25,20 +25,18 @@ import scala.language.postfixOps
 class DruidRewriteCubeTest extends BaseTest {
 
 
-  test("basicCube") {
-    val df = sqlAndLog("basicCube",
-      "select l_returnflag, l_linestatus, " +
+  test("basicCube",
+    "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
-        "group by l_returnflag, l_linestatus with cube")
-    logPlan("basicAggOrderByDimension", df)
+        "group by l_returnflag, l_linestatus with cube",
+    4,
+    true,
+    true
+  )
 
-    df.show()
-  }
-
-  test("testUnion") {
-    val df = sqlAndLog("testUnion",
-      "select l_returnflag, l_linestatus, " +
+  test("testUnion",
+    "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
@@ -46,11 +44,10 @@ class DruidRewriteCubeTest extends BaseTest {
         "select l_returnflag, null, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
-        "group by l_returnflag ")
-    logPlan("testUnion", df)
-
-    //df.show()
-  }
+        "group by l_returnflag ",
+    2,
+    true
+  )
 
   /*
    * TODO: followup on the following Spark-SQL issue:
@@ -67,7 +64,7 @@ class DruidRewriteCubeTest extends BaseTest {
    * "concat(concat(l_linestatus, 'a'), 'b')". More than one level of function invocation is
    * needed, so "concat(l_linestatus, 'a')" works fine.
    */
-  ignore("ShipDateYearAggCube") {
+  ignore("ShipDateYearAggCube") { td =>
 
     val shipDtYrGroup = dateTime('l_shipdate) year
 
@@ -82,51 +79,43 @@ class DruidRewriteCubeTest extends BaseTest {
     //df.show()
   }
 
-  test("basicFilterCube") {
-    val df = sqlAndLog("basicFilterCube",
-      "select s_nation, l_returnflag, l_linestatus, " +
+  test("basicFilterCube",
+    "select s_nation, l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
         "where s_nation = 'FRANCE' " +
-        "group by s_nation, l_returnflag, l_linestatus with cube")
-    logPlan("basicAggOrderByDimension", df)
+        "group by s_nation, l_returnflag, l_linestatus with cube",
+    8,
+    true
+  )
 
-    //df.show()
-  }
-
-  test("basicFilterRollup") {
-    val df = sqlAndLog("basicFilterRollup",
-      "select l_returnflag, l_linestatus, grouping__id, " +
+  test("basicFilterRollup",
+    "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
         "where s_nation = 'FRANCE' " +
-        "group by l_returnflag, l_linestatus with rollup")
-    logPlan("basicAggOrderByDimension", df)
+        "group by l_returnflag, l_linestatus with rollup",
+    3,
+    true
+  )
 
-    //df.show()
-  }
-
-  test("basicFilterGroupingSet") {
-    val df = sqlAndLog("basicFilterGroupingSet",
-      "select l_returnflag, l_linestatus, grouping__id, " +
+  test("basicFilterGroupingSet",
+    "select l_returnflag, l_linestatus, grouping__id, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
         "where s_nation = 'FRANCE' " +
-        "group by l_returnflag, l_linestatus grouping sets(l_returnflag, l_linestatus, ())")
-    logPlan("basicAggOrderByDimension", df)
+        "group by l_returnflag, l_linestatus grouping sets(l_returnflag, l_linestatus, ())",
+    3,
+    true
+  )
 
-    //df.show()
-  }
-
-  test("basicCubeWithExpr") {
-    val df = sqlAndLog("basicCubeWithExpr",
-      "select lower(l_returnflag), l_linestatus, " +
+  test("basicCubeWithExpr",
+    "select lower(l_returnflag), l_linestatus, " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
-        "group by lower(l_returnflag), l_linestatus with cube")
-    logPlan("basicAggOrderByDimension", df)
-
-    //df.show()
-  }
+        "group by lower(l_returnflag), l_linestatus with cube",
+    0,
+    true
+  )
 
 }

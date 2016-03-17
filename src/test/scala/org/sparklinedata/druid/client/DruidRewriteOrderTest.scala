@@ -20,98 +20,81 @@ package org.sparklinedata.druid.client
 class DruidRewriteOrderTest extends BaseTest {
 
 
-  test("basicAggOrderByDimension") {
-    val df = sqlAndLog("basicAggOrderByDimension",
-      "select l_returnflag, l_linestatus, " +
+  test("basicAggOrderByDimension",
+    "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
-        "order by l_linestatus")
-    logPlan("basicAggOrderByDimension", df)
+        "order by l_linestatus",
+    1,
+    true
+  )
 
-    //df.show()
-  }
-
-  test("basicAggOrderByDimensionLimit") {
-    val df = sqlAndLog("basicAggOrderByDimensionLimit",
-      "select l_returnflag, l_linestatus, " +
+  test("basicAggOrderByDimensionLimit",
+    "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
         "count(distinct o_orderkey)  " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
         "order by l_returnflag " +
-        "limit 2")
-    logPlan("basicAggOrderByDimensionLimit", df)
+        "limit 2",
+    2,
+    true
+  )
 
-    //df.show()
-  }
-
-  /*
-   * SPARK-10437 is only fixed in Spark-1.6, but the issue here was translation of
-   * SortOrder clause.
-   */
-  test("basicAggOrderByMetric") {
-    val df = sqlAndLog("basicAggOrderByMetric",
-      "select l_returnflag, l_linestatus, " +
+  test("basicAggOrderByMetric",
+    "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
-        "order by count(*)")
-    logPlan("basicAggOrderByMetric", df)
+        "order by count(*)",
+    1,
+    true,
+    true
+  )
 
-    df.show()
-  }
-
-  test("basicAggOrderByMetric2") {
-    val df = sqlAndLog("basicAggOrderByMetric2",
-      "select l_returnflag, l_linestatus, " +
+  test("basicAggOrderByMetric2",
+    "select l_returnflag, l_linestatus, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
-        "order by s")
-    logPlan("basicAggOrderByMetric2", df)
+        "order by s",
+    1,
+    true
+  )
 
-    //df.show()
-  }
-
-  test("basicAggOrderByLimitFull") {
-    val df = sqlAndLog("basicAggOrderByLimitFull",
-      "select l_returnflag as r, l_linestatus as ls, " +
+  test("basicAggOrderByLimitFull",
+    "select l_returnflag as r, l_linestatus as ls, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
         "order by s, ls, r " +
-        "limit 3")
-    logPlan("basicAggOrderByLimitFull", df)
+        "limit 3",
+    1,
+    true
+  )
 
-    //df.show()
-  }
-
-  test("basicAggOrderByLimitFull2") {
-    val df = sqlAndLog("basicAggOrderByLimitFull2",
-      "select l_returnflag as r, l_linestatus as ls, " +
+  test("basicAggOrderByLimitFull2",
+    "select l_returnflag as r, l_linestatus as ls, " +
         "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
         "order by m desc, s, r " +
-        "limit 3")
-    logPlan("basicAggOrderByLimitFull2", df)
+        "limit 3",
+    1,
+    true
+  )
 
-
-    //df.show()
-  }
-
-  test("sortNotPushed") {
-    val df = sqlAndLog("sortNotPushed",
-      "select l_returnflag as r, l_linestatus as ls, " +
-        "count(*) + 1 as c, sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +
+  test("sortNotPushed",
+    "select l_returnflag as r, l_linestatus as ls, " +
+        "count(*) + 1 as c, sum(l_extendedprice) as s, max(ps_supplycost) as m, " +
+      "avg(ps_availqty) as a  " +
         "from orderLineItemPartSupplier " +
         "group by l_returnflag, l_linestatus " +
         "order by c " +
-        "limit 3")
-    logPlan("sortNotPushed", df)
-
-    //df.show()
-  }
+        "limit 3",
+    1,
+    true
+  )
 
 }

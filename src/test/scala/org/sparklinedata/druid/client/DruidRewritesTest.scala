@@ -25,56 +25,38 @@ import scala.language.postfixOps
 
 class DruidRewritesTest extends BaseTest {
 
-  test("basicAgg") {
-    val df = sqlAndLog("basicAgg",
+  test("basicAgg",
       "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
       "count(distinct o_orderkey)  " +
-      "from orderLineItemPartSupplier group by l_returnflag, l_linestatus")
-    logPlan("basicAgg", df)
+      "from orderLineItemPartSupplier group by l_returnflag, l_linestatus",
+    2,
+    true
+  )
 
-    // df.show()
-  }
-
-  test("noAggs") {
-    val df = sqlAndLog("noAggs",
+  test("noAggs",
       "select l_returnflag, l_linestatus " +
         "from orderLineItemPartSupplier " +
-        "group by l_returnflag, l_linestatus")
+        "group by l_returnflag, l_linestatus",
+    1,
+    true,
+    true
+  )
 
-    logPlan("noAggs", df)
-
-    df.show()
-  }
-
-  test("basicAggWithProject") {
-
-    /*
-     * use `turnOnTransformDebugging` and `turnOnTransformDebugging` to see
-     * the transformations happening in a query. Use this judiciously as the
-     * output can be large
-     */
-    try {
-      turnOnTransformDebugging
-
-      val df = sqlAndLog("basicAggWithProject",
+  test("basicAggWithProject",
         "select f, s, " +
           "count(*)  " +
           "from (select l_returnflag f, l_linestatus s " +
-          "from orderLineItemPartSupplier) t group by f, s")
-      logPlan("basicAggWithProject", df)
-    } finally {
-      turnOffTransformDebugging
-    }
-    // df.show()
-  }
+          "from orderLineItemPartSupplier) t group by f, s",
+    1,
+    true,
+    false,
+    true
+  )
 
-  test("dateFilter") {
-
+  test("dateFilter", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
-
-    val df = sqlAndLog("dateFilter",
-      date"""
+    date"""
       select f, s, count(*) as count_order
       from
       (
@@ -84,18 +66,14 @@ class DruidRewritesTest extends BaseTest {
       where $shipDtPredicate
       group by f,s
       order by f,s
-""")
+"""},
+    1,
+    true
+  )
 
-    logPlan("dateFilter", df)
-
-    // df.show()
-  }
-
-  test("intervalFilter") {
+  test("intervalFilter", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
-
-    val df = sqlAndLog("intervalFilter",
-      date"""
+    date"""
       select f, s, count(*) as count_order
       from
       (
@@ -107,20 +85,16 @@ class DruidRewritesTest extends BaseTest {
                                  )
       group by f,s
       order by f,s
-""")
+"""
+  },
+    1, true
+  )
 
-    logPlan("intervalFilter", df)
-
-    // df.show()
-
-  }
-
-  test("intervalFilter2") {
+  test("intervalFilter2", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) > (dateTime("1995-12-01"))
 
-    val df = sqlAndLog("intervalFilter2",
-      date"""
+    date"""
       select f, s, count(*) as count_order
       from
       (
@@ -130,20 +104,17 @@ class DruidRewritesTest extends BaseTest {
       where $shipDtPredicate and $shipDtPredicate2
       group by f,s
       order by f,s
-""")
+"""
+  },
+    1,
+    true
+  )
 
-    logPlan("intervalFilter2", df)
-
-    // df.show()
-
-  }
-
-  test("intervalFilter3") {
+  test("intervalFilter3", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) < (dateTime("1995-12-01"))
 
-    val df = sqlAndLog("intervalFilter3",
-      date"""
+    date"""
       select f, s, count(*) as count_order
       from
       (
@@ -153,20 +124,16 @@ class DruidRewritesTest extends BaseTest {
       where $shipDtPredicate and $shipDtPredicate2
       group by f,s
       order by f,s
-""")
+"""
+  },
+    1,
+    true)
 
-    logPlan("intervalFilter3", df)
-
-    // df.show()
-
-  }
-
-  test("intervalFilter4") {
+  test("intervalFilter4", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) > (dateTime("1997-12-02"))
 
-    val df = sqlAndLog("intervalFilter4",
-      date"""
+    date"""
       select f, s, count(*) as count_order
       from
       (
@@ -176,19 +143,16 @@ class DruidRewritesTest extends BaseTest {
       where $shipDtPredicate and $shipDtPredicate2
       group by f,s
       order by f,s
-""")
+"""
+  },
+    1,
+    true
+  )
 
-    logPlan("intervalFilter4", df)
-
-    // df.show()
-
-  }
-
-  test("dimFilter2") {
+  test("dimFilter2", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
-    val df = sqlAndLog("dimFilter2",
-      date"""
+    date"""
       select f, s, count(*) as count_order
       from
       (
@@ -201,19 +165,16 @@ class DruidRewritesTest extends BaseTest {
                                  ) and p_type = 'ECONOMY ANODIZED STEEL'
       group by f,s
       order by f,s
-""")
+"""
+  },
+    1,
+    true
+  )
 
-    logPlan("dimFilter2", df)
-
-    // df.show()
-
-  }
-
-  test("dimFilter3") {
+  test("dimFilter3", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
-    val df = sqlAndLog("dimFilter3",
-      date"""
+    date"""
       select s_nation, count(*) as count_order
       from
       (
@@ -226,19 +187,16 @@ class DruidRewritesTest extends BaseTest {
                                  )
       group by s_nation
       order by s_nation
-""")
+"""
+  },
+    1,
+    true
+  )
 
-    logPlan("dimFilter3", df)
-
-    // df.show()
-
-  }
-
-  test("dimFilter4") {
+  test("dimFilter4", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
 
-    val df = sqlAndLog("dimFilter4",
-      date"""
+    date"""
       select s_nation, count(*) as count_order
       from
       (
@@ -249,20 +207,17 @@ class DruidRewritesTest extends BaseTest {
       where $shipDtPredicate and s_nation >= 'FRANCE'
       group by s_nation
       order by s_nation
-""")
+"""
+  },
+    1,
+    true
+  )
 
-    logPlan("dimFilter4", df)
-
-    // df.show()
-
-  }
-
-  test("projFilterAgg") {
+  test("projFilterAgg", {
     val shipDtPredicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 90.day)
     val shipDtPredicate2 = dateTime('l_shipdate) > (dateTime("1995-12-01"))
 
-    val df = sqlAndLog("projFilterAgg",
-      date"""
+    date"""
       select s_nation,
       count(*) as count_order,
       sum(l_extendedprice) as s,
@@ -283,49 +238,45 @@ class DruidRewritesTest extends BaseTest {
                                  )
       group by s_nation
       order by s_nation
-""")
-    logPlan("projFilterAgg", df)
+"""
+  },
+    2,
+    true
+  )
 
-    // df.show()
-  }
-
-  test("ShipDateYearAgg") {
+  test("ShipDateYearAgg", {
 
     val shipDtYrGroup = dateTime('l_shipdate) year
 
-    val df = sqlAndLog("basicAgg",
-      date"""select l_returnflag, l_linestatus, $shipDtYrGroup, count(*),
+    date"""select l_returnflag, l_linestatus, $shipDtYrGroup, count(*),
       sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a,
       count(distinct o_orderkey)
-      from orderLineItemPartSupplier group by l_returnflag, l_linestatus, $shipDtYrGroup""")
-    logPlan("basicAgg", df)
+      from orderLineItemPartSupplier group by l_returnflag, l_linestatus, $shipDtYrGroup"""
+  },
+    2,
+    true
+  )
 
-    // df.show()
-  }
-
-  test("OrderDateYearAgg") {
+  test("OrderDateYearAgg", {
 
     val orderDtYrGroup = dateTime('o_orderdate) year
 
-    val df = sqlAndLog("basicAgg",
-      date"""select l_returnflag, l_linestatus, $orderDtYrGroup, count(*),
+    date"""select l_returnflag, l_linestatus, $orderDtYrGroup, count(*),
       sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a,
       count(distinct o_orderkey)
-      from orderLineItemPartSupplier group by l_returnflag, l_linestatus, $orderDtYrGroup""")
-    logPlan("basicAgg", df)
+      from orderLineItemPartSupplier group by l_returnflag, l_linestatus, $orderDtYrGroup"""
+  },
+    2,
+    true
+  )
 
-    // df.show()
-  }
-
-  test("noRewrite") {
-    val df = sqlAndLog("noRewrite",
-      """select *
+  test("noRewrite",
+    """select *
         |from orderLineItemPartSupplier
-        |limit 3""".stripMargin)
-    logPlan("basicAgg", df)
-
-    df.show()
-  }
+        |limit 3""".stripMargin,
+    0,
+    true
+    )
 
 }
 

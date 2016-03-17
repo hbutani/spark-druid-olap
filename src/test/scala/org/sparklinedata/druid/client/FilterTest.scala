@@ -21,31 +21,31 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.hive.test.TestHive
 import org.scalatest.BeforeAndAfterAll
 
-class FilterTest extends BaseTest with BeforeAndAfterAll with Logging{
-  test("inclauseTest1") {
-    val df = sqlAndLog("inclauseTest1", "select c_name, sum(c_acctbal) as bal " +
+class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
+
+  test("inclauseTest1",
+    "select c_name, sum(c_acctbal) as bal " +
       "from orderLineItemPartSupplier " +
       "where c_mktsegment in ('MACHINERY', 'HOUSEHOLD') " +
-      "group by c_name")
-    logPlan("inclauseTest1", df)
-    df.explain(true)
-  }
+      "group by c_name",
+    1,
+    true)
 
-  test("notInclauseTest1") {
-    val df = sqlAndLog("notInclauseTest1", "select c_name, sum(c_acctbal) as bal " +
+  test("notInclauseTest1",
+    "select c_name, sum(c_acctbal) as bal " +
       "from orderLineItemPartSupplier " +
       "where c_mktsegment not in ('MACHINERY', 'HOUSEHOLD') " +
-      "group by c_name")
-    logPlan("notInclauseTest1", df)
-    df.explain(true)
-  }
+      "group by c_name",
+    1,
+    true
+  )
 
-  test("notEqTest1") {
-    val df = sqlAndLog("notEqTest1", "select c_name, sum(c_acctbal) as bal " +
+  test("notEqTest1",
+    "select c_name, sum(c_acctbal) as bal " +
       "from orderLineItemPartSupplier " +
       "where c_mktsegment !=  'MACHINERY' " +
-      "group by c_name")
-    logPlan("notEqTest1", df)
-    df.explain(true)
-  }
+      "group by c_name",
+    1,
+    true
+  )
 }
