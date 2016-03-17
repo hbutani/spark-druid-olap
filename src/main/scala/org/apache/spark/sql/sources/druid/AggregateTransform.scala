@@ -30,6 +30,9 @@ import scala.collection.mutable.ArrayBuffer
 trait AggregateTransform {
   self: DruidPlanner =>
 
+  def aggExpressions(aEs : Seq[Expression]) : Seq[AggregateExpression] =
+  aEs.flatMap(_ collect { case a: AggregateExpression => a })
+
   /**
    * Match the following as a rewritable Grouping Expression:
    * - an AttributeReference, these are translated to a [[DefaultDimensionSpec]]
@@ -44,9 +47,10 @@ trait AggregateTransform {
   def groupingExpression(dqb: DruidQueryBuilder,
                          timeElemExtractor: TimeElementExtractor,
                          timeElemExtractor2 : SparkNativeTimeElementExtractor,
-                         ge: Expression):
+                         ge: Expression,
+                         expandOpExp : Expression):
   Option[DruidQueryBuilder] = {
-    ge match {
+    expandOpExp match {
       case AttributeReference(nm, dT, _, _) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
           yield dqb.dimension(new DefaultDimensionSpec(dD.name, nm)).
@@ -80,11 +84,25 @@ trait AggregateTransform {
       case _ => None
     }
   }
+
   private def transformSingleGrouping(dqb: DruidQueryBuilder,
                                       aggOp: Aggregate,
                                       grpInfo: GroupingInfo): Option[DruidQueryBuilder] = {
+
+    debugTranslation(
+      s"""
+         | Translating GroupingInfo:
+         |   ${grpInfo}
+                """.stripMargin
+
+    )
+
     val timeElemExtractor = new TimeElementExtractor(dqb)
     val timeElemExtractor2 = new SparkNativeTimeElementExtractor(dqb)
+
+    implicit val expandOpProjection : Seq[Expression] = grpInfo.expandOpProjection
+    implicit val aEExprIdToPos : Map[ExprId, Int] = grpInfo.aEExprIdToPos
+    implicit val aEToLiteralExpr: Map[Expression, Expression] = grpInfo.aEToLiteralExpr
 
     /*
      * For pushing down to Druid only consider the GrpExprs that don't have a override
@@ -92,33 +110,51 @@ trait AggregateTransform {
      * column). For the initial call, the grouping__id is not in the override list, so we
      * also check for it explicitly here.
      */
-    val gEsToDruid = grpInfo.gEs.filter {
-      case x if grpInfo.aEToLiteralExpr.contains(x) => false
-      case AttributeReference(
-      GroupingColumnName(_), IntegerType, _, _) => false
+    val gEsToDruid = grpInfo.gEs.zip(grpInfo.expandOpGExps).filter {
+      case (x,_) if grpInfo.aEToLiteralExpr.contains(x) => false
+      case (AttributeReference(
+      GroupingColumnName(_), IntegerType, _, _), _) => false
       case _ => true
     }
+
+    debugTranslation(
+      s"""
+         | Candidate Group Expressions pushed to Druid:
+         |   ${gEsToDruid}
+                """.stripMargin
+
+    )
 
     val dqb1 =
       gEsToDruid.foldLeft(Some(dqb).asInstanceOf[Option[DruidQueryBuilder]]) {
         (dqb, e) =>
-          dqb.flatMap(groupingExpression(_, timeElemExtractor, timeElemExtractor2, e))
+          dqb.flatMap(groupingExpression(_,
+            timeElemExtractor, timeElemExtractor2, e._1, e._2))
       }
 
-    val allAggregates =
-      grpInfo.aEs.flatMap(_ collect { case a: AggregateExpression => a })
+    /*
+     * if the aE is a null agg for count distinct, ignore it when
+     * pushing to Druid.
+     */
+    val allAggregates = aggExpressions(grpInfo.aEs.filterNot(aEToLiteralExpr.contains(_)))
 
-    // Only do partial aggregation if supported by all aggregate expressions.
-   {
-      val dqb2 = allAggregates.foldLeft(dqb1) {
-        (dqb, ne) =>
-          dqb.flatMap(aggregateExpression(_, ne))
-      }
+    debugTranslation(
+      s"""
+         | Candidate Agg Expressions pushed to Druid:
+         |   ${allAggregates}
+                """.stripMargin
 
-      dqb2.map(_.aggregateOp(aggOp)).map(
-        _.copy(aggExprToLiteralExpr = grpInfo.aEToLiteralExpr)
-      )
+    )
+
+    val dqb2 = allAggregates.foldLeft(dqb1) {
+      (dqb, ne) =>
+        dqb.flatMap(aggregateExpression(_, ne))
     }
+
+    dqb2.map(_.aggregateOp(aggOp)).map(
+      _.copy(aggExprToLiteralExpr = grpInfo.aEToLiteralExpr)
+    )
+
   }
 
 
@@ -127,32 +163,58 @@ trait AggregateTransform {
     AggregateMatch((agg, gEs, aEs, projectList, expandOp, projections, child))) => {
       plan(dqb, child).flatMap { dqb =>
 
-        /*
-         * First check if the GroupBy and Aggregate Expressions are pushable to
-         * Druid.
-         */
-        val dqb1 = transformSingleGrouping(dqb,
-          agg,
-          GroupingInfo(gEs, aEs))
+        val dqb1 =Some(dqb)
 
         /*
-         * If yes, then try to create a DruidQueryBuilder for each Expand projection.
+         * For each Expand projection.
          * Currently this is a all or nothing step. If any projection is not
          * rewritten to a DQB then the entire rewrite is abandoned.
          */
         val childDQBs: Option[Seq[DruidQueryBuilder]] = dqb1.flatMap { _ =>
 
           /*
-           * Map from a GroupExpression to the index in the Expand.projections
+           * For each GroupExpression compute the corresponding Expression in the
+           * Expand Output and its position within the Expand project list.
            */
-          val attrRefIdxList: Option[List[(Expression, (AttributeReference, Int))]] =
+          val oattrRefIdxList: Option[List[(Expression, (AttributeReference, Int))]] =
             Utils.sequence(gEs.map(gE => positionOfAttribute(gE, expandOp)).toList)
 
-          attrRefIdxList.map { attrRefIdxList =>
+          /*
+           * For each AggregateExpression map the AttributeReference that it is
+           * aggregating on to the position within the Expand project List.
+           */
+          val oaggExprIdToPos : Option[List[(ExprId, Int)]] =
+            Utils.sequence(Utils.filterSomes(
+            aggExpressions(aEs).map(
+              exprIdToAttribute(_, expandOp)
+            ).toList)
+            )
 
+          debugTranslation(
+            s"""
+               |  GroupExpression Mapping to Expand Projection:
+               |    ${oattrRefIdxList}
+               |  Aggregate Expressions Mapping to Expand Projection:
+               |    ${oaggExprIdToPos}
+             """.stripMargin)
+
+          for(
+            attrRefIdxList <- oattrRefIdxList;
+            aggExprIdToPos <- oaggExprIdToPos
+          ) yield {
             val geToPosMap = attrRefIdxList.toMap
+            val aggExprIdToPosMap = aggExprIdToPos.toMap
 
             val grpSetInfos = projections.map { p =>
+
+              debugTranslation(
+                s"""
+                  | Translating Expand Projection:
+                  |   ${p}
+                """.stripMargin
+
+              )
+
               /*
                * Represents a mapping from an AggExpr to the override value added in the Project
                * above the DruidRDD. Any missing(null) Group Expr for this Projection and
@@ -166,6 +228,7 @@ trait AggregateTransform {
                * be in aE list, just use the gE.
                */
               val gEsAndaEs = gEs.init.zip(aEs) :+(gEs.last, gEs.last)
+              val expandOpGExps : ArrayBuffer[Expression] = ArrayBuffer()
 
               gEsAndaEs.foreach { t =>
                 val gE: Expression = t._1
@@ -174,6 +237,7 @@ trait AggregateTransform {
                 val gExprDT = gEAttrRef.dataType
                 val idx = geToPosMap(gE)._2
                 val grpingExpr = p(idx)
+                expandOpGExps += grpingExpr
 
                 val transformedGExpr: Expression = aE match {
                   case ar@AttributeReference(nm, _, _, _) => Alias(grpingExpr, nm)(ar.exprId)
@@ -196,7 +260,31 @@ trait AggregateTransform {
 
               }
 
-              GroupingInfo(gEs, aEs, literlVals.toMap)
+              /*
+               * if this an expansion for CountDistinct then the aEs are not pushed to Druid.
+               * But add the null values in the projection above the DruidRelation.
+               */
+              val nc = new NullCheckAggregateExpression(p, aggExprIdToPosMap)
+              for {
+                aE <- aEs
+                tE <- nc.nullTransform(aE)
+              } yield {
+                literlVals += ((aE, tE))
+                ()
+              }
+
+              val gI =
+                GroupingInfo(gEs, expandOpGExps.toSeq, aEs, p, aggExprIdToPosMap, literlVals.toMap)
+
+              debugTranslation(
+                s"""
+                   | GroupingInfo:
+                   |   ${gI}
+                """.stripMargin
+
+              )
+
+              gI
             }
 
             val dqbs: Seq[Option[DruidQueryBuilder]] = grpSetInfos.map { gInfo =>
@@ -208,7 +296,6 @@ trait AggregateTransform {
             }
             Utils.sequence(dqbs.toList).getOrElse(Nil)
           }
-
         }
         childDQBs.getOrElse(Nil)
       }
@@ -217,27 +304,30 @@ trait AggregateTransform {
       plan(dqb, child).flatMap { dqb =>
         transformSingleGrouping(dqb,
           agg,
-          GroupingInfo(gEs, aEs))
+          GroupingInfo(gEs, gEs, aEs, Seq(), Map()))
       }
     }
     case _ => Seq()
   }
 
-  def aggregateExpression(dqb: DruidQueryBuilder, aggExp: AggregateExpression):
-  Option[DruidQueryBuilder] = aggExp.aggregateFunction match {
-    case Count(Literal(1, IntegerType) :: Nil) => {
+  def aggregateExpression(dqb: DruidQueryBuilder, aggExp: AggregateExpression)(
+    implicit expandOpProjection : Seq[Expression],
+    aEExprIdToPos : Map[ExprId, Int],
+    aEToLiteralExpr: Map[Expression, Expression]) :
+  Option[DruidQueryBuilder] = (aggExp, aggExp.aggregateFunction) match {
+    case (_, Count(Literal(1, IntegerType) :: Nil)) => {
       val a = dqb.nextAlias
       Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
         outputAttribute(a, aggExp, aggExp.dataType, LongType))
     }
-    case Count(AttributeReference("1", _, _, _) :: Nil) => {
+    case (_, Count(AttributeReference("1", _, _, _) :: Nil)) => {
       val a = dqb.nextAlias
       Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
         outputAttribute(a, aggExp, aggExp.dataType, LongType))
     }
-    case c => {
+    case (_, c) => {
       val a = dqb.nextAlias
-      (dqb, c) match {
+      (dqb, c, expandOpProjection, aEExprIdToPos) match {
         case CountDistinctAggregate(dN) =>
           Some(dqb.aggregate(new CardinalityAggregationSpec(a, List(dN))).
             outputAttribute(a, aggExp, aggExp.dataType, DoubleType))
@@ -272,17 +362,28 @@ trait AggregateTransform {
     }
   }
 
-  private def attributeRef(arg: Expression): Option[String] = arg match {
+  private def attributeRef(arg: Expression)(
+    implicit expandOpProjection : Seq[Expression], aEExprIdToPos : Map[ExprId, Int]):
+  Option[String] = arg match {
+    case ar : AttributeReference
+      if aEExprIdToPos.contains(ar.exprId) && expandOpProjection(aEExprIdToPos(ar.exprId)) != ar =>
+      attributeRef(expandOpProjection(aEExprIdToPos(ar.exprId)))
+    case Cast(ar@AttributeReference(_, _, _, _), _)
+      if aEExprIdToPos.contains(ar.exprId) && expandOpProjection(aEExprIdToPos(ar.exprId)) != ar =>
+      attributeRef(expandOpProjection(aEExprIdToPos(ar.exprId)))
     case AttributeReference(name, _, _, _) => Some(name)
     case Cast(AttributeReference(name, _, _, _), _) => Some(name)
     case _ => None
   }
 
   private object CountDistinctAggregate {
-    def unapply(t: (DruidQueryBuilder, AggregateFunction)): Option[(String)]
+    def unapply(t: (DruidQueryBuilder, AggregateFunction, Seq[Expression], Map[ExprId, Int])):
+    Option[(String)]
     = {
       val dqb = t._1
       val aggFunc = t._2
+      implicit val expandOpProjection = t._3
+      implicit val aEExprIdToPos = t._4
 
       val r = for (c <- aggFunc.children.headOption if (aggFunc.children.size == 1);
                    dNm <- attributeRef(c);
@@ -305,10 +406,13 @@ trait AggregateTransform {
    */
   private object SumMinMaxAvgAggregate {
 
-    def unapply(t: (DruidQueryBuilder, AggregateFunction)): Option[(String, DruidColumn)]
+    def unapply(t: (DruidQueryBuilder, AggregateFunction, Seq[Expression], Map[ExprId, Int])):
+    Option[(String, DruidColumn)]
     = {
       val dqb = t._1
       val aggFunc = t._2
+      implicit val expandOpProjection = t._3
+      implicit val aEExprIdToPos = t._4
 
       val r = for (c <- aggFunc.children.headOption if (aggFunc.children.size == 1);
                    mNm <- attributeRef(c);
@@ -356,6 +460,42 @@ trait AggregateTransform {
           Some((agg, gEs, aEs, projectList, expandOp, projections, child))
       case _ => None
     }
+  }
+
+  class NullCheckAggregateExpression(val expandOpProjection: Seq[Expression],
+                                     val aEExprIdToPos: Map[ExprId, Int]) {
+
+    private def isNull(ar : AttributeReference) =
+      expandOpProjection(aEExprIdToPos(ar.exprId)) match {
+      case Literal(null, _) => true
+      case _ => false
+    }
+
+    private def isNull(aggFunc : AggregateFunction) : Boolean = {
+      if (aggFunc.children.size == 1) {
+        val c = aggFunc.children(0)
+        c match {
+          case ar : AttributeReference
+            if aEExprIdToPos.contains(ar.exprId) => isNull(ar)
+          case Cast(ar@AttributeReference(_, _, _, _), _)
+            if aEExprIdToPos.contains(ar.exprId) => isNull(ar)
+          case _ => false
+        }
+      } else {
+        false
+      }
+    }
+
+    private def isNull(e : Expression) : Boolean = {
+      e.collect( { case a: AggregateExpression => a }).exists(a => isNull(a.aggregateFunction))
+    }
+
+    def nullTransform(e : Expression) : Option[Expression] = e match {
+      case al@Alias(_, nm) if  (isNull(al))=>
+        Some(Alias(Literal.create(null, e.dataType), nm)(al.exprId))
+      case _ => None
+    }
+
   }
 
 }

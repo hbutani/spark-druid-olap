@@ -70,7 +70,13 @@ with PredicateHelper with DruidPlannerHelper with Logging {
            */
           val dq = DruidQuery(qs, intervals, Some(exprToDruidOutput.values.toList))
 
-          // Utils.logQuery(dq)
+        planner.debugTranslation(
+          s"""
+             | DruidQuery:
+             |   ${Utils.queryToString(dq)}
+                """.stripMargin
+
+        )
 
           val dR: DruidRelation = DruidRelation(dqb.drInfo, Some(dq))(planner.sqlContext)
 
