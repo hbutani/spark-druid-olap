@@ -121,7 +121,10 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
     val sTime : String = (jV \\ "minTime").extract[String]
     val eTime : String = (jV \\ "maxTime").extract[String]
-    new Interval(DateTime.parse(sTime), DateTime.parse(eTime))
+
+    val endDate = DateTime.parse(eTime).plusSeconds(1)
+
+    new Interval(DateTime.parse(sTime), endDate)
   }
 
   @throws(classOf[DruidDataSourceException])
