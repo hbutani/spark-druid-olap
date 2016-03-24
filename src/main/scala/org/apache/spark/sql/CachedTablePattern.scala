@@ -108,6 +108,7 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
   private def collectInMemoryRelation(iP :InMemoryRelation) : Option[CollectProjectFilterType] =
     logicalPlan(iP).map {
       case Subquery(name, child) => child
+      case x => x
      }.map { lP =>
       (
         None.asInstanceOf[Option[Seq[NamedExpression]]],
