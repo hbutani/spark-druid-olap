@@ -62,4 +62,4 @@ fi
 
 export SUBMIT_USAGE_FUNCTION=usage
 
-exec "$FWDIR"/sbin/spark-daemon.sh submit $CLASS 1 --packages com.databricks:spark-csv_2.10:1.1.0,SparklineData:spark-datetime:0.0.2 "$@" $sparklinejar
+exec "$FWDIR"/sbin/spark-daemon.sh submit $CLASS 1 --packages com.databricks:spark-csv_2.10:1.1.0,SparklineData:spark-datetime:0.0.2 --jars $sparklinejar "$@" spark-internal
