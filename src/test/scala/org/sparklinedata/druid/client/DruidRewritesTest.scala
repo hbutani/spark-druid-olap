@@ -25,6 +25,13 @@ import scala.language.postfixOps
 
 class DruidRewritesTest extends BaseTest {
 
+  test("profile",
+    "select count(distinct o_custkey) from orderLineItemPartSupplier",
+    1,
+    true,
+    true
+  )
+
   test("basicAgg",
       "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
