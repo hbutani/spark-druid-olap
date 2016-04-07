@@ -17,13 +17,16 @@
 
 package org.sparklinedata.druid.client
 
+import java.io.FileInputStream
+
+import org.apache.commons.io.IOUtils
+import org.apache.spark.sql.sources.druid.DruidQueryResultIterator
 import org.json4s.Extraction
 import org.json4s.jackson.JsonMethods._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
-
 import org.sparklinedata.druid.Utils
 
-class DruidClientTest extends FunSuite with BeforeAndAfterAll {
+class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
 
   import TPCHQueries._
 
@@ -64,6 +67,31 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll {
 
     val r = client.executeQuery(q1)
     r.foreach(println)
+  }
+
+  test("streamQueryResult") {
+
+    def qRis = getClass.getClassLoader.getResourceAsStream("sampleQueryResult.json")
+
+    for(i <- 0 to 5) {
+      recordTime("streamed read") {
+
+        val is = IOUtils.toBufferedInputStream(qRis)
+        val it = DruidQueryResultIterator(is)
+        while (it.hasNext) {
+          it.next
+        }
+      }
+      recordTime("list read") {
+        val is = IOUtils.toBufferedInputStream(qRis)
+        val it = DruidQueryResultIterator(is, (), true)
+        while (it.hasNext) {
+          it.next
+        }
+      }
+
+    }
+
   }
 
 }

@@ -21,12 +21,12 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRowWithSchema
 import org.apache.spark.sql.types.{LongType, StringType, StructField}
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.{TaskContext, Partition}
+import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SQLContext}
 import org.joda.time.Interval
-import org.sparklinedata.druid.client.DruidClient
+import org.sparklinedata.druid.client.{DruidClient, QueryResultRow}
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 
 class DruidPartition(idx: Int, val i : Interval) extends Partition {
@@ -43,9 +43,11 @@ class DruidRDD(sqlContext: SQLContext,
     val client = new DruidClient(drInfo.druidClientInfo.host, drInfo.druidClientInfo.port)
     val mQry = dQuery.q.setInterval(p.i)
     Utils.logQuery(mQry)
-    val r = client.executeQuery(mQry)
+    val dr = client.executeQueryAsStream(mQry)
+    context.addTaskCompletionListener{ context => dr.closeIfNeeded() }
+    val r = new InterruptibleIterator[QueryResultRow](context, dr)
     val schema = dQuery.schema(drInfo)
-    r.iterator.map { r =>
+    r.map { r =>
       new GenericInternalRowWithSchema(schema.fields.map(f => sparkValue(f, r.event(f.name))),
         schema)
     }

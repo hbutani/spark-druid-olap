@@ -25,12 +25,14 @@ import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.util.EntityUtils
 import org.apache.spark.Logging
+import org.apache.spark.sql.sources.druid.DruidQueryResultIterator
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.{DruidDataSourceException, QuerySpec}
 import org.sparklinedata.druid.metadata.DruidDataSource
 import org.sparklinedata.druid.Utils
+import org.sparklinedata.druid.CloseableIterator
 
 import scala.util.Try
 
@@ -96,9 +98,41 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     })
   }
 
+  @throws(classOf[DruidDataSourceException])
+  private def performQuery(reqType : String => HttpRequestBase,
+                      payload : String,
+                      reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
+    var resp: CloseableHttpResponse = null
+
+    try {
+      val req: CloseableHttpClient = httpClient
+      val request: HttpRequestBase = reqType(url)
+      if (payload != null && request.isInstanceOf[HttpEntityEnclosingRequestBase]) {
+        val input: StringEntity = new StringEntity(payload, ContentType.APPLICATION_JSON)
+        request.asInstanceOf[HttpEntityEnclosingRequestBase].setEntity(input)
+      }
+      addHeaders(request, reqHeaders)
+      resp = req.execute(request)
+      val status = resp.getStatusLine().getStatusCode();
+      if (status >= 200 && status < 300) {
+        DruidQueryResultIterator(resp.getEntity.getContent, {release(resp)})
+      } else {
+        throw new DruidDataSourceException(s"Unexpected response status: ${resp.getStatusLine}")
+      }
+    } catch {
+      case dE: DruidDataSourceException => throw dE
+      case x : Throwable =>
+        throw new DruidDataSourceException("Failed in communication with Druid", x)
+    }
+  }
+
   private def post(payload : String,
                    reqHeaders: Map[String, String] = null ) : JValue =
     perform(postRequest _, payload, reqHeaders)
+
+  private def postQuery(payload : String,
+                   reqHeaders: Map[String, String] = null ) : CloseableIterator[QueryResultRow] =
+    performQuery(postRequest _, payload, reqHeaders)
 
   private def get(payload : String,
                    reqHeaders: Map[String, String] = null) : JValue =
@@ -154,5 +188,11 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
     jV.extract[List[QueryResultRow]]
 
+  }
+
+  @throws(classOf[DruidDataSourceException])
+  def executeQueryAsStream(qry : QuerySpec) : CloseableIterator[QueryResultRow] = {
+    val jR = compact(render(Extraction.decompose(qry)))
+    postQuery(jR)
   }
 }
