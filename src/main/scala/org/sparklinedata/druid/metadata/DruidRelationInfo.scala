@@ -33,54 +33,19 @@ case class DruidRelationInfo(val druidClientInfo : DruidClientInfo,
                          val sourceToDruidMapping : Map[String, DruidColumn],
                          val fd : FunctionalDependencies,
                             val starSchema : StarSchema,
-                         val maxCardinality : Long,
-                         val cardinalityPerDruidQuery : Long,
-                              val allowCountDistinct : Boolean) {
+                         val options : DruidRelationOptions) {
 
   def sourceDF(sqlContext : SQLContext) = sqlContext.table(sourceDFName)
 
 }
 
-object DruidRelationInfo {
+case class DruidRelationOptions(val maxCardinality : Long,
+                                val cardinalityPerDruidQuery : Long,
+                                pushHLLTODruid : Boolean,
+                                streamDruidQueryResults : Boolean,
+                                loadMetadataFromAllSegments : Boolean)
 
-  // scalastyle:off parameter.number
-  def apply(sqlContext : SQLContext,
-            sourceDFName : String,
-             sourceDF : DataFrame,
-           dsName : String,
-            timeDimensionCol : String,
-             druidHost : String,
-             druidPort : Int,
-             columnMapping : Map[String, String],
-             functionalDeps : List[FunctionalDependency],
-             starSchema : StarSchema,
-            maxCardinality : Long,
-            cardinalityPerDruidQuery : Long,
-             allowCountDistinct : Boolean = true) : DruidRelationInfo = {
-
-    val client = new DruidClient(druidHost, druidPort)
-    val druidDS = client.metadata(dsName)
-    val sourceToDruidMapping =
-      MappingBuilder.buildMapping(sqlContext, sourceDFName,
-        starSchema, columnMapping, timeDimensionCol, druidDS)
-    val fd = new FunctionalDependencies(druidDS, functionalDeps,
-      DependencyGraph(druidDS, functionalDeps))
-
-    DruidRelationInfo(DruidClientInfo(druidHost, druidPort),
-    sourceDFName,
-    timeDimensionCol,
-    druidDS,
-    sourceToDruidMapping,
-    fd,
-    starSchema,
-    maxCardinality,
-    cardinalityPerDruidQuery,
-    allowCountDistinct)
-  }
-
-}
-
-private object MappingBuilder extends Logging {
+private[druid] object MappingBuilder extends Logging {
 
   /**
    * Only top level Numeric and String Types are mapped.

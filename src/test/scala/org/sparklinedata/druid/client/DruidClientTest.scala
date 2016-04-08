@@ -43,7 +43,7 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
   }
 
   test("metaData") {
-    println(client.metadata("tpch"))
+    println(client.metadata("tpch", false))
   }
 
   test("tpchQ1") {
