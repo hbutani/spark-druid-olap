@@ -17,6 +17,7 @@
 
 package org.sparklinedata.druid.client
 
+import org.joda.time.Interval
 import org.json4s.CustomSerializer
 import org.json4s.JsonAST._
 
@@ -26,6 +27,14 @@ case class MetadataResponse(id : String,
                             intervals : List[String],
                              columns : Map[String, ColumnDetails],
                              size : Long)
+
+case class SegmentInfo(id : String,
+                       intervals : Interval,
+                       size : Long
+                      ) {
+  def this(mr : MetadataResponse) =
+    this(mr.id,  Interval.parse(mr.intervals(0)), mr.size  )
+}
 
 case class QueryResultRow(version : String,
                            timestamp : String,

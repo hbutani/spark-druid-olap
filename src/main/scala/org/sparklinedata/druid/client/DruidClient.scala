@@ -25,15 +25,17 @@ import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.util.EntityUtils
 import org.apache.spark.Logging
+import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.sources.druid.DruidQueryResultIterator
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.{DruidDataSourceException, QuerySpec}
-import org.sparklinedata.druid.metadata.DruidDataSource
+import org.sparklinedata.druid.metadata.{DependencyGraph, DruidClientInfo, DruidRelationInfo, _}
 import org.sparklinedata.druid.Utils
 import org.sparklinedata.druid.CloseableIterator
 
+import scala.collection.mutable.{Map => MMap}
 import scala.util.Try
 
 object ConnectionManager {
@@ -162,11 +164,11 @@ class DruidClient(val host : String, val port : Int) extends Logging {
   }
 
   @throws(classOf[DruidDataSourceException])
-  def metadata(dataSource : String) : DruidDataSource = {
+  def metadata(dataSource : String, fullIndex : Boolean) : DruidDataSource = {
 
     val in = timeBoundary(dataSource)
 
-    val i = in.withEnd(in.getStart.plusMillis(1)).toString
+    val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
 
     val jR = compact(render(
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
@@ -178,6 +180,27 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
     val l = jV.extract[List[MetadataResponse]]
     DruidDataSource(dataSource, l.head, List(in))
+  }
+
+  @throws(classOf[DruidDataSourceException])
+  def segmentInfo(dataSource : String) : List[SegmentInfo] = {
+
+    val in = timeBoundary(dataSource)
+
+    val t = render(("type" -> "none"))
+
+    val jR = compact(render(
+      ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
+        ("intervals" -> List(in.toString)) ~
+        ("merge" -> "false") ~
+        ("toInclude" -> render(("type" -> "none")))
+    ))
+    val jV = post(jR) transformField {
+      case ("type", x) => ("typ", x)
+    }
+
+    val l = jV.extract[List[MetadataResponse]]
+    l.map(new SegmentInfo(_))
   }
 
   @throws(classOf[DruidDataSourceException])
@@ -195,4 +218,64 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     val jR = compact(render(Extraction.decompose(qry)))
     postQuery(jR)
   }
+}
+
+object DruidClient {
+
+  type DruidDataSourceKey = (String, String)
+
+  val druidRelationInfoMap : MMap[DruidDataSourceKey, DruidRelationInfo] = MMap()
+
+  // scalastyle:off parameter.number
+  private def _druidRelation(sqlContext : SQLContext,
+            sourceDFName : String,
+            sourceDF : DataFrame,
+            dsName : String,
+            timeDimensionCol : String,
+            druidHost : String,
+            druidPort : Int,
+            columnMapping : Map[String, String],
+            functionalDeps : List[FunctionalDependency],
+            starSchema : StarSchema,
+            options : DruidRelationOptions) : DruidRelationInfo = {
+
+    val client = new DruidClient(druidHost, druidPort)
+    val druidDS = client.metadata(dsName, options.loadMetadataFromAllSegments)
+    val sourceToDruidMapping =
+      MappingBuilder.buildMapping(sqlContext, sourceDFName,
+        starSchema, columnMapping, timeDimensionCol, druidDS)
+    val fd = new FunctionalDependencies(druidDS, functionalDeps,
+      DependencyGraph(druidDS, functionalDeps))
+
+    val dr = DruidRelationInfo(DruidClientInfo(druidHost, druidPort),
+      sourceDFName,
+      timeDimensionCol,
+      druidDS,
+      sourceToDruidMapping,
+      fd,
+      starSchema,
+      options)
+    druidRelationInfoMap((druidHost, sourceDFName)) = dr
+    dr
+  }
+
+  def druidRelation(sqlContext : SQLContext,
+                     sourceDFName : String,
+                     sourceDF : DataFrame,
+                     dsName : String,
+                     timeDimensionCol : String,
+                     druidHost : String,
+                     druidPort : Int,
+                     columnMapping : Map[String, String],
+                     functionalDeps : List[FunctionalDependency],
+                     starSchema : StarSchema,
+                     options : DruidRelationOptions) : DruidRelationInfo =
+    druidRelationInfoMap.synchronized {
+    druidRelationInfoMap.getOrElse((druidHost, sourceDFName),
+      _druidRelation(sqlContext, sourceDFName, sourceDF, dsName, timeDimensionCol,
+        druidHost, druidPort, columnMapping, functionalDeps, starSchema, options)
+    )
+  }
+
+
 }

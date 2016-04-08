@@ -392,7 +392,7 @@ trait AggregateTransform {
       ) yield (aggFunc, dD)
 
       r flatMap {
-        case (p: HyperLogLogPlusPlus, dD) if dqb.drInfo.allowCountDistinct => Some(dD.name)
+        case (p: HyperLogLogPlusPlus, dD) if dqb.drInfo.options.pushHLLTODruid => Some(dD.name)
         case _ => None
       }
     }
