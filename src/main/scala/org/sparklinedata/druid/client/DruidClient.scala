@@ -49,6 +49,14 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
   @transient val url = s"http://$host:$port/druid/v2/?pretty"
 
+  def this(t : (String, Int)) = {
+    this(t._1, t._2)
+  }
+
+  def this(s : String) = {
+    this(DruidClient.hosPort(s))
+  }
+
   private def httpClient: CloseableHttpClient = {
     HttpClients.custom.setConnectionManager(ConnectionManager.pool).build
   }
@@ -218,6 +226,20 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     val jR = compact(render(Extraction.decompose(qry)))
     postQuery(jR)
   }
+
+  @throws(classOf[DruidDataSourceException])
+  def serversInfo : List[HistoricalServerInfo] = {
+
+    // http://localhost:8081/druid/coordinator/v1/servers?full=true
+    ???
+  }
+
+  @throws(classOf[DruidDataSourceException])
+  def dataSourceInfo(datasource : String) : DataSourceInfo = {
+
+    // http://localhost:8081/druid/coordinator/v1/datasources/tpch?full=true
+    ???
+  }
 }
 
 object DruidClient {
@@ -275,6 +297,13 @@ object DruidClient {
       _druidRelation(sqlContext, sourceDFName, sourceDF, dsName, timeDimensionCol,
         druidHost, druidPort, columnMapping, functionalDeps, starSchema, options)
     )
+  }
+
+  val HOST = """([^:]*):(\d*)""".r
+
+  def hosPort(s : String) : (String, Int) = {
+    val HOST(h, p) = s
+    (h, p.toInt)
   }
 
 
