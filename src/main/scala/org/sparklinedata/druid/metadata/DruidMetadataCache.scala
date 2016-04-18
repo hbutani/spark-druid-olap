@@ -27,7 +27,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.collection.mutable.{Map => MMap}
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
-import org.sparklinedata.druid.client.DruidClient
+import org.sparklinedata.druid.client.DruidCoordinatorClient
 
 case class DruidServer(host : String, port : Int)
 
@@ -127,7 +127,7 @@ class DruidMetadataCache(sqlContext : SQLContext) {
     clusterInfoFutures.synchronized {
     if ( !clusterInfoFutures.contains(host)) {
       clusterInfoFutures(host) = Future {
-        val dc = new DruidClient(host)
+        val dc = new DruidCoordinatorClient(host)
         val r = dc.serversInfo
         new DruidClusterInfo(host, MMap[String, DataSourceInfo](), r)
       }
@@ -139,7 +139,7 @@ class DruidMetadataCache(sqlContext : SQLContext) {
     clusterInfoFutures.synchronized {
       if ( !dataSourceInfoFutures.contains(datasource)) {
         dataSourceInfoFutures(datasource) = Future {
-          val dc = new DruidClient(host)
+          val dc = new DruidCoordinatorClient(host)
           val r = dc.dataSourceInfo(datasource)
           r
         }

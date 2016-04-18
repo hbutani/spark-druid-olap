@@ -17,8 +17,6 @@
 
 package org.sparklinedata.druid.client
 
-import java.io.FileInputStream
-
 import org.apache.commons.io.IOUtils
 import org.apache.spark.sql.sources.druid.DruidQueryResultIterator
 import org.json4s.Extraction
@@ -30,26 +28,32 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
 
   import TPCHQueries._
 
-  var client : DruidClient = _
+  var brokerClient : DruidBrokerClient = _
+  var coordClient : DruidCoordinatorClient = _
 
   import Utils._
 
   override def beforeAll() = {
-    client = new DruidClient("localhost", 8082)
+    brokerClient = new DruidBrokerClient("localhost", 8082)
+    coordClient = new DruidCoordinatorClient("localhost", 8081)
   }
 
   test("timeBoundary") {
-    println(client.timeBoundary("tpch"))
+    println(brokerClient.timeBoundary("tpch"))
+  }
+
+  test("coordTimeBoundary") {
+    println(coordClient.timeBoundary("tpch"))
   }
 
   test("metaData") {
-    println(client.metadata("tpch", false))
+    println(brokerClient.metadata("tpch", false))
   }
 
   test("tpchQ1") {
     println(pretty(render(Extraction.decompose(q1))))
 
-    val r = client.executeQuery(q1)
+    val r = brokerClient.executeQuery(q1)
     r.foreach(println)
 
   }
@@ -57,7 +61,7 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
   test("tpchQ3") {
     println(pretty(render(Extraction.decompose(q3))))
 
-    val r = client.executeQuery(q3)
+    val r = brokerClient.executeQuery(q3)
     r.foreach(println)
 
   }
@@ -65,7 +69,7 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
   test("tpchQ1MonthGrain") {
     println(pretty(render(Extraction.decompose(q1))))
 
-    val r = client.executeQuery(q1)
+    val r = brokerClient.executeQuery(q1)
     r.foreach(println)
   }
 
@@ -92,6 +96,16 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
 
     }
 
+  }
+
+  test("serversInfo") {
+    val sInfo = coordClient.serversInfo
+    println(pretty(render(Extraction.decompose(sInfo))))
+  }
+
+  test("dataSourceInfo") {
+    val dInfo = coordClient.dataSourceInfo("tpch")
+    println(pretty(render(Extraction.decompose(dInfo))))
   }
 
 }

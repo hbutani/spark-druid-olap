@@ -20,7 +20,6 @@ package org.sparklinedata.druid.metadata
 import org.apache.spark.Logging
 import org.apache.spark.sql.{SQLContext, DataFrame}
 import org.apache.spark.sql.types._
-import org.sparklinedata.druid.client.DruidClient
 
 import scala.collection.mutable.{Map => MMap}
 

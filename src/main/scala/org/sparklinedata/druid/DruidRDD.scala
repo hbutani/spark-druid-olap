@@ -26,7 +26,7 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SQLContext}
 import org.joda.time.Interval
-import org.sparklinedata.druid.client.{DruidClient, QueryResultRow}
+import org.sparklinedata.druid.client.{DruidBrokerClient, QueryResultRow}
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 
 class DruidPartition(idx: Int, val i : Interval) extends Partition {
@@ -40,7 +40,7 @@ class DruidRDD(sqlContext: SQLContext,
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
 
     val p = split.asInstanceOf[DruidPartition]
-    val client = new DruidClient(drInfo.druidClientInfo.host, drInfo.druidClientInfo.port)
+    val client = new DruidBrokerClient(drInfo.druidClientInfo.host, drInfo.druidClientInfo.port)
     val mQry = dQuery.q.setInterval(p.i)
     Utils.logQuery(mQry)
     val dr = client.executeQueryAsStream(mQry)
@@ -60,7 +60,8 @@ class DruidRDD(sqlContext: SQLContext,
    * conversion from Druid values to Spark values. Most of the conversion cases are handled by
    * cast expressions in the [[org.apache.spark.sql.execution.Project]] operator above the
    * DruidRelation Operator; but Strings need to be converted to [[UTF8String]] strings.
-   * @param f
+    *
+    * @param f
    * @param druidVal
    * @return
    */

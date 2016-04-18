@@ -42,12 +42,10 @@ object ConnectionManager {
   val pool = new PoolingHttpClientConnectionManager
 }
 
-class DruidClient(val host : String, val port : Int) extends Logging {
+abstract class DruidClient(val host : String,
+                  val port : Int) extends Logging {
 
-  import org.json4s.JsonDSL._
   import Utils._
-
-  @transient val url = s"http://$host:$port/druid/v2/?pretty"
 
   def this(t : (String, Int)) = {
     this(t._1, t._2)
@@ -57,11 +55,11 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     this(DruidClient.hosPort(s))
   }
 
-  private def httpClient: CloseableHttpClient = {
+  protected def httpClient: CloseableHttpClient = {
     HttpClients.custom.setConnectionManager(ConnectionManager.pool).build
   }
 
-  private def release(resp: CloseableHttpResponse) : Unit = {
+  protected def release(resp: CloseableHttpResponse) : Unit = {
     Try {
       if (resp != null) EntityUtils.consume(resp.getEntity)
     } recover {
@@ -69,13 +67,14 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     }
   }
 
-  private def getRequest(url : String) = new HttpGet(url)
-  private def postRequest(url : String) = new HttpPost(url)
+  protected def getRequest(url : String) = new HttpGet(url)
+  protected def postRequest(url : String) = new HttpPost(url)
 
   @throws(classOf[DruidDataSourceException])
-  private def perform(reqType : String => HttpRequestBase,
-                  payload : String,
-                  reqHeaders: Map[String, String]) : JValue =  {
+  protected def perform(url : String,
+                       reqType : String => HttpRequestBase,
+                      payload : String,
+                      reqHeaders: Map[String, String]) : JValue =  {
     var resp: CloseableHttpResponse = null
 
     val js : Try[JValue] = for {
@@ -109,9 +108,10 @@ class DruidClient(val host : String, val port : Int) extends Logging {
   }
 
   @throws(classOf[DruidDataSourceException])
-  private def performQuery(reqType : String => HttpRequestBase,
-                      payload : String,
-                      reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
+  protected def performQuery(url : String,
+                            reqType : String => HttpRequestBase,
+                           payload : String,
+                           reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
     var resp: CloseableHttpResponse = null
 
     try {
@@ -136,23 +136,76 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     }
   }
 
-  private def post(payload : String,
+  protected def post(url : String,
+                     payload : String,
                    reqHeaders: Map[String, String] = null ) : JValue =
-    perform(postRequest _, payload, reqHeaders)
+    perform(url, postRequest _, payload, reqHeaders)
 
-  private def postQuery(payload : String,
-                   reqHeaders: Map[String, String] = null ) : CloseableIterator[QueryResultRow] =
-    performQuery(postRequest _, payload, reqHeaders)
+  protected def postQuery(url : String,
+                          payload : String,
+                        reqHeaders: Map[String, String] = null ) :
+  CloseableIterator[QueryResultRow] =
+    performQuery(url, postRequest _, payload, reqHeaders)
 
-  private def get(payload : String,
-                   reqHeaders: Map[String, String] = null) : JValue =
-    perform(getRequest _, payload, reqHeaders)
+  protected def get(url : String,
+                    payload : String = null,
+                  reqHeaders: Map[String, String] = null) : JValue =
+    perform(url, getRequest _, payload, reqHeaders)
 
-  private def addHeaders(req: HttpRequestBase, reqHeaders: Map[String, String]) {
+  protected def addHeaders(req: HttpRequestBase, reqHeaders: Map[String, String]) {
     if (reqHeaders == null) return
     for (key <- reqHeaders.keySet) {
       req.setHeader(key, reqHeaders(key))
     }
+  }
+
+  @throws(classOf[DruidDataSourceException])
+  def executeQuery(url : String,
+                   qry : QuerySpec) : List[QueryResultRow] = {
+
+    val jR = compact(render(Extraction.decompose(qry)))
+    val jV = post(url, jR)
+
+    jV.extract[List[QueryResultRow]]
+
+  }
+
+  @throws(classOf[DruidDataSourceException])
+  def executeQueryAsStream(url : String,
+                           qry : QuerySpec) : CloseableIterator[QueryResultRow] = {
+    val jR = compact(render(Extraction.decompose(qry)))
+    postQuery(url, jR)
+  }
+
+  def timeBoundary(dataSource : String) : Interval
+
+}
+
+object DruidClient {
+
+  val HOST = """([^:]*):(\d*)""".r
+
+  def hosPort(s : String) : (String, Int) = {
+    val HOST(h, p) = s
+    (h, p.toInt)
+  }
+
+}
+
+class DruidBrokerClient(host : String, port : Int)
+  extends DruidClient(host, port) with Logging {
+
+  import org.json4s.JsonDSL._
+  import Utils._
+
+  @transient val url = s"http://$host:$port/druid/v2/?pretty"
+
+  def this(t : (String, Int)) = {
+    this(t._1, t._2)
+  }
+
+  def this(s : String) = {
+    this(DruidClient.hosPort(s))
   }
 
   @throws(classOf[DruidDataSourceException])
@@ -161,7 +214,7 @@ class DruidClient(val host : String, val port : Int) extends Logging {
     val jR = compact(render(
       ( "queryType" -> "timeBoundary") ~ ("dataSource" -> dataSource)
     ))
-    val jV = post(jR)
+    val jV = post(url, jR)
 
     val sTime : String = (jV \\ "minTime").extract[String]
     val eTime : String = (jV \\ "maxTime").extract[String]
@@ -182,7 +235,7 @@ class DruidClient(val host : String, val port : Int) extends Logging {
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
         ("intervals" -> List(i)) ~ ("merge" -> "true")
     ))
-    val jV = post(jR) transformField {
+    val jV = post(url, jR) transformField {
       case ("type", x) => ("typ", x)
     }
 
@@ -203,7 +256,7 @@ class DruidClient(val host : String, val port : Int) extends Logging {
         ("merge" -> "false") ~
         ("toInclude" -> render(("type" -> "none")))
     ))
-    val jV = post(jR) transformField {
+    val jV = post(url, jR) transformField {
       case ("type", x) => ("typ", x)
     }
 
@@ -213,36 +266,17 @@ class DruidClient(val host : String, val port : Int) extends Logging {
 
   @throws(classOf[DruidDataSourceException])
   def executeQuery(qry : QuerySpec) : List[QueryResultRow] = {
-
-    val jR = compact(render(Extraction.decompose(qry)))
-    val jV = post(jR)
-
-    jV.extract[List[QueryResultRow]]
-
+    executeQuery(url, qry)
   }
 
   @throws(classOf[DruidDataSourceException])
   def executeQueryAsStream(qry : QuerySpec) : CloseableIterator[QueryResultRow] = {
-    val jR = compact(render(Extraction.decompose(qry)))
-    postQuery(jR)
-  }
-
-  @throws(classOf[DruidDataSourceException])
-  def serversInfo : List[HistoricalServerInfo] = {
-
-    // http://localhost:8081/druid/coordinator/v1/servers?full=true
-    ???
-  }
-
-  @throws(classOf[DruidDataSourceException])
-  def dataSourceInfo(datasource : String) : DataSourceInfo = {
-
-    // http://localhost:8081/druid/coordinator/v1/datasources/tpch?full=true
-    ???
+    executeQueryAsStream(url, qry)
   }
 }
 
-object DruidClient {
+
+object DruidBrokerClient {
 
   type DruidDataSourceKey = (String, String)
 
@@ -261,7 +295,7 @@ object DruidClient {
             starSchema : StarSchema,
             options : DruidRelationOptions) : DruidRelationInfo = {
 
-    val client = new DruidClient(druidHost, druidPort)
+    val client = new DruidBrokerClient(druidHost, druidPort)
     val druidDS = client.metadata(dsName, options.loadMetadataFromAllSegments)
     val sourceToDruidMapping =
       MappingBuilder.buildMapping(sqlContext, sourceDFName,
@@ -299,12 +333,64 @@ object DruidClient {
     )
   }
 
-  val HOST = """([^:]*):(\d*)""".r
+}
 
-  def hosPort(s : String) : (String, Int) = {
-    val HOST(h, p) = s
-    (h, p.toInt)
+
+class DruidCoordinatorClient(host : String, port : Int)
+  extends DruidClient(host, port) with Logging {
+
+  import org.json4s.JsonDSL._
+  import Utils._
+
+  @transient val urlPrefix = s"http://$host:$port/druid/coordinator/v1"
+
+  def this(t: (String, Int)) = {
+    this(t._1, t._2)
   }
 
+  def this(s: String) = {
+    this(DruidClient.hosPort(s))
+  }
 
+  @throws(classOf[DruidDataSourceException])
+  def timeBoundary(dataSource : String) : Interval = {
+
+    val url = s"$urlPrefix/datasources/$dataSource"
+    val jV = get(url)
+    val i = jV.extract[CoordDataSourceInfo]
+    new Interval(i.segments.minTime, i.segments.maxTime)
+  }
+
+//  @throws(classOf[DruidDataSourceException])
+//  def metadata(dataSource : String, fullIndex : Boolean) : DruidDataSource = {
+//
+//    val in = timeBoundary(dataSource)
+//
+//    val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
+//
+//    val jR = compact(render(
+//      ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
+//        ("intervals" -> List(i)) ~ ("merge" -> "true")
+//    ))
+//    val jV = post(url, jR) transformField {
+//      case ("type", x) => ("typ", x)
+//    }
+//
+//    val l = jV.extract[List[MetadataResponse]]
+//    DruidDataSource(dataSource, l.head, List(in))
+//  }
+
+  @throws(classOf[DruidDataSourceException])
+  def serversInfo : List[HistoricalServerInfo] = {
+    val url = s"$urlPrefix/servers?full=true"
+    val jV = get(url)
+    jV.extract[List[HistoricalServerInfo]]
+  }
+
+  @throws(classOf[DruidDataSourceException])
+  def dataSourceInfo(datasource : String) : DataSourceInfo = {
+    val url = s"$urlPrefix/datasources/$datasource?full=true"
+    val jV = get(url)
+    jV.extract[DataSourceInfo]
+  }
 }
