@@ -45,6 +45,7 @@ object ConnectionManager {
 abstract class DruidClient(val host : String,
                   val port : Int) extends Logging {
 
+  import org.json4s.JsonDSL._
   import Utils._
 
   def this(t : (String, Int)) = {
@@ -179,6 +180,27 @@ abstract class DruidClient(val host : String,
 
   def timeBoundary(dataSource : String) : Interval
 
+  @throws(classOf[DruidDataSourceException])
+  def metadata(url : String,
+               dataSource : String,
+               fullIndex : Boolean) : DruidDataSource = {
+
+    val in = timeBoundary(dataSource)
+
+    val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
+
+    val jR = compact(render(
+      ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
+        ("intervals" -> List(i)) ~ ("merge" -> "true")
+    ))
+    val jV = post(url, jR) transformField {
+      case ("type", x) => ("typ", x)
+    }
+
+    val l = jV.extract[List[MetadataResponse]]
+    DruidDataSource(dataSource, l.head, List(in))
+  }
+
 }
 
 object DruidClient {
@@ -226,21 +248,7 @@ class DruidBrokerClient(host : String, port : Int)
 
   @throws(classOf[DruidDataSourceException])
   def metadata(dataSource : String, fullIndex : Boolean) : DruidDataSource = {
-
-    val in = timeBoundary(dataSource)
-
-    val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
-
-    val jR = compact(render(
-      ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
-        ("intervals" -> List(i)) ~ ("merge" -> "true")
-    ))
-    val jV = post(url, jR) transformField {
-      case ("type", x) => ("typ", x)
-    }
-
-    val l = jV.extract[List[MetadataResponse]]
-    DruidDataSource(dataSource, l.head, List(in))
+    metadata(url, dataSource, fullIndex)
   }
 
   @throws(classOf[DruidDataSourceException])
@@ -335,7 +343,6 @@ object DruidBrokerClient {
 
 }
 
-
 class DruidCoordinatorClient(host : String, port : Int)
   extends DruidClient(host, port) with Logging {
 
@@ -361,24 +368,14 @@ class DruidCoordinatorClient(host : String, port : Int)
     new Interval(i.segments.minTime, i.segments.maxTime)
   }
 
-//  @throws(classOf[DruidDataSourceException])
-//  def metadata(dataSource : String, fullIndex : Boolean) : DruidDataSource = {
-//
-//    val in = timeBoundary(dataSource)
-//
-//    val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
-//
-//    val jR = compact(render(
-//      ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
-//        ("intervals" -> List(i)) ~ ("merge" -> "true")
-//    ))
-//    val jV = post(url, jR) transformField {
-//      case ("type", x) => ("typ", x)
-//    }
-//
-//    val l = jV.extract[List[MetadataResponse]]
-//    DruidDataSource(dataSource, l.head, List(in))
-//  }
+  @throws(classOf[DruidDataSourceException])
+  def metadataFromHistorical(histServer : String,
+               dataSource : String,
+               fullIndex : Boolean) : DruidDataSource = {
+    val (h,p) = DruidClient.hosPort(histServer)
+    val url = s"http://$h:$p/druid/v2/?pretty"
+    metadata(url, dataSource, fullIndex)
+  }
 
   @throws(classOf[DruidDataSourceException])
   def serversInfo : List[HistoricalServerInfo] = {
@@ -388,9 +385,9 @@ class DruidCoordinatorClient(host : String, port : Int)
   }
 
   @throws(classOf[DruidDataSourceException])
-  def dataSourceInfo(datasource : String) : DataSourceInfo = {
+  def dataSourceInfo(datasource : String) : DataSourceSegmentInfo = {
     val url = s"$urlPrefix/datasources/$datasource?full=true"
     val jV = get(url)
-    jV.extract[DataSourceInfo]
+    jV.extract[DataSourceSegmentInfo]
   }
 }
