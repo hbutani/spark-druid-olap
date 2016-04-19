@@ -22,7 +22,8 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Expand, Project, Aggregate}
 import org.apache.spark.sql.types.{DoubleType, LongType, IntegerType, StringType}
-import org.sparklinedata.druid.metadata.{DruidMetric, DruidColumn, DruidDataType, DruidDimension}
+import org.sparklinedata.druid.jscodegen.JSCodeGenerator
+import org.sparklinedata.druid.metadata._
 import org.sparklinedata.druid._
 
 import scala.collection.mutable.ArrayBuffer
@@ -81,7 +82,16 @@ trait AggregateTransform {
               dtGrpElem.pushedExpression.dataType, StringType)
         )
       }
-      case _ => None
+      case _ => {
+        val codeGen = JSCodeGenerator(dqb, ge, false,
+          sqlContext.getConf(DruidPlanner.TZ_ID).toString)
+        for (fn <- codeGen.fnCode) yield {
+          val outDName = dqb.nextAlias(codeGen.fnParams.last)
+          dqb.dimension(new ExtractionDimensionSpec(codeGen.fnParams.last, outDName,
+            new JavaScriptExtractionFunctionSpec("javascript", fn))).
+            outputAttribute(outDName, ge, ge.dataType, StringType)
+        }
+      }
     }
   }
 

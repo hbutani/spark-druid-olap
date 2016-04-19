@@ -84,7 +84,9 @@ case class TimeParsingExtractionFunctionSpec(val `type`: String,
 case class JavaScriptExtractionFunctionSpec(val `type`: String,
                                             val `function`: String,
                                             val injective: Boolean = false)
-  extends ExtractionFunctionSpec
+  extends ExtractionFunctionSpec {
+  def this(fn: String) = this("javascript", fn)
+}
 
 case class LookUpMap(val `type`: String, val `map`: Map[String, String])
 
