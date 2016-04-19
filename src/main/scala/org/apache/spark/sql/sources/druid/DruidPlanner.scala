@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.sources.druid
 
+import java.util.TimeZone
+
 import org.apache.spark.sql.SQLConf.SQLConfEntry._
 import org.apache.spark.sql.execution.{SparkPlan, PhysicalRDD}
 import org.apache.spark.sql.{CachedTablePattern, SQLContext}
@@ -70,6 +72,10 @@ object DruidPlanner {
     defaultValue = Some(false),
     doc = "When set to true each transformation is logged.")
 
+  val  TZ_ID = stringConf("spark.sparklinedata.tz.id",
+    defaultValue = Some(org.joda.time.DateTimeZone.getDefault.getID),
+    doc = "Specifes the TimeZone ID of the spark; " +
+      "used by Druid for Date/TimeStamp transformations.")
 
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
