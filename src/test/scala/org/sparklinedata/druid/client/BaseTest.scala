@@ -168,7 +168,7 @@ abstract class BaseTest extends fixture.FunSuite with
       p_comment string, c_name string , c_address string , c_phone string , c_acctbal double ,
       c_mktsegment string , c_comment string , c_nation string , c_region string)
       USING com.databricks.spark.csv
-      OPTIONS (path "/Users/jpullokk/IdeaProjects/spark-druid-olap2/quickstart/tpch/datascale1.sample/orderLineItemPartSupplierCustomer",
+      OPTIONS (path "src/test/resources/tpch/datascale1/orderLineItemPartSupplierCustomer.small",
       header "false", delimiter "|")""".stripMargin
 
     println(cT)
