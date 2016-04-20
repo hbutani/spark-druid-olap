@@ -28,13 +28,13 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
 
   import TPCHQueries._
 
-  var brokerClient : DruidBrokerClient = _
+  var brokerClient : DruidQueryServerClient = _
   var coordClient : DruidCoordinatorClient = _
 
   import Utils._
 
   override def beforeAll() = {
-    brokerClient = new DruidBrokerClient("localhost", 8082)
+    brokerClient = new DruidQueryServerClient("localhost", 8082)
     coordClient = new DruidCoordinatorClient("localhost", 8081)
   }
 

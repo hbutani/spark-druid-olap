@@ -69,7 +69,8 @@ case class DruidClusterInfo(host : String,
                               (DataSourceSegmentInfo, DruidDataSource)],
                             histServers : List[HistoricalServerInfo]) {
 
-  def historicalServers(datasource : String, in : Interval) : List[HistoricalServerAssignment] = {
+  def historicalServers(datasource : String, ins : List[Interval]) :
+  List[HistoricalServerAssignment] = {
 
     val m : MMap[HistoricalServerInfo, List[Interval]] = MMap()
 
@@ -82,24 +83,26 @@ case class DruidClusterInfo(host : String,
       override def compare(x: HistoricalServerInfo, y: HistoricalServerInfo): Int = {
         if (x.priority == y.priority) {
           (m.get(x), m.get(y)) match {
-            case (None, None) => x
-            case (None, _) => x
-            case (_, None) => y
+            case (None, None) => 0 // x
+            case (None, _) => -1 // x
+            case (_, None) => 1 // y
             case (Some(l1), Some(l2)) => l1.size - l2.size
           }
 
+        } else {
+          y.priority - x.priority
         }
-        y.priority - x.priority
       }
     }
 
-
-    dataSources(datasource)._1.segmentsToScan(in).map { seg =>
-      val s = histServers.filter(_.handlesSegment(seg.identifier)).sorted.head
-      if ( m(s).contains(s) ) {
-        m(s) = in :: m(s)
-      } else {
-        m(s) = List(in)
+    for(in <- ins) {
+      dataSources(datasource)._1.segmentsToScan(in).map { seg =>
+        val s = histServers.filter(_.handlesSegment(seg.identifier)).sorted.head
+        if (m.contains(s)) {
+          m(s) = seg._interval :: m(s)
+        } else {
+          m(s) = List(seg._interval)
+        }
       }
     }
 
@@ -123,7 +126,7 @@ trait DruidMetadataCache {
   def assignHistoricalServers(coordinator : String,
                               port : Int,
                               dataSourceName : String,
-                              interval : Interval) : List[HistoricalServerAssignment]
+                              intervals : List[Interval]) : List[HistoricalServerAssignment]
 
   def register(coordinator : String, port : Int, dataSource : String) : Unit
 
@@ -316,8 +319,8 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
   def assignHistoricalServers(coordinator : String,
                               port : Int,
                               dataSourceName : String,
-                              interval : Interval) : List[HistoricalServerAssignment] = {
-    getDruidClusterInfo(hostKey(coordinator, port)).historicalServers(dataSourceName, interval)
+                              intervals : List[Interval]) : List[HistoricalServerAssignment] = {
+    getDruidClusterInfo(hostKey(coordinator, port)).historicalServers(dataSourceName, intervals)
 
   }
 
