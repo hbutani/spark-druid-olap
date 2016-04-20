@@ -415,7 +415,7 @@ sealed trait QuerySpec {
   val dataSource: String
   val intervals: List[String]
 
-  def setInterval(i : Interval) : QuerySpec
+  def setIntervals(ins : List[Interval]) : QuerySpec
 
   def dimensions : List[DimensionSpec] = Nil
   def aggregations : List[AggregationSpec] = Nil
@@ -446,7 +446,7 @@ case class GroupByQuerySpec(
     dataSource, dimensions, limitSpec, having, granularity, filter,
     aggregations, postAggregations, intervals)
 
-  def setInterval(i : Interval) : QuerySpec = this.copy(intervals = List(i.toString))
+  def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
 }
 
 case class TimeSeriesQuerySpec(
@@ -466,7 +466,7 @@ case class TimeSeriesQuerySpec(
            postAggregations: Option[List[PostAggregationSpec]]) = this("timeseries",
     dataSource, intervals, granularity, filters, aggregations, postAggregations)
 
-  def setInterval(i : Interval) = this.copy(intervals = List(i.toString))
+  def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
 }
 
 case class TopNQuerySpec(
@@ -493,5 +493,5 @@ case class TopNQuerySpec(
     intervals, granularity, filter, aggregations,
     postAggregations, dimension, threshold, metric)
 
-  def setInterval(i : Interval) = this.copy(intervals = List(i.toString))
+  def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
 }

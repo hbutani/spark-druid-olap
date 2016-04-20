@@ -184,7 +184,7 @@ abstract class BaseTest extends fixture.FunSuite with
       timeDimensionColumn "l_shipdate",
       druidDatasource "tpch",
       druidHost "localhost",
-      druidPort "8082",
+      druidPort "8081",
       columnMapping '$colMapping',
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema')""".stripMargin

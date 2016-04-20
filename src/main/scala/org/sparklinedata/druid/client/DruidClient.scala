@@ -214,7 +214,7 @@ object DruidClient {
 
 }
 
-class DruidBrokerClient(host : String, port : Int)
+class DruidQueryServerClient(host : String, port : Int)
   extends DruidClient(host, port) with Logging {
 
   import org.json4s.JsonDSL._
@@ -284,7 +284,7 @@ class DruidBrokerClient(host : String, port : Int)
 }
 
 
-object DruidBrokerClient {
+object DruidQueryServerClient {
 
   type DruidDataSourceKey = (String, String)
 
@@ -303,7 +303,7 @@ object DruidBrokerClient {
             starSchema : StarSchema,
             options : DruidRelationOptions) : DruidRelationInfo = {
 
-    val client = new DruidBrokerClient(druidHost, druidPort)
+    val client = new DruidQueryServerClient(druidHost, druidPort)
     val druidDS = client.metadata(dsName, options.loadMetadataFromAllSegments)
     val sourceToDruidMapping =
       MappingBuilder.buildMapping(sqlContext, sourceDFName,

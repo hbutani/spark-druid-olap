@@ -23,7 +23,6 @@ import org.apache.spark.sql.sources.{BaseRelation, RelationProvider}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.metadata._
-import org.sparklinedata.druid.client.DruidBrokerClient
 
 class DefaultSource extends RelationProvider with Logging {
 
@@ -106,7 +105,7 @@ class DefaultSource extends RelationProvider with Logging {
     )
 
 
-    val drI = DruidBrokerClient.druidRelation(sqlContext,
+    val drI = DruidMetadataCache.druidRelation(sqlContext,
       sourceDFName, sourceDF,
       dsName,
       timeDimensionCol,
