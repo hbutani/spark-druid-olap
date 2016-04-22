@@ -348,16 +348,16 @@ trait AggregateTransform {
               case DruidDataType.Long => "longSum"
               case _ => "doubleSum"
             }
+            val aggFuncDType = DruidDataType.sparkDataType(dC.dataType)
             val sumAlias = dqb.nextAlias
             val countAlias = dqb.nextAlias
 
             Some(
               dqb.aggregate(FunctionAggregationSpec(aggFunc, sumAlias, dC.name)).
+                outputAttribute(sumAlias, null, aggFuncDType, aggFuncDType).
                 aggregate(FunctionAggregationSpec("count", countAlias, "count")).
-                postAggregate(new ArithmeticPostAggregationSpec(a, "/",
-                  List(new FieldAccessPostAggregationSpec(sumAlias),
-                    new FieldAccessPostAggregationSpec(countAlias)), None)).
-                outputAttribute(a, aggExp, aggExp.dataType, DoubleType)
+                outputAttribute(countAlias, null, LongType, LongType).
+                avgExpression(aggExp, sumAlias, countAlias)
             )
           }
           case _ => {

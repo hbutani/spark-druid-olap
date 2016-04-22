@@ -58,6 +58,9 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
                              projectionAliasMap: Map[String, String] = Map(),
                              outputAttributeMap:
                              Map[String, (Expression, DataType, DataType)] = Map(),
+                            // avg expressions to perform in the Project Operator
+                            // on top of Druid PhysicalScan
+                             avgExpressions : Map[Expression, (String, String)] = Map(),
                              aggExprToLiteralExpr: Map[Expression, Expression] = Map(),
                              aggregateOper: Option[Aggregate] = None,
                              curId: AtomicLong = new AtomicLong(-1)) {
@@ -105,6 +108,10 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
 
   def outputAttribute(nm: String, e: Expression, originalDT: DataType, druidDT: DataType) = {
     this.copy(outputAttributeMap = outputAttributeMap + (nm ->(e, originalDT, druidDT)))
+  }
+
+  def avgExpression(e: Expression, sumAlias : String, cntAlias : String) = {
+    this.copy(avgExpressions = avgExpressions + (e ->(sumAlias, cntAlias)))
   }
 
   def aggregateOp(op: Aggregate) = this.copy(aggregateOper = Some(op))

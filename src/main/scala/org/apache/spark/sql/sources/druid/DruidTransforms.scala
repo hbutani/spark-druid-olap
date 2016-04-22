@@ -42,7 +42,7 @@ trait LimitTransfom {
       // TODO: handle Having
       val dqbs = plan(dqb, child).map { dqb =>
         val exprToDruidOutput =
-          buildDruidSchemaMap(dqb.outputAttributeMap)
+          new DruidOperatorSchema(dqb).pushedDownExprToDruidAttr
 
         val dqb1: ODB = orderExprs.foldLeft(Some(dqb).asInstanceOf[ODB]) { (dqb, e) =>
           for (ue <- unalias(e.child, child);

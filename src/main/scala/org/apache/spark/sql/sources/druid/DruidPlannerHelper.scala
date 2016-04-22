@@ -24,23 +24,6 @@ import org.sparklinedata.druid.DruidOperatorAttribute
 
 trait DruidPlannerHelper {
 
-  /**
-   *
-   * @param outputAttributeMap outputAttributeMap from the QryBldr
-   * @return a map from the AggregationOp output to a DruidOperatorAttribute
-   */
-  def buildDruidSchemaMap(outputAttributeMap:
-                          Map[String, (Expression, DataType, DataType)]):
-  Map[Expression, DruidOperatorAttribute] = (outputAttributeMap map {
-    case (nm, (e, oDT, dDT)) => {
-      val druidEid = e match {
-        case n: NamedExpression => n.exprId
-        case _ => NamedExpression.newExprId
-      }
-      (e -> DruidOperatorAttribute(druidEid, nm, dDT))
-    }
-  })
-
   def unalias(e: Expression, agg: Aggregate): Option[Expression] = {
 
     agg.aggregateExpressions.find { aE =>
