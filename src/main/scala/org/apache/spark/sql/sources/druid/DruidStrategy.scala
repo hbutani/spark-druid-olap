@@ -22,6 +22,7 @@ import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
 import org.apache.spark.sql.execution.{PhysicalRDD, Project, SparkPlan, Union}
+import org.apache.spark.sql.types.DoubleType
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.query.QuerySpecTransforms
 
@@ -35,11 +36,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
                                    a <- dqb.aggregateOper
       ) yield {
 
-          /*
-           * 1. build the map from aggOp expressions to DruidOperatorAttribute
-           */
-          val exprToDruidOutput =
-            buildDruidSchemaMap(dqb.outputAttributeMap)
+        val druidOpSchema = new DruidOperatorSchema(dqb)
 
           /*
            * 2. Interval is either in the SQL, or use the entire datasource interval
@@ -68,7 +65,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           /*
            * 5. Setup DruidRelation
            */
-          val dq = DruidQuery(qs, intervals, Some(exprToDruidOutput.values.toList))
+          val dq = DruidQuery(qs, intervals, Some(druidOpSchema.operatorDruidAttributes))
 
         planner.debugTranslation(
           s"""
@@ -80,16 +77,10 @@ with PredicateHelper with DruidPlannerHelper with Logging {
 
           val dR: DruidRelation = DruidRelation(dqb.drInfo, Some(dq))(planner.sqlContext)
 
-          /*
-           * 6. Setup SparkPlan = PhysicalRDD + Projection
-           */
-          val druidOpAttrs = exprToDruidOutput.values.map {
-            case DruidOperatorAttribute(eId, nm, dT) => AttributeReference(nm, dT)(eId)
-          }
           val projections = buildProjectionList(dqb.aggregateOper.get,
-            dqb.aggExprToLiteralExpr, exprToDruidOutput)
+            dqb.aggExprToLiteralExpr, druidOpSchema)
           Project(projections, PhysicalRDD.createFromDataSource(
-            druidOpAttrs.toList,
+            druidOpSchema.operatorSchema,
             dR.buildInternalScan,
             dR))
         }
@@ -101,7 +92,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
 
   def buildProjectionList(aggOp: Aggregate,
                           grpExprToFillInLiteralExpr: Map[Expression, Expression],
-                          druidPushDownExprMap: Map[Expression, DruidOperatorAttribute]):
+                          druidOpSchema : DruidOperatorSchema):
   Seq[NamedExpression] = {
 
     /*
@@ -111,7 +102,20 @@ with PredicateHelper with DruidPlannerHelper with Logging {
      */
     val aEs = aggOp.aggregateExpressions.map { aE => grpExprToFillInLiteralExpr.getOrElse(aE, aE) }
 
+    val druidPushDownExprMap = druidOpSchema.pushedDownExprToDruidAttr
+    val avgExpressions = druidOpSchema.avgExpressions
+
     aEs.map(_.transformUp {
+      case e: Expression if avgExpressions.contains(e) => {
+        val (s,c) = avgExpressions(e)
+        val (sDAttr, cDAttr) = (druidOpSchema.druidAttrMap(s), druidOpSchema.druidAttrMap(c))
+        Cast(
+        Divide(
+          Cast(AttributeReference(sDAttr.name, sDAttr.dataType)(sDAttr.exprId), DoubleType),
+          Cast(AttributeReference(cDAttr.name, sDAttr.dataType)(cDAttr.exprId), DoubleType)
+        ),
+          e.dataType)
+      }
       case ne: AttributeReference if druidPushDownExprMap.contains(ne) &&
         druidPushDownExprMap(ne).dataType != ne.dataType => {
         val dA = druidPushDownExprMap(ne)
