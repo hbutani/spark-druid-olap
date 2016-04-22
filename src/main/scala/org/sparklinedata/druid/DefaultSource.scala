@@ -70,7 +70,6 @@ class DefaultSource extends RelationProvider with Logging {
     }.getOrElse(List())
 
     val druidHost = parameters.get(DRUID_HOST_PARAM).getOrElse(DEFAULT_DRUID_HOST)
-    val druidPort: Int = parameters.get(DRUID_PORT_PARAM).getOrElse(DEFAULT_DRUID_PORT).toInt
 
     val starSchemaInfo =
       parameters.get(STAR_SCHEMA_INFO_PARAM).map(parse(_).extract[StarSchemaInfo]).orElse(
@@ -108,6 +107,10 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(ZK_DRUID_PATH).
         getOrElse(DEFAULT_ZK_DRUID_PATH)
 
+    val queryBroker : Boolean =
+      parameters.get(QUERY_VIA_BROKER).
+        getOrElse(DEFAULT_QUERY_VIA_BROKER).toBoolean
+
     val options = DruidRelationOptions(
       maxCardinality,
       cardinalityPerDruidQuery,
@@ -116,7 +119,8 @@ class DefaultSource extends RelationProvider with Logging {
       loadMetadataFromAllSegments,
       zkSessionTimeoutMs,
       zkEnableCompression,
-      zkDruidPath
+      zkDruidPath,
+      queryBroker
     )
 
 
@@ -125,7 +129,6 @@ class DefaultSource extends RelationProvider with Logging {
       dsName,
       timeDimensionCol,
       druidHost,
-      druidPort,
       columnMapping,
       fds,
       ss.right.get,
@@ -183,9 +186,6 @@ object DefaultSource {
   val DRUID_HOST_PARAM = "druidHost"
   val DEFAULT_DRUID_HOST = "localhost"
 
-  val DRUID_PORT_PARAM = "druidPort"
-  val DEFAULT_DRUID_PORT = "8082" // the broker port
-
   // this is only for test purposes
   val DRUID_QUERY = "druidQuery"
 
@@ -223,4 +223,7 @@ object DefaultSource {
 
   val ZK_DRUID_PATH = "zkDruidPath"
   val DEFAULT_ZK_DRUID_PATH = "/druid"
+
+  val QUERY_VIA_BROKER = "queryBroker"
+  val DEFAULT_QUERY_VIA_BROKER = "false"
 }

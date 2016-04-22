@@ -31,7 +31,7 @@ import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.{DruidDataSourceException, QuerySpec}
-import org.sparklinedata.druid.metadata.{DependencyGraph, DruidClientInfo, DruidRelationInfo, _}
+import org.sparklinedata.druid.metadata.{DependencyGraph, DruidRelationInfo, _}
 import org.sparklinedata.druid.Utils
 import org.sparklinedata.druid.CloseableIterator
 
@@ -311,7 +311,7 @@ object DruidQueryServerClient {
     val fd = new FunctionalDependencies(druidDS, functionalDeps,
       DependencyGraph(druidDS, functionalDeps))
 
-    val dr = DruidRelationInfo(DruidClientInfo(druidHost, druidPort),
+    val dr = DruidRelationInfo(druidHost,
       sourceDFName,
       timeDimensionCol,
       druidDS,

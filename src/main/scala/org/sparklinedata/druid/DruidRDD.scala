@@ -24,15 +24,32 @@ import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{SQLContext}
+import org.apache.spark.sql.SQLContext
+import org.joda.time.Interval
 import org.sparklinedata.druid.client.{DruidQueryServerClient, QueryResultRow}
 import org.sparklinedata.druid.metadata.DruidMetadataCache
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 import org.sparklinedata.druid.metadata.HistoricalServerAssignment
 
-class DruidPartition(idx: Int, val hs : HistoricalServerAssignment) extends Partition {
-  override def index: Int = idx
+abstract class DruidPartition extends Partition {
+  def queryClient : DruidQueryServerClient
+  def intervals : List[Interval]
 }
+
+class HistoricalPartition(idx: Int, val hs : HistoricalServerAssignment) extends DruidPartition {
+  override def index: Int = idx
+  def queryClient : DruidQueryServerClient = new DruidQueryServerClient(hs.server.host)
+  def intervals : List[Interval] = hs.intervals
+}
+
+class BrokerPartition(idx: Int,
+                      val broker : String,
+                      val i : Interval) extends DruidPartition {
+  override def index: Int = idx
+  def queryClient : DruidQueryServerClient = new DruidQueryServerClient(broker)
+  def intervals : List[Interval] = List(i)
+}
+
 
 class DruidRDD(sqlContext: SQLContext,
               val drInfo : DruidRelationInfo,
@@ -40,10 +57,11 @@ class DruidRDD(sqlContext: SQLContext,
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
 
+
     val p = split.asInstanceOf[DruidPartition]
-    val mQry = dQuery.q.setIntervals(p.hs.intervals)
+    val mQry = dQuery.q.setIntervals(p.intervals)
     Utils.logQuery(mQry)
-    val client = new DruidQueryServerClient(p.hs.server.host)
+    val client = p.queryClient
     val dr = client.executeQueryAsStream(mQry)
     context.addTaskCompletionListener{ context => dr.closeIfNeeded() }
     val r = new InterruptibleIterator[QueryResultRow](context, dr)
@@ -55,13 +73,19 @@ class DruidRDD(sqlContext: SQLContext,
   }
 
   override protected def getPartitions: Array[Partition] = {
+    if (!drInfo.options.queryBroker) {
     val hAssigns = DruidMetadataCache.assignHistoricalServers(
-      drInfo.druidClientInfo.host,
-      drInfo.druidClientInfo.port,
+      drInfo.host,
       drInfo.druidDS.name,
+      drInfo.options,
       dQuery.intervalSplits
     )
-    hAssigns.zipWithIndex.map(t => new DruidPartition(t._2, t._1)).toArray
+    hAssigns.zipWithIndex.map(t => new HistoricalPartition(t._2, t._1)).toArray
+  } else {
+      val broker = DruidMetadataCache.getDruidClusterInfo(drInfo.host,
+        drInfo.options).curatorConnection.getBroker
+      dQuery.intervalSplits.zipWithIndex.map(t => new BrokerPartition(t._2, broker, t._1)).toArray
+    }
   }
 
   /**

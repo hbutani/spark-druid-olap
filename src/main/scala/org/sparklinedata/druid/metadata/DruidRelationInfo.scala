@@ -23,9 +23,7 @@ import org.apache.spark.sql.types._
 
 import scala.collection.mutable.{Map => MMap}
 
-case class DruidClientInfo(host : String, port : Int)
-
-case class DruidRelationInfo(val druidClientInfo : DruidClientInfo,
+case class DruidRelationInfo(val host : String,
                          val sourceDFName : String,
                             val timeDimensionCol : String,
                          val druidDS : DruidDataSource,
@@ -45,7 +43,8 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 loadMetadataFromAllSegments : Boolean,
                                 zkSessionTimeoutMs : Int,
                                 zkEnableCompression : Boolean,
-                                zkDruidPath : String)
+                                zkDruidPath : String,
+                                queryBroker : Boolean)
 
 private[druid] object MappingBuilder extends Logging {
 
