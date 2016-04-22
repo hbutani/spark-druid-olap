@@ -30,11 +30,6 @@ import org.sparklinedata.druid.metadata.DruidMetadataCache
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 import org.sparklinedata.druid.metadata.HistoricalServerAssignment
 
-/*
- - DPart has historical server in it.
- - getParts calls DMDCache for hist assignments
- */
-
 class DruidPartition(idx: Int, val hs : HistoricalServerAssignment) extends Partition {
   override def index: Int = idx
 }

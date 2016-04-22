@@ -26,4 +26,8 @@ object SparklineThreadUtils {
     ThreadUtils.newDaemonCachedThreadPool(prefix, maxThreadNumber, keepAliveSeconds)
   }
 
+  def addShutdownHook(hook: () => Unit) : Unit = {
+    ShutdownHookManager.addShutdownHook(hook)
+  }
+
 }
