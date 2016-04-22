@@ -29,7 +29,10 @@ import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
 import org.sparklinedata.druid.client.DruidCoordinatorClient
 
-case class DruidServer(host : String, port : Int)
+case class DruidNode(name : String,
+                     id : String,
+                     address : String,
+                     port : Int)
 
 case class DruidSegmentInfo(dataSource : String,
                             interval : String,
@@ -130,7 +133,7 @@ trait DruidMetadataCache {
 
   def register(coordinator : String, port : Int, dataSource : String) : Unit
 
-  def clearCache : Unit
+  def clearCache(host : String) : Unit
 }
 
 trait DruidRelationInfoCache {
@@ -328,7 +331,7 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     _get(hostKey(coordinator, port), dataSource)
   }
 
-  def clearCache : Unit = cache.synchronized(cache.clear())
+  def clearCache(host : String) : Unit = cache.synchronized(cache.clear())
 
 
 }

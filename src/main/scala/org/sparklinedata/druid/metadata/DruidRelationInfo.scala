@@ -42,7 +42,10 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 val cardinalityPerDruidQuery : Long,
                                 pushHLLTODruid : Boolean,
                                 streamDruidQueryResults : Boolean,
-                                loadMetadataFromAllSegments : Boolean)
+                                loadMetadataFromAllSegments : Boolean,
+                                zkSessionTimeoutMs : Int,
+                                zkEnableCompression : Boolean,
+                                zkDruidPath : String)
 
 private[druid] object MappingBuilder extends Logging {
 

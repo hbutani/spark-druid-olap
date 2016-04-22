@@ -96,12 +96,27 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(LOAD_METADATA_FROM_ALL_SEGMENTS).
         getOrElse(DEFAULT_LOAD_METADATA_FROM_ALL_SEGMENTS).toBoolean
 
+    val zkSessionTimeoutMs : Int =
+      parameters.get(ZK_SESSION_TIMEOUT).
+        getOrElse(DEFAULT_ZK_SESSION_TIMEOUT).toInt
+
+    val zkEnableCompression : Boolean =
+      parameters.get(ZK_ENABLE_COMPRESSION).
+        getOrElse(DEFAULT_ZK_ENABLE_COMPRESSION).toBoolean
+
+    val zkDruidPath : String =
+      parameters.get(ZK_DRUID_PATH).
+        getOrElse(DEFAULT_ZK_DRUID_PATH)
+
     val options = DruidRelationOptions(
       maxCardinality,
       cardinalityPerDruidQuery,
       pushHLLTODruid,
       streamDruidQueryResults,
-      loadMetadataFromAllSegments
+      loadMetadataFromAllSegments,
+      zkSessionTimeoutMs,
+      zkEnableCompression,
+      zkDruidPath
     )
 
 
@@ -199,4 +214,13 @@ object DefaultSource {
     */
   val LOAD_METADATA_FROM_ALL_SEGMENTS = "loadMetadataFromAllSegments"
   val DEFAULT_LOAD_METADATA_FROM_ALL_SEGMENTS = "false"
+
+  val ZK_SESSION_TIMEOUT = "zkSessionTimeoutMilliSecs"
+  val DEFAULT_ZK_SESSION_TIMEOUT = "30000"
+
+  val ZK_ENABLE_COMPRESSION = "zkEnableCompression"
+  val DEFAULT_ZK_ENABLE_COMPRESSION = "true"
+
+  val ZK_DRUID_PATH = "zkDruidPath"
+  val DEFAULT_ZK_DRUID_PATH = "/druid"
 }
