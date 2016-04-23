@@ -107,9 +107,9 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(ZK_DRUID_PATH).
         getOrElse(DEFAULT_ZK_DRUID_PATH)
 
-    val queryBroker : Boolean =
-      parameters.get(QUERY_VIA_BROKER).
-        getOrElse(DEFAULT_QUERY_VIA_BROKER).toBoolean
+    val queryHistorical : Boolean =
+      parameters.get(QUERY_HISTORICAL).
+        getOrElse(DEFAULT_QUERY_HISTORICAL).toBoolean
 
     val options = DruidRelationOptions(
       maxCardinality,
@@ -120,7 +120,7 @@ class DefaultSource extends RelationProvider with Logging {
       zkSessionTimeoutMs,
       zkEnableCompression,
       zkDruidPath,
-      queryBroker
+      queryHistorical
     )
 
 
@@ -224,6 +224,6 @@ object DefaultSource {
   val ZK_DRUID_PATH = "zkDruidPath"
   val DEFAULT_ZK_DRUID_PATH = "/druid"
 
-  val QUERY_VIA_BROKER = "queryBroker"
-  val DEFAULT_QUERY_VIA_BROKER = "false"
+  val QUERY_HISTORICAL = "queryHistoricalServers"
+  val DEFAULT_QUERY_HISTORICAL = "false"
 }
