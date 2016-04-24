@@ -148,6 +148,17 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
     case _ => None
   }
 
+  /**
+    * currently we don't transform queries with [[LimitSpec]] or [[HavingSpec]] into
+    * post DruidOperations in Spark.
+    * @return
+    */
+  def canPushToHistorical = !(
+    postAggregations.isDefined ||
+    limitSpec.isDefined ||
+    havingSpec.isDefined
+    )
+
 }
 
 object DruidQueryBuilder {

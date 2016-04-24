@@ -101,11 +101,12 @@ case class DruidClusterInfo(host : String,
 
     for(in <- ins) {
       dataSources(datasource)._1.segmentsToScan(in).map { seg =>
+        val segIn = seg._interval.overlap(in)
         val s = histServers.filter(_.handlesSegment(seg.identifier)).sorted.head
         if (m.contains(s)) {
-          m(s) = seg._interval :: m(s)
+          m(s) = segIn :: m(s)
         } else {
-          m(s) = List(seg._interval)
+          m(s) = List(segIn)
         }
       }
     }

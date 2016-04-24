@@ -19,6 +19,7 @@ package org.sparklinedata.druid.client
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
@@ -145,6 +146,8 @@ abstract class BaseTest extends fixture.FunSuite with
 
   override def beforeAll() = {
 
+    TestHive.sparkContext.setLogLevel("WARN")
+
     register(TestHive)
     DruidPlanner(TestHive)
 
@@ -190,6 +193,17 @@ abstract class BaseTest extends fixture.FunSuite with
 
     println(cTOlap)
     sql(cTOlap)
+  }
+
+  def result(df : DataFrame) : Array[Row] = {
+    df.collect()
+  }
+
+  def assertResultEquals(
+                     df1 : DataFrame,
+                    df2 : DataFrame
+                   ) : Unit = {
+    assert(result(df1) == result(df2))
   }
 
   def test(nm : String, sql : String,
