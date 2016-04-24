@@ -73,7 +73,7 @@ class DruidRDD(sqlContext: SQLContext,
   }
 
   override protected def getPartitions: Array[Partition] = {
-    if (drInfo.options.queryHistoricalServers) {
+    if (dQuery.queryHistoricalServer) {
     val hAssigns = DruidMetadataCache.assignHistoricalServers(
       drInfo.host,
       drInfo.druidDS.name,

@@ -37,11 +37,14 @@ case class DruidOperatorAttribute(exprId : ExprId, name : String, dataType : Dat
  *                       on the ExprId.
  */
 case class DruidQuery(q : QuerySpec,
+                      queryHistoricalServer : Boolean,
                       intervalSplits : List[Interval],
                        outputAttrSpec :Option[List[DruidOperatorAttribute]]
                        ) {
 
-  def this(q : QuerySpec) = this(q, q.intervals.map(Interval.parse(_)), None)
+  def this(q : QuerySpec,
+           queryHistoricalServer : Boolean = false) =
+    this(q, queryHistoricalServer, q.intervals.map(Interval.parse(_)), None)
 
   private def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType = {
 

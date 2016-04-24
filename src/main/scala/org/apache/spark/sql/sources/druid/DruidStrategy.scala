@@ -37,35 +37,39 @@ with PredicateHelper with DruidPlannerHelper with Logging {
       ) yield {
 
         val druidOpSchema = new DruidOperatorSchema(dqb)
+        val pAgg = new PostAggregate(druidOpSchema)
 
-          /*
-           * 2. Interval is either in the SQL, or use the entire datasource interval
-           */
-          val intervals = dqb.queryIntervals.get
+        /*
+         * 2. Interval is either in the SQL, or use the entire datasource interval
+         */
+        val intervals = dqb.queryIntervals.get
 
-          /*
-           * 3. Setup GroupByQuerySpec
-           */
-          var qs : QuerySpec = new GroupByQuerySpec(dqb.drInfo.druidDS.name,
-            dqb.dimensions,
-            dqb.limitSpec,
-            dqb.havingSpec,
-            dqb.granularitySpec,
-            dqb.filterSpec,
-            dqb.aggregations,
-            dqb.postAggregations,
-            intervals.map(_.toString)
-          )
+        /*
+         * 3. Setup GroupByQuerySpec
+         */
+        var qs: QuerySpec = new GroupByQuerySpec(dqb.drInfo.druidDS.name,
+          dqb.dimensions,
+          dqb.limitSpec,
+          dqb.havingSpec,
+          dqb.granularitySpec,
+          dqb.filterSpec,
+          dqb.aggregations,
+          dqb.postAggregations,
+          intervals.map(_.toString)
+        )
 
-          /*
-           * 4. apply QuerySpec transforms
-           */
-          qs = QuerySpecTransforms.transform(dqb.drInfo, qs)
+        /*
+         * 4. apply QuerySpec transforms
+         */
+        qs = QuerySpecTransforms.transform(dqb.drInfo, qs)
 
-          /*
-           * 5. Setup DruidRelation
-           */
-          val dq = DruidQuery(qs, intervals, Some(druidOpSchema.operatorDruidAttributes))
+        /*
+         * 5. Setup DruidRelation
+         */
+        val dq = DruidQuery(qs,
+          dqb.drInfo.options.queryHistoricalServers && pAgg.canBeExecutedInHistorical,
+          intervals,
+          Some(druidOpSchema.operatorDruidAttributes))
 
         planner.debugTranslation(
           s"""
@@ -75,16 +79,27 @@ with PredicateHelper with DruidPlannerHelper with Logging {
 
         )
 
-          val dR: DruidRelation = DruidRelation(dqb.drInfo, Some(dq))(planner.sqlContext)
+        val dR: DruidRelation = DruidRelation(dqb.drInfo, Some(dq))(planner.sqlContext)
 
+        var druidPhysicalOp : SparkPlan = PhysicalRDD.createFromDataSource(
+          druidOpSchema.operatorSchema,
+          dR.buildInternalScan,
+          dR)
+
+        if (dq.queryHistoricalServer) {
+          // add an Agg on top of druidQuery
+          druidPhysicalOp = pAgg.aggOp(druidPhysicalOp).head
+        }
+
+        if ( druidPhysicalOp != null ) {
           val projections = buildProjectionList(dqb.aggregateOper.get,
             dqb.aggExprToLiteralExpr, druidOpSchema)
-          Project(projections, PhysicalRDD.createFromDataSource(
-            druidOpSchema.operatorSchema,
-            dR.buildInternalScan,
-            dR))
-        }
+          Project(projections, druidPhysicalOp)
+        } else null
+      }
+
       val pL = p.toList
+
       if (pL.size < 2) pL else Seq(Union(pL))
 
     }
