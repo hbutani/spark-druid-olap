@@ -25,7 +25,7 @@ object DruidDataType extends Enumeration {
   val String = Value("STRING")
   val Long = Value("LONG")
   val Float = Value("FLOAT")
-  val HyperUnique = Value("HYPERUNIQUE")
+  val HyperUnique = Value("hyperUnique")
 
   def sparkDataType(t : String) : DataType = sparkDataType(DruidDataType.withName(t))
 
