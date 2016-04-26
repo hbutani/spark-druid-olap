@@ -35,6 +35,7 @@ class CuratorConnectionTest extends fixture.FunSuite with
       30000,
       true,
       "/druid",
+      false,
       false
     )
 
