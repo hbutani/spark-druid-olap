@@ -111,6 +111,10 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(QUERY_HISTORICAL).
         getOrElse(DEFAULT_QUERY_HISTORICAL).toBoolean
 
+    val zkQualifyDiscoveryNames : Boolean =
+      parameters.get(ZK_QUALIFY_DISCOVERY_NAMES).
+        getOrElse(DEFAULT_ZK_QUALIFY_DISCOVERY_NAMES).toBoolean
+
     val options = DruidRelationOptions(
       maxCardinality,
       cardinalityPerDruidQuery,
@@ -120,7 +124,8 @@ class DefaultSource extends RelationProvider with Logging {
       zkSessionTimeoutMs,
       zkEnableCompression,
       zkDruidPath,
-      queryHistorical
+      queryHistorical,
+      zkQualifyDiscoveryNames
     )
 
 
@@ -226,4 +231,7 @@ object DefaultSource {
 
   val QUERY_HISTORICAL = "queryHistoricalServers"
   val DEFAULT_QUERY_HISTORICAL = "false"
+
+  val ZK_QUALIFY_DISCOVERY_NAMES = "zkQualifyDiscoveryNames"
+  val DEFAULT_ZK_QUALIFY_DISCOVERY_NAMES = "false"
 }

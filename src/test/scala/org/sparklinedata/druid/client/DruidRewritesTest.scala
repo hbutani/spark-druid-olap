@@ -175,6 +175,7 @@ class DruidRewritesTest extends BaseTest {
 """
   },
     1,
+    true,
     true
   )
 
