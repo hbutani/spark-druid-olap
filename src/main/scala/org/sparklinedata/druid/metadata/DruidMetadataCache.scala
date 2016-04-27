@@ -218,7 +218,7 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
         val cc = new CuratorConnection(host, options, this, this.thrdPool)
         val svr = cc.getCoordinator
         val dc = new DruidCoordinatorClient(svr)
-        val r = dc.serversInfo
+        val r = dc.serversInfo.filter(_.`type` == "historical")
         new DruidClusterInfo(host, cc, MMap[String, DruidDataSourceInfo](), r)
       }
     }
@@ -258,6 +258,30 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     cache(dCI.host) = dCI
   }
 
+  private def getDruidClusterInfoFailure(hostKey : String,
+                          options : DruidRelationOptions,
+                                         datasource : String,
+                          e : Throwable) : DruidClusterInfo = cache.synchronized {
+    clusterInfoFutures.remove(hostKey)
+    e match {
+      case e : DruidDataSourceException => throw e
+      case t : Throwable =>
+        throw new DruidDataSourceException("failed in future invocation", t)
+    }
+  }
+
+  private def getDataSourceInfoFailure(hostKey : String,
+                                         options : DruidRelationOptions,
+                                       datasource : String,
+                                         e : Throwable) : DruidDataSourceInfo = cache.synchronized {
+    dataSourceInfoFutures.remove(datasource)
+    e match {
+      case e : DruidDataSourceException => throw e
+      case t : Throwable =>
+        throw new DruidDataSourceException("failed in future invocation", t)
+    }
+  }
+
   private def _add(dCI : DruidClusterInfo, i : DruidDataSourceInfo)
   : Unit = dCI.synchronized {
     val m = dCI.dataSources.asInstanceOf[MMap[String, DruidDataSourceInfo]]
@@ -283,7 +307,13 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     }
   }
 
-  private def awaitInfo[T](f : Future[T], successAction : T => Unit) : T = {
+  private def awaitInfo[T](hostKey : String,
+                           options : DruidRelationOptions,
+                           dataSource : String,
+                            f : Future[T],
+                           successAction : T => Unit,
+                           failureAction :
+                           (String, DruidRelationOptions, String, Throwable) => T) : T = {
     Await.ready(f, Duration.Inf)
     cache.synchronized {
       f.value match {
@@ -291,11 +321,8 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
           successAction(i)
           i
         }
-        case Some(Failure(e)) =>  e match {
-          case e : DruidDataSourceException => throw e
-          case t : Throwable =>
-            throw new DruidDataSourceException("failed in future invocation", t)
-        }
+        case Some(Failure(e)) =>
+          failureAction(hostKey, options, dataSource, e)
         case None =>
           throw new DruidDataSourceException("internal error: waiting for future didn't happen")
       }
@@ -306,7 +333,8 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
                           options : DruidRelationOptions) : DruidClusterInfo = {
     _get(hostKey, options) match {
       case Left(i) => i
-      case Right(f) => awaitInfo[DruidClusterInfo](f, _put(_))
+      case Right(f) => awaitInfo[DruidClusterInfo](hostKey, options, null, f, _put(_),
+        getDruidClusterInfoFailure)
     }
   }
 
@@ -316,7 +344,8 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     _get(hostKey, datasource, options) match {
       case Left(i) => i
       case Right(f) =>
-        awaitInfo[DruidDataSourceInfo](f, _add(cache(hostKey), _))
+        awaitInfo[DruidDataSourceInfo](hostKey, options, datasource, f,
+          _add(cache(hostKey), _), getDataSourceInfoFailure)
     }
   }
 
