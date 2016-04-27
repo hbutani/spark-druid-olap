@@ -21,10 +21,9 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.types.LongType
-import org.joda.time.DateTime
+import org.sparklinedata.druid.Debugging._
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDimension}
-import Debugging._
 
 trait ProjectFilterTransfom {
   self: DruidPlanner =>
@@ -187,8 +186,14 @@ trait ProjectFilterTransfom {
         }
       }
       case In(AttributeReference(nm, dT, _, _), vl: Seq[Expression]) => {
-        val allLiterals = vl.forall(e => e.isInstanceOf[Literal])
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] && allLiterals)
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] &&
+          (vl.forall(e => e.isInstanceOf[Literal])))
+          yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
+      }
+      case InSet(AttributeReference(nm, dT, _, _), vl: Set[Any]) => {
+        val primitieVals = vl.foldLeft(true)((x,y) =>
+          x & ( y.isInstanceOf[Literal] || !y.isInstanceOf[Expression]))
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] && primitieVals)
           yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
       }
       case Not(e) => {
@@ -199,6 +204,5 @@ trait ProjectFilterTransfom {
       case _ => None
     }
   }
-
 }
 

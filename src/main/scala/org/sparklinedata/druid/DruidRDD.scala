@@ -19,7 +19,8 @@ package org.sparklinedata.druid
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRowWithSchema
-import org.apache.spark.sql.types.{LongType, StringType, StructField}
+import org.apache.spark.sql.catalyst.util.DateTimeUtils.SQLTimestamp
+import org.apache.spark.sql.types.{LongType, StringType, StructField, TimestampType}
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
@@ -98,8 +99,13 @@ class DruidRDD(sqlContext: SQLContext,
    * @return
    */
   def sparkValue(f : StructField, druidVal : Any) : Any = f.dataType match {
+    case TimestampType if druidVal.isInstanceOf[Double] =>
+      druidVal.asInstanceOf[Double].longValue().asInstanceOf[SQLTimestamp]
     case StringType if druidVal != null => UTF8String.fromString(druidVal.toString)
-    case LongType if druidVal.isInstanceOf[BigInt] => druidVal.asInstanceOf[BigInt].longValue()
+    case LongType if druidVal.isInstanceOf[BigInt] =>
+      druidVal.asInstanceOf[BigInt].longValue()
+    case LongType if druidVal.isInstanceOf[Double] =>
+      druidVal.asInstanceOf[Double].longValue()
     case _ => druidVal
   }
 }

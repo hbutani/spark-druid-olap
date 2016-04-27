@@ -18,7 +18,6 @@
 package org.sparklinedata.druid.client
 
 import org.apache.spark.Logging
-import org.apache.spark.sql.hive.test.TestHive
 import org.scalatest.BeforeAndAfterAll
 
 class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
@@ -27,6 +26,15 @@ class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
     "select c_name, sum(c_acctbal) as bal " +
       "from orderLineItemPartSupplier " +
       "where c_mktsegment in ('MACHINERY', 'HOUSEHOLD') " +
+      "group by c_name",
+    1,
+    true)
+
+  test("inclauseTest2",
+    "select c_name, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where l_linenumber in (1, 2, 3, 4, 5, 6, 7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22," +
+      "23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45) " +
       "group by c_name",
     1,
     true)

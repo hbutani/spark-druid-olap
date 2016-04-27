@@ -19,19 +19,18 @@ package org.sparklinedata.druid.jscodegen
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.util.TypeUtils
 import org.apache.spark.sql.types._
-import org.sparklinedata.druid
 import org.sparklinedata.druid.DruidQueryBuilder
-import org.sparklinedata.druid.metadata._
 import org.sparklinedata.druid.jscodegen.JSDateTimeCtx._
+import org.sparklinedata.druid.metadata._
 
 import scala.collection.mutable
 import scala.language.reflectiveCalls
 
 
-case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression,
-                           mulInParamsAllowed: Boolean, tz_id: String) extends Logging {
+case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAllowed: Boolean,
+                           metricAllowed: Boolean, tz_id: String,
+                           retType: DataType = StringType) extends Logging {
   private[this] var uid: Int = 0
   private[jscodegen] def makeUniqueVarName: String = {
     uid += 1
@@ -40,15 +39,21 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression,
   private[this] var inParams: mutable.HashSet[String] = mutable.HashSet()
   private[jscodegen] val dateTimeCtx = new JSDateTimeCtx(tz_id, this)
 
-  def fnCode: Option[String] =
+  private[jscodegen] def fnElements: Option[(String, String)] =
     for (fnb <- genExprCode(e) if inParams.nonEmpty;
-         rStmt <- JSCast(fnb, StringType, this).castCode) yield {
-      s"""function (${fnParams.mkString(", ")}) {
+         rStmt <- JSCast(fnb, retType, this).castCode) yield {
+      (s"""
             ${dateTimeCtx.dateTimeInitCode}
             ${fnb.linesSoFar}
-            ${rStmt.linesSoFar}
+            ${rStmt.linesSoFar}""".stripMargin, rStmt.getRef)
+    }
 
-            return(${rStmt.getRef});
+  def fnCode: Option[String] =
+    for (fne <- fnElements) yield {
+      s"""function (${fnParams.mkString(", ")}) {
+            ${fne._1}
+
+            return(${fne._2});
             }""".stripMargin
     }
 
@@ -64,9 +69,10 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression,
     e match {
       case AttributeReference(nm, dT, _, _) =>
         for (dD <- dqb.druidColumn(nm);
-             v = if (dD.isInstanceOf[DruidTimeDimension]) dqb.druidColumn(nm).get.name else nm;
-             if (dD.isInstanceOf[DruidDimension] || dD.isInstanceOf[DruidTimeDimension]) &&
-               validInParams(v)) yield {
+             v = dqb.druidColumn(nm).get.name
+             if ((dD.isInstanceOf[DruidTimeDimension] ||
+               (metricAllowed && dD.isInstanceOf[DruidMetric]) ||
+               dD.isInstanceOf[DruidDimension]) && validInParams(v))) yield {
           new JSExpr(v, e.dataType, dD.isInstanceOf[DruidTimeDimension])
         }
 
@@ -269,6 +275,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression,
   }
 
   private[this] def validInParams(inParam: String): Boolean = {
-    if (!mulInParamsAllowed && ((inParams += inParam).size > 1)) false else true
+    inParams += inParam
+    if (!mulInParamsAllowed && (inParams.size > 1)) false else true
   }
 }

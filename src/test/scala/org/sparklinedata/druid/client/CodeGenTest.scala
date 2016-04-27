@@ -371,4 +371,46 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       "order by o_orderdate, x",
     0,
     true, true)
+
+  test("aggTest1",
+    """
+      |SELECT MIN(CAST(CAST(l_shipdate AS TIMESTAMP) AS TIMESTAMP)) AS x,
+      |       MAX(CAST(CAST(l_shipdate AS TIMESTAMP) AS TIMESTAMP)) AS y,
+      |	  COUNT(1) AS c
+      |   FROM ( select * from orderLineItemPartSupplier ) custom_sql_query
+      |   HAVING (COUNT(1) > 0)
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("aggTest1B",
+    """
+      |SELECT MIN(CAST(CAST(l_shipdate AS TIMESTAMP) AS TIMESTAMP)) AS x,
+      |       MAX(CAST(CAST(l_shipdate AS TIMESTAMP) AS TIMESTAMP)) AS y,
+      |	  COUNT(1) AS c
+      |   FROM ( select * from orderLineItemPartSupplierBase ) custom_sql_query
+      |   HAVING (COUNT(1) > 0)
+    """.stripMargin,
+    0, true, true
+  )
+
+  test("aggTest2",
+    """
+      |SELECT sum(l_quantity + 10) as s, MIN(l_quantity + 10) AS mi,
+      |          MAX(l_quantity + 10) ma, COUNT(1) AS c
+      |   FROM ( select * from orderLineItemPartSupplier ) custom_sql_query
+      |   HAVING (COUNT(1) > 0) order by s, mi, ma
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("aggTest2B",
+    """
+      |SELECT sum(l_quantity + 10) as s, MIN(l_quantity + 10) AS mi,
+      |          MAX(l_quantity + 10) ma, COUNT(1) AS c
+      |   FROM ( select * from orderLineItemPartSupplierBase ) custom_sql_query
+      |   HAVING (COUNT(1) > 0) order by s, mi, ma
+    """.stripMargin,
+    0, true, true
+  )
 }
