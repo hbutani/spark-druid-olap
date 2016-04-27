@@ -20,11 +20,11 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Expand, Project, Aggregate}
-import org.apache.spark.sql.types.{DoubleType, LongType, IntegerType, StringType}
-import org.sparklinedata.druid.jscodegen.JSCodeGenerator
-import org.sparklinedata.druid.metadata._
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Expand, LogicalPlan, Project}
+import org.apache.spark.sql.types._
 import org.sparklinedata.druid._
+import org.sparklinedata.druid.jscodegen.{JSAggGenerator, JSCodeGenerator}
+import org.sparklinedata.druid.metadata._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -83,7 +83,7 @@ trait AggregateTransform {
         )
       }
       case _ => {
-        val codeGen = JSCodeGenerator(dqb, ge, false,
+        val codeGen = JSCodeGenerator(dqb, ge, false, false,
           sqlContext.getConf(DruidPlanner.TZ_ID).toString)
         for (fn <- codeGen.fnCode) yield {
           val outDName = dqb.nextAlias(codeGen.fnParams.last)
@@ -334,6 +334,16 @@ trait AggregateTransform {
       val a = dqb.nextAlias
       Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
         outputAttribute(a, aggExp, aggExp.dataType, LongType))
+    }
+      // TODO: Make this the last option
+    case (_, c) if JSAggGenerator.JSAggCandidate(dqb, c) => {
+      val jsag = JSAggGenerator(dqb, c, sqlContext.getConf(DruidPlanner.TZ_ID).toString);
+      for (fna <- jsag.fnAggregate; fnc <- jsag.fnCombine; fnr <- jsag.fnReset;
+           aggFnName <- jsag.aggFnName; fnName = dqb.nextAlias(aggFnName);
+           fnparams <- jsag.fnParams; at <- jsag.druidType) yield {
+        dqb.aggregate(JavascriptAggregationSpec("javascript", fnName,
+          fnparams, fna, fnc, fnr)).outputAttribute(fnName, aggExp, aggExp.dataType, at)
+      }
     }
     case (_, c) => {
       val a = dqb.nextAlias

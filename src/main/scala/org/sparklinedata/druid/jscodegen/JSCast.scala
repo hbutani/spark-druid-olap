@@ -19,7 +19,6 @@ package org.sparklinedata.druid.jscodegen
 
 import org.apache.spark.sql.types._
 import org.sparklinedata.druid.jscodegen.JSDateTimeCtx._
-import org.sparklinedata.druid.jscodegen.JSCodeGenerator._
 
 case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
   private[jscodegen] val castCode: Option[JSExpr] =
@@ -62,7 +61,7 @@ case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
       case DateType =>
         Some(new JSExpr(s"null", outDt))
       case TimestampType =>
-        Some(new JSExpr(s"Number(${dtToIntegerCode(from.getRef)})", outDt))
+        Some(new JSExpr(s"Number(${dtToLongCode(from.getRef)})", outDt))
       case _ => None
     }
 

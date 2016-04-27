@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.metadata
 
 import org.apache.spark.Logging
-import org.apache.spark.sql.{SQLContext, DataFrame}
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types._
 
 import scala.collection.mutable.{Map => MMap}
@@ -31,6 +31,8 @@ case class DruidRelationInfo(val host : String,
                          val fd : FunctionalDependencies,
                             val starSchema : StarSchema,
                          val options : DruidRelationOptions) {
+
+  lazy val dimensionNamesSet = druidDS.dimensions.map(_.name).toSet
 
   def sourceDF(sqlContext : SQLContext) = sqlContext.table(sourceDFName)
 
@@ -51,7 +53,8 @@ private[druid] object MappingBuilder extends Logging {
 
   /**
    * Only top level Numeric and String Types are mapped.
-   * @param dT
+    *
+    * @param dT
    * @return
    */
   def supportedDataType(dT : DataType) : Boolean = dT match {

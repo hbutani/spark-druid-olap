@@ -146,7 +146,7 @@ abstract class BaseTest extends fixture.FunSuite with
 
   override def beforeAll() = {
 
-    TestHive.sparkContext.setLogLevel("WARN")
+    TestHive.sparkContext.setLogLevel("INFO")
 
     register(TestHive)
     DruidPlanner(TestHive)

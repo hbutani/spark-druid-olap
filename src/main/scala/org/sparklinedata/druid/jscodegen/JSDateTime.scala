@@ -93,7 +93,7 @@ private[jscodegen] object JSDateTimeCtx {
     s"$ld.toDateTimeAtStartOfDay(${ctx.tzVar})"
   }
 
-  private[jscodegen] def dtToIntegerCode(ts: String) = s"$ts.getMillis()"
+  private[jscodegen] def dtToLongCode(ts: String) = s"$ts.getMillis()*1000"
 
   private[jscodegen] def dtToSecondsCode(ts: String) = s"Math.floor($ts.getMillis()/1000)"
 
