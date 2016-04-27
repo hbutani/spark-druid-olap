@@ -93,7 +93,11 @@ abstract class DruidClient(val host : String,
       respStr <- Try {
         val status = r.getStatusLine().getStatusCode();
         if (status >= 200 && status < 300) {
-          IOUtils.toString(r.getEntity.getContent)
+          if (r.getEntity != null ) {
+            IOUtils.toString(r.getEntity.getContent)
+          } else {
+            throw new DruidDataSourceException(s"Unexpected response status: ${r.getStatusLine}")
+          }
         } else {
           throw new DruidDataSourceException(s"Unexpected response status: ${r.getStatusLine}")
         }
