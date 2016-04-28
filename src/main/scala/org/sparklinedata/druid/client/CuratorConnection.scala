@@ -65,6 +65,8 @@ class CuratorConnection(val zkHosts : String,
     }
   }
 
+  childrenCache.getListenable.addListener(listener)
+
   framework.start()
   childrenCache.start(StartMode.BUILD_INITIAL_CACHE)
 
