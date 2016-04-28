@@ -195,7 +195,9 @@ abstract class DruidClient(val host : String,
 
     val jR = compact(render(
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
-        ("intervals" -> List(i)) ~ ("merge" -> "true")
+        ("intervals" -> List(i)) ~
+        ("analysisTypes" -> List[String]()) ~
+        ("merge" -> "false")
     ))
     val jV = post(url, jR) transformField {
       case ("type", x) => ("typ", x)
