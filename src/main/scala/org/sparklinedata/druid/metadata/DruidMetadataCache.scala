@@ -146,7 +146,7 @@ trait DruidRelationInfoCache {
 
   type DruidDataSourceKey = (String, String)
 
-  private val druidRelationInfoMap : MMap[DruidDataSourceKey, DruidRelationInfo] = MMap()
+  private[metadata] val druidRelationInfoMap : MMap[DruidDataSourceKey, DruidRelationInfo] = MMap()
 
   // scalastyle:off parameter.number
   private def _druidRelation(sqlContext : SQLContext,
@@ -367,7 +367,10 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     _get(host, dataSource, options)
   }
 
-  def clearCache(host : String) : Unit = cache.synchronized(cache.clear())
+  def clearCache(host : String) : Unit = druidRelationInfoMap.synchronized {
+    druidRelationInfoMap.clear()
+    cache.synchronized(cache.clear())
+  }
 
 
 }
