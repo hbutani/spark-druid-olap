@@ -81,7 +81,17 @@ class DruidRDD(sqlContext: SQLContext,
       drInfo.options,
       dQuery.intervalSplits
     )
-    hAssigns.zipWithIndex.map(t => new HistoricalPartition(t._2, t._1)).toArray
+      var idx = -1
+      val numSegmentsPerQuery = drInfo.options.numSegmentsPerHistoricalQuery
+
+      (for(
+        hA <- hAssigns;
+           ins <- hA.intervals.sliding(numSegmentsPerQuery,numSegmentsPerQuery)
+      ) yield {
+        idx = idx + 1
+        new HistoricalPartition(idx, new HistoricalServerAssignment(hA.server, ins))
+      }
+        ).toArray
   } else {
       val broker = DruidMetadataCache.getDruidClusterInfo(drInfo.host,
         drInfo.options).curatorConnection.getBroker

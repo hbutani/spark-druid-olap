@@ -115,6 +115,10 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(ZK_QUALIFY_DISCOVERY_NAMES).
         getOrElse(DEFAULT_ZK_QUALIFY_DISCOVERY_NAMES).toBoolean
 
+    val numSegmentsPerHistoricalQuery : Int =
+      parameters.get(NUM_SEGMENTS_PER_HISTORICAL_QUERY).
+        getOrElse(DEFAULT_NUM_SEGMENTS_PER_HISTORICAL_QUERY).toInt
+
     val options = DruidRelationOptions(
       maxCardinality,
       cardinalityPerDruidQuery,
@@ -125,7 +129,8 @@ class DefaultSource extends RelationProvider with Logging {
       zkEnableCompression,
       zkDruidPath,
       queryHistorical,
-      zkQualifyDiscoveryNames
+      zkQualifyDiscoveryNames,
+      numSegmentsPerHistoricalQuery
     )
 
 
@@ -234,4 +239,7 @@ object DefaultSource {
 
   val ZK_QUALIFY_DISCOVERY_NAMES = "zkQualifyDiscoveryNames"
   val DEFAULT_ZK_QUALIFY_DISCOVERY_NAMES = "false"
+
+  val NUM_SEGMENTS_PER_HISTORICAL_QUERY = "numSegmentsPerHistoricalQuery"
+  val DEFAULT_NUM_SEGMENTS_PER_HISTORICAL_QUERY = Int.MaxValue.toString
 }

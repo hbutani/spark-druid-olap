@@ -47,7 +47,8 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 zkEnableCompression : Boolean,
                                 zkDruidPath : String,
                                 queryHistoricalServers : Boolean,
-                                zkQualifyDiscoveryNames : Boolean)
+                                zkQualifyDiscoveryNames : Boolean,
+                                numSegmentsPerHistoricalQuery : Int)
 
 private[druid] object MappingBuilder extends Logging {
 
