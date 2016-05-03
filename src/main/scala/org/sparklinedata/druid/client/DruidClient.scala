@@ -187,22 +187,34 @@ abstract class DruidClient(val host : String,
   @throws(classOf[DruidDataSourceException])
   def metadata(url : String,
                dataSource : String,
+               seg : DruidSegmentInfo,
                fullIndex : Boolean) : DruidDataSource = {
 
     val in = timeBoundary(dataSource)
+    val ins : JValue = if ( seg != null ) {
+      val part : Int = seg.shardSpec.flatMap(_.partitionNum).getOrElse(0)
+      (
+        ("type" -> "segments") ~
+          ("segments" -> List((
+            ("itvl" -> seg.interval) ~
+              ("ver" -> seg.version) ~
+              ( "part" -> part)
+            )))
+        )
+    } else {
+      val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
+      List(i)
+    }
 
-    val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
-
-    val jR = compact(render(
+    val jR = pretty(render(
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
-        ("intervals" -> List(i)) ~
+        ("intervals" -> ins) ~
         ("analysisTypes" -> List[String]()) ~
         ("merge" -> "false")
     ))
     val jV = post(url, jR) transformField {
       case ("type", x) => ("typ", x)
     }
-
     val l = jV.extract[List[MetadataResponse]]
     DruidDataSource(dataSource, l.head, List(in))
   }
@@ -254,7 +266,7 @@ class DruidQueryServerClient(host : String, port : Int)
 
   @throws(classOf[DruidDataSourceException])
   def metadata(dataSource : String, fullIndex : Boolean) : DruidDataSource = {
-    metadata(url, dataSource, fullIndex)
+    metadata(url, dataSource, null, fullIndex)
   }
 
   @throws(classOf[DruidDataSourceException])
@@ -375,12 +387,12 @@ class DruidCoordinatorClient(host : String, port : Int)
   }
 
   @throws(classOf[DruidDataSourceException])
-  def metadataFromHistorical(histServer : String,
+  def metadataFromHistorical(histServer : HistoricalServerInfo,
                dataSource : String,
                fullIndex : Boolean) : DruidDataSource = {
-    val (h,p) = DruidClient.hosPort(histServer)
+    val (h,p) = DruidClient.hosPort(histServer.host)
     val url = s"http://$h:$p/druid/v2/?pretty"
-    metadata(url, dataSource, fullIndex)
+    metadata(url, dataSource, histServer.segments.values.head, fullIndex)
   }
 
   @throws(classOf[DruidDataSourceException])

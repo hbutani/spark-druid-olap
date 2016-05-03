@@ -34,12 +34,19 @@ case class DruidNode(name : String,
                      address : String,
                      port : Int)
 
+case class ShardSpec(
+                      `type` : String,
+                      partitionNum : Option[Int],
+                      partitions : Option[Int]
+)
+
 case class DruidSegmentInfo(dataSource : String,
                             interval : String,
                             version : String,
                             binaryVersion : String,
                             size : Long,
-                            identifier : String
+                            identifier : String,
+                            shardSpec : Option[ShardSpec]
                            ) {
 
   lazy val _interval = Interval.parse(interval)
@@ -226,7 +233,7 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
   }
 
     private def dataSourceInfoFuture(dCI : DruidClusterInfo,
-                                   histServer : String,
+                                   histServer : HistoricalServerInfo,
                                    datasource : String,
                                      options : DruidRelationOptions) :
   Future[DruidDataSourceInfo] =
@@ -297,12 +304,12 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
         if ( dCI.dataSources.contains(dataSource)) {
           Left(dCI.dataSources(dataSource))
         } else {
-          Right(dataSourceInfoFuture(dCI, dCI.histServers.head.host, dataSource, options))
+          Right(dataSourceInfoFuture(dCI, dCI.histServers.head, dataSource, options))
         }
       }
       case Right(f) => Right(f.flatMap{ dCI =>
         _put(dCI)
-        dataSourceInfoFuture(dCI, dCI.histServers.head.host, dataSource, options)
+        dataSourceInfoFuture(dCI, dCI.histServers.head, dataSource, options)
       })
     }
   }
