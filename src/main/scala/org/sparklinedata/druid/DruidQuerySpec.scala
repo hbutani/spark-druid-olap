@@ -18,10 +18,9 @@
 package org.sparklinedata.druid
 
 import scala.collection.breakOut
-import org.apache.spark.sql.types.{DoubleType, LongType, StringType, DataType}
+import org.apache.spark.sql.types.{DataType, DoubleType, LongType, StringType}
 import org.joda.time.Interval
-
-import org.sparklinedata.druid.metadata.{DruidDataType, DruidDataSource}
+import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDataType, DruidSegmentInfo}
 
 sealed trait ExtractionFunctionSpec {
   val `type`: String
@@ -408,14 +407,36 @@ case class InvertedTopNMetricSpec(
                                    val metric: TopNMetricSpec
                                    ) extends TopNMetricSpec
 
+
+case class SegmentInterval(itvl : String,
+                           ver : String,
+                           part : Option[Int]
+                          )
+
+case class SegmentIntervals(`type` : String,
+                            segments : List[SegmentInterval]
+                           ) {
+  def this(segInAssignments: List[(DruidSegmentInfo, Interval)]) = {
+    this("segments", segInAssignments.map {
+      case (segInfo, in) =>
+        val itvl: String = in.toString
+        val ver: String = segInfo.version
+        val part: Option[Int] = segInfo.shardSpec.flatMap(_.partitionNum)
+        SegmentInterval(itvl, ver, part)
+    }
+    )
+  }
+}
+
 // TODO: look into exposing ContextSpec
 sealed trait QuerySpec {
   self : Product =>
   val queryType: String
   val dataSource: String
-  val intervals: List[String]
 
+  def intervalList: List[String]
   def setIntervals(ins : List[Interval]) : QuerySpec
+  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec
 
   def dimensions : List[DimensionSpec] = Nil
   def aggregations : List[AggregationSpec] = Nil
@@ -447,6 +468,43 @@ case class GroupByQuerySpec(
     aggregations, postAggregations, intervals)
 
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
+  def intervalList: List[String] = intervals
+
+  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec =
+    GroupByQuerySpecWithSegIntervals(
+      queryType,
+      dataSource,
+      dimensions,
+      limitSpec,
+      having,
+      granularity,
+      filter,
+      aggregations,
+      postAggregations,
+      null
+    ).setSegIntervals(segIns)
+}
+
+case class GroupByQuerySpecWithSegIntervals(
+                             val queryType: String,
+                             val dataSource: String,
+                             override val dimensions: List[DimensionSpec],
+                             val limitSpec: Option[LimitSpec],
+                             val having: Option[HavingSpec],
+                             val granularity: Either[String,GranularitySpec],
+                             val filter: Option[FilterSpec],
+                             override val aggregations: List[AggregationSpec],
+                             override val postAggregations: Option[List[PostAggregationSpec]],
+                             val intervals: SegmentIntervals
+                           ) extends QuerySpec {
+
+  override def intervalList: List[String] = intervals.segments.map(_.itvl)
+
+  override def setSegIntervals(segInAssignments: List[(DruidSegmentInfo, Interval)]): QuerySpec = {
+    this.copy(intervals = new SegmentIntervals(segInAssignments))
+  }
+
+  override def setIntervals(ins: List[Interval]): QuerySpec = ???
 }
 
 case class TimeSeriesQuerySpec(
@@ -467,6 +525,9 @@ case class TimeSeriesQuerySpec(
     dataSource, intervals, granularity, filters, aggregations, postAggregations)
 
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
+  def intervalList: List[String] = intervals
+
+  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec = ???
 }
 
 case class TopNQuerySpec(
@@ -494,4 +555,7 @@ case class TopNQuerySpec(
     postAggregations, dimension, threshold, metric)
 
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
+  def intervalList: List[String] = intervals
+
+  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec = ???
 }

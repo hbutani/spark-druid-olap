@@ -44,7 +44,7 @@ case class DruidQuery(q : QuerySpec,
 
   def this(q : QuerySpec,
            queryHistoricalServer : Boolean = false) =
-    this(q, queryHistoricalServer, q.intervals.map(Interval.parse(_)), None)
+    this(q, queryHistoricalServer, q.intervalList.map(Interval.parse(_)), None)
 
   private def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType = {
 

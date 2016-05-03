@@ -30,17 +30,30 @@ import org.joda.time.Interval
 import org.sparklinedata.druid.client.{DruidQueryServerClient, QueryResultRow}
 import org.sparklinedata.druid.metadata.DruidMetadataCache
 import org.sparklinedata.druid.metadata.DruidRelationInfo
+import org.sparklinedata.druid.metadata.DruidSegmentInfo
 import org.sparklinedata.druid.metadata.HistoricalServerAssignment
 
 abstract class DruidPartition extends Partition {
   def queryClient : DruidQueryServerClient
   def intervals : List[Interval]
+  def segIntervals : List[(DruidSegmentInfo, Interval)]
+
+  def setIntervalsOnQuerySpec(q : QuerySpec) : QuerySpec = {
+    if ( segIntervals == null) {
+      q.setIntervals(intervals)
+    } else {
+      q.setSegIntervals(segIntervals)
+    }
+  }
 }
 
 class HistoricalPartition(idx: Int, val hs : HistoricalServerAssignment) extends DruidPartition {
   override def index: Int = idx
   def queryClient : DruidQueryServerClient = new DruidQueryServerClient(hs.server.host)
-  def intervals : List[Interval] = hs.intervals
+
+  def intervals : List[Interval] = hs.segmentIntervals.map(_._2)
+
+  def segIntervals : List[(DruidSegmentInfo, Interval)] = hs.segmentIntervals
 }
 
 class BrokerPartition(idx: Int,
@@ -49,6 +62,8 @@ class BrokerPartition(idx: Int,
   override def index: Int = idx
   def queryClient : DruidQueryServerClient = new DruidQueryServerClient(broker)
   def intervals : List[Interval] = List(i)
+
+  def segIntervals : List[(DruidSegmentInfo, Interval)] = null
 }
 
 
@@ -60,7 +75,7 @@ class DruidRDD(sqlContext: SQLContext,
 
 
     val p = split.asInstanceOf[DruidPartition]
-    val mQry = dQuery.q.setIntervals(p.intervals)
+    val mQry = p.setIntervalsOnQuerySpec(dQuery.q)
     Utils.logQuery(mQry)
     val client = p.queryClient
     val dr = client.executeQueryAsStream(mQry)
@@ -86,10 +101,10 @@ class DruidRDD(sqlContext: SQLContext,
 
       (for(
         hA <- hAssigns;
-           ins <- hA.intervals.sliding(numSegmentsPerQuery,numSegmentsPerQuery)
+           segIns <- hA.segmentIntervals.sliding(numSegmentsPerQuery,numSegmentsPerQuery)
       ) yield {
         idx = idx + 1
-        new HistoricalPartition(idx, new HistoricalServerAssignment(hA.server, ins))
+        new HistoricalPartition(idx, new HistoricalServerAssignment(hA.server, segIns))
       }
         ).toArray
   } else {

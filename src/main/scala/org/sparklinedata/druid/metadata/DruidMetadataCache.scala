@@ -83,7 +83,7 @@ case class DruidClusterInfo(host : String,
   def historicalServers(datasource : String, ins : List[Interval]) :
   List[HistoricalServerAssignment] = {
 
-    val m : MMap[String, (HistoricalServerInfo, List[Interval])] = MMap()
+    val m : MMap[String, (HistoricalServerInfo, List[(DruidSegmentInfo, Interval)])] = MMap()
 
     /**
       * - favor the higher priority server
@@ -112,9 +112,10 @@ case class DruidClusterInfo(host : String,
         val s = histServers.filter(_.handlesSegment(seg.identifier)).sorted.head
         if (m.contains(s.host)) {
           val v = m(s.host)
-          m(s.host) = (v._1, segIn :: v._2)
+          val segInTuple  = (seg, segIn)
+          m(s.host) = (v._1, segInTuple :: v._2)
         } else {
-          m(s.host) = (s, List(segIn))
+          m(s.host) = (s, List((seg,segIn)))
         }
       }
     }
@@ -207,7 +208,7 @@ trait DruidRelationInfoCache {
 }
 
 case class HistoricalServerAssignment(server : HistoricalServerInfo,
-                                      intervals : List[Interval])
+                                      segmentIntervals : List[(DruidSegmentInfo, Interval)])
 
 object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCache {
 
