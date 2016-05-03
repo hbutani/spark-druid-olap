@@ -83,7 +83,7 @@ case class DruidClusterInfo(host : String,
   def historicalServers(datasource : String, ins : List[Interval]) :
   List[HistoricalServerAssignment] = {
 
-    val m : MMap[HistoricalServerInfo, List[Interval]] = MMap()
+    val m : MMap[String, (HistoricalServerInfo, List[Interval])] = MMap()
 
     /**
       * - favor the higher priority server
@@ -93,11 +93,11 @@ case class DruidClusterInfo(host : String,
     implicit val o = new Ordering[HistoricalServerInfo] {
       override def compare(x: HistoricalServerInfo, y: HistoricalServerInfo): Int = {
         if (x.priority == y.priority) {
-          (m.get(x), m.get(y)) match {
+          (m.get(x.host), m.get(y.host)) match {
             case (None, None) => 0 // x
             case (None, _) => -1 // x
             case (_, None) => 1 // y
-            case (Some(l1), Some(l2)) => l1.size - l2.size
+            case (Some((i1, l1)), Some((i2, l2))) => l1.size - l2.size
           }
 
         } else {
@@ -110,16 +110,17 @@ case class DruidClusterInfo(host : String,
       dataSources(datasource)._1.segmentsToScan(in).map { seg =>
         val segIn = seg._interval.overlap(in)
         val s = histServers.filter(_.handlesSegment(seg.identifier)).sorted.head
-        if (m.contains(s)) {
-          m(s) = segIn :: m(s)
+        if (m.contains(s.host)) {
+          val v = m(s.host)
+          m(s.host) = (v._1, segIn :: v._2)
         } else {
-          m(s) = List(segIn)
+          m(s.host) = (s, List(segIn))
         }
       }
     }
 
     m.map {
-      case (h, l) => HistoricalServerAssignment(h,l)
+      case (h, t) => HistoricalServerAssignment(t._1,t._2)
     }.toList
   }
 
