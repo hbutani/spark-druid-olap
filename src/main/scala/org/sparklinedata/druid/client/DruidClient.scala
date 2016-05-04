@@ -26,7 +26,8 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.util.EntityUtils
 import org.apache.spark.Logging
 import org.apache.spark.sql.{DataFrame, SQLContext}
-import org.apache.spark.sql.sources.druid.DruidQueryResultIterator
+import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryResultIterator}
+
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
@@ -39,7 +40,21 @@ import scala.collection.mutable.{Map => MMap}
 import scala.util.Try
 
 object ConnectionManager {
-  val pool = new PoolingHttpClientConnectionManager
+  val pool = {
+    val p = new PoolingHttpClientConnectionManager
+    p.setMaxTotal(40)
+    p.setDefaultMaxPerRoute(8)
+    p
+  }
+
+  // Todo execute this in each Executor process
+  // for now each Executor gets the built-in values.
+  def init(sqlContext : SQLContext): Unit = {
+    pool.setMaxTotal(DruidPlanner.getConfValue(sqlContext,
+      DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS))
+    pool.setDefaultMaxPerRoute(DruidPlanner.getConfValue(sqlContext,
+      DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS_PER_ROUTE))
+  }
 }
 
 abstract class DruidClient(val host : String,

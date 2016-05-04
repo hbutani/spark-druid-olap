@@ -33,6 +33,8 @@ import org.sparklinedata.druid.metadata.DruidRelationInfo
 import org.sparklinedata.druid.metadata.DruidSegmentInfo
 import org.sparklinedata.druid.metadata.HistoricalServerAssignment
 
+import scala.util.Random
+
 abstract class DruidPartition extends Partition {
   def queryClient : DruidQueryServerClient
   def intervals : List[Interval]
@@ -99,14 +101,17 @@ class DruidRDD(sqlContext: SQLContext,
       var idx = -1
       val numSegmentsPerQuery = drInfo.options.numSegmentsPerHistoricalQuery
 
-      (for(
+      val l  = (for(
         hA <- hAssigns;
            segIns <- hA.segmentIntervals.sliding(numSegmentsPerQuery,numSegmentsPerQuery)
       ) yield {
         idx = idx + 1
         new HistoricalPartition(idx, new HistoricalServerAssignment(hA.server, segIns))
       }
-        ).toArray
+        )
+
+      val l1 : Array[Partition] = Random.shuffle(l).toArray
+      l1
   } else {
       val broker = DruidMetadataCache.getDruidClusterInfo(drInfo.host,
         drInfo.options).curatorConnection.getBroker
