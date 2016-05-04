@@ -428,6 +428,20 @@ case class SegmentIntervals(`type` : String,
   }
 }
 
+object SegmentIntervals {
+
+  def segmentIntervals(segInAssignments: List[DruidSegmentInfo]) : SegmentIntervals = {
+    SegmentIntervals("segments", segInAssignments.map {
+      case segInfo =>
+        val itvl: String = segInfo.interval
+        val ver: String = segInfo.version
+        val part: Option[Int] = segInfo.shardSpec.flatMap(_.partitionNum)
+        SegmentInterval(itvl, ver, part)
+    }
+    )
+  }
+}
+
 // TODO: look into exposing ContextSpec
 sealed trait QuerySpec {
   self : Product =>

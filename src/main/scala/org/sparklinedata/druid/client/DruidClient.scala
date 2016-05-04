@@ -27,14 +27,11 @@ import org.apache.http.util.EntityUtils
 import org.apache.spark.Logging
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryResultIterator}
-
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
-import org.sparklinedata.druid.{DruidDataSourceException, QuerySpec}
+import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.{DependencyGraph, DruidRelationInfo, _}
-import org.sparklinedata.druid.Utils
-import org.sparklinedata.druid.CloseableIterator
 
 import scala.collection.mutable.{Map => MMap}
 import scala.util.Try
@@ -147,7 +144,8 @@ abstract class DruidClient(val host : String,
       if (status >= 200 && status < 300) {
         DruidQueryResultIterator(resp.getEntity.getContent, {release(resp)})
       } else {
-        throw new DruidDataSourceException(s"Unexpected response status: ${resp.getStatusLine}")
+        throw new DruidDataSourceException(s"Unexpected response status: ${resp.getStatusLine} " +
+          s"on $url for query: \n $payload")
       }
     } catch {
       case dE: DruidDataSourceException => throw dE
@@ -202,20 +200,12 @@ abstract class DruidClient(val host : String,
   @throws(classOf[DruidDataSourceException])
   def metadata(url : String,
                dataSource : String,
-               seg : DruidSegmentInfo,
+               segs : List[DruidSegmentInfo],
                fullIndex : Boolean) : DruidDataSource = {
 
     val in = timeBoundary(dataSource)
-    val ins : JValue = if ( seg != null ) {
-      val part : Int = seg.shardSpec.flatMap(_.partitionNum).getOrElse(0)
-      (
-        ("type" -> "segments") ~
-          ("segments" -> List((
-            ("itvl" -> seg.interval) ~
-              ("ver" -> seg.version) ~
-              ( "part" -> part)
-            )))
-        )
+    val ins : JValue = if ( segs != null ) {
+      Extraction.decompose(SegmentIntervals.segmentIntervals(segs))
     } else {
       val i = if (fullIndex) in.toString else in.withEnd(in.getStart.plusMillis(1)).toString
       List(i)
@@ -227,6 +217,7 @@ abstract class DruidClient(val host : String,
         ("analysisTypes" -> List[String]()) ~
         ("merge" -> "false")
     ))
+
     val jV = post(url, jR) transformField {
       case ("type", x) => ("typ", x)
     }
@@ -407,7 +398,7 @@ class DruidCoordinatorClient(host : String, port : Int)
                fullIndex : Boolean) : DruidDataSource = {
     val (h,p) = DruidClient.hosPort(histServer.host)
     val url = s"http://$h:$p/druid/v2/?pretty"
-    metadata(url, dataSource, histServer.segments.values.head, fullIndex)
+    metadata(url, dataSource, histServer.segments.values.toList, fullIndex)
   }
 
   @throws(classOf[DruidDataSourceException])
