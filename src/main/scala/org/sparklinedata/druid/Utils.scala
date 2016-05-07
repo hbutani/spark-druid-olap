@@ -18,14 +18,12 @@
 package org.sparklinedata.druid
 
 import org.apache.spark.Logging
+import org.joda.time.DateTimeZone
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
 import org.json4s.{Extraction, ShortTypeHints}
-
 import org.sparklinedata.druid.client.QueryResultRowSerializer
-
-
 import org.sparklinedata.druid.metadata._
 
 import scala.util.Random
@@ -121,6 +119,8 @@ object Utils extends Logging {
   a.filter{ case Some(x) => true; case _ => false }
 
   def permute(s: String): String = StringPermute.permute(s)
+
+  def defaultTZ : String = DateTimeZone.getDefault.getID
 }
 
 /**

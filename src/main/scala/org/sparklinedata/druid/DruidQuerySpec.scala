@@ -17,6 +17,8 @@
 
 package org.sparklinedata.druid
 
+import java.util.Locale
+
 import scala.collection.breakOut
 import org.apache.spark.sql.types.{DataType, DoubleType, LongType, StringType}
 import org.joda.time.Interval
@@ -68,8 +70,9 @@ case class TimeFormatExtractionFunctionSpec(val `type`: String,
                                             val timeZone: Option[String],
                                             val locale: Option[String])
   extends ExtractionFunctionSpec {
-  def this(format: String, timeZone: Option[String] = None) =
-    this("timeFormat", format, timeZone, None)
+  def this(format: String,
+           timeZone: Option[String]) =
+    this("timeFormat", format, timeZone, Some(Locale.getDefault.toString))
 }
 
 case class TimeParsingExtractionFunctionSpec(val `type`: String,

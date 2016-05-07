@@ -135,7 +135,7 @@ class DateTimeWithZoneExtractor(val dqb : DruidQueryBuilder) {
     case ScalaUDF(fn, _, Seq(AttributeReference(nm, _, _, _)), _)
       if fn == dateTimeFn  => {
       val dC = dqb.druidColumn(nm)
-      dC.filter(_.isDimension()).map((nm, _, None))
+      dC.filter(_.isDimension()).map((nm, _, Some(Utils.defaultTZ)))
     }
     case ScalaUDF(fn, _, Seq(rExtractor((nm, dC, None)), Literal(tzId, StringType)), _)
       if fn == withZoneFn  => {
@@ -232,14 +232,14 @@ class SparkNativeTimeElementExtractor(val dqb : DruidQueryBuilder) {
 
   def unapply(e : Expression) : Option[DateTimeGroupingElem] = e match {
     case Cast(c@dcExtractor(dc), DateType) =>
-      Some(DateTimeGroupingElem(dqb.nextAlias, dc, DATE_FORMAT, None, c))
+      Some(DateTimeGroupingElem(dqb.nextAlias, dc, DATE_FORMAT, Some(Utils.defaultTZ), c))
     case Cast(timeExtractor(dtGrp), DateType) =>
       Some(DateTimeGroupingElem(dtGrp.outputName,
         dtGrp.druidColumn, DATE_FORMAT,
         dtGrp.tzForFormat, dtGrp.pushedExpression))
     case Cast(c@dcExtractor(dc), TimestampType) =>
       // TODO: handle a tsFmt coming from below, see test fromUnixTimestamp
-      Some(DateTimeGroupingElem(dqb.nextAlias, dc, TIMESTAMP_FORMAT, None, c))
+      Some(DateTimeGroupingElem(dqb.nextAlias, dc, TIMESTAMP_FORMAT, Some(Utils.defaultTZ), c))
     case Cast(timeExtractor(dtGrp), TimestampType) =>
       Some(DateTimeGroupingElem(dtGrp.outputName,
         dtGrp.druidColumn, TIMESTAMP_FORMAT,

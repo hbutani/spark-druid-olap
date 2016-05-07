@@ -64,7 +64,8 @@ object TPCHQueries {
       new DefaultDimensionSpec("l_linestatus"),
       new ExtractionDimensionSpec(DruidDataSource.TIME_COLUMN_NAME,
         "month",
-        new TimeFormatExtractionFunctionSpec("yyyy-MMM")
+        new TimeFormatExtractionFunctionSpec("yyyy-MMM",
+          Some(Utils.defaultTZ))
       )
     ),
     Some(new LimitSpec(10,
