@@ -78,12 +78,11 @@ private[druid] object MappingBuilder extends Logging {
       df.schema.iterator.foreach { f =>
         if (supportedDataType(f.dataType)) {
           val dCol = druidDS.columns.get(nameMapping.getOrElse(f.name, f.name))
-          if (dCol.isDefined) {
-            m += (f.name -> dCol.get)
-          } else if (f.name == timeDimensionCol) {
+          if (f.name == timeDimensionCol) {
             m += (f.name -> druidDS.timeDimension.get)
+          } else if (dCol.isDefined) {
+            m += (f.name -> dCol.get)
           }
-
         } else {
           logDebug(s"${f.name} not mapped to Druid dataSource, unsupported dataType")
         }
