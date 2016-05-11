@@ -27,7 +27,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.collection.mutable.{Map => MMap}
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
-import org.sparklinedata.druid.client.{CuratorConnection, DruidCoordinatorClient}
+import org.sparklinedata.druid.client.{CuratorConnection, DruidCoordinatorClient, DruidQueryServerClient}
 
 case class DruidNode(name : String,
                      id : String,
@@ -244,7 +244,8 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
         dataSourceInfoFutures(datasource) = Future {
           val dc = new DruidCoordinatorClient(dCI.curatorConnection.getCoordinator)
           val r = dc.dataSourceInfo(datasource)
-          val dds : DruidDataSource = dc.metadataFromHistorical(histServer, datasource, false)
+          val bC = new DruidQueryServerClient(dCI.curatorConnection.getBroker)
+          val dds : DruidDataSource = bC.metadata(datasource, options.loadMetadataFromAllSegments)
           (r, dds)
         }
       }

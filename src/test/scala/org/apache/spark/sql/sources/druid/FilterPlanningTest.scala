@@ -43,7 +43,7 @@ class FilterPlanningTest extends PlanningTest {
     validateFilter("Cast(l_shipdate  AS timestamp) >= Cast('1995-12-30' AS timestamp)",
       true,
       None,
-      List(Interval.parse("1995-12-30T00:00:00.000-08:00/1998-01-01T00:00:00.000-08:00"))
+      List(Interval.parse("1995-12-30T00:00:00.000Z/1997-12-31T00:00:01.000Z"))
     )
   }
 
@@ -56,7 +56,7 @@ class FilterPlanningTest extends PlanningTest {
       """,
       true,
       None,
-      List(Interval.parse("1993-01-01T00:00:00.000-08:00/1997-08-02T00:00:00.001-07:00")))
+      List(Interval.parse("1993-01-01T00:00:00.000Z/1997-08-02T00:00:00.001Z")))
   }
 
   test("timestamp3") { td =>

@@ -17,14 +17,15 @@
 
 package org.sparklinedata.druid.client
 
+import java.util.TimeZone
+
 import org.apache.spark.Logging
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
-
-import org.scalatest.{fixture, BeforeAndAfterAll}
+import org.scalatest.{BeforeAndAfterAll, fixture}
 import org.sparklinedata.druid.Utils
 import org.sparklinedata.spark.dateTime.Functions._
 
@@ -145,6 +146,9 @@ abstract class BaseTest extends fixture.FunSuite with
   """.stripMargin.replace('\n', ' ')
 
   override def beforeAll() = {
+
+    System.setProperty("user.timezone", "UTC")
+    TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
 
     TestHive.sparkContext.setLogLevel("INFO")
 

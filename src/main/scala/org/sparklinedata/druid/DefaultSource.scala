@@ -218,12 +218,12 @@ object DefaultSource {
 
   /**
     * When loading Druid DataSource metadata should the query interval be
-    * the entire dataSource interval, or only the latests segment is enough.
-    * Default is to load from the latest segment; loading from all segments
-    * can be very slow.
+    * the entire dataSource interval, or only the latest segment is enough.
+    * Default is to load from all segments; since our query has
+    * ("analysisTypes" -> []) the query is cheap.
     */
   val LOAD_METADATA_FROM_ALL_SEGMENTS = "loadMetadataFromAllSegments"
-  val DEFAULT_LOAD_METADATA_FROM_ALL_SEGMENTS = "false"
+  val DEFAULT_LOAD_METADATA_FROM_ALL_SEGMENTS = "true"
 
   val ZK_SESSION_TIMEOUT = "zkSessionTimeoutMilliSecs"
   val DEFAULT_ZK_SESSION_TIMEOUT = "30000"

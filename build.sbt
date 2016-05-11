@@ -6,8 +6,7 @@ organization := "SparklineData"
 
 scalaVersion := "2.10.4"
 
-// add a JVM option to use when forking a JVM for 'run'
-javaOptions in Test += " -Xms1g -Xmx2g -Duser.timezone=UTC "
+javaOptions += " -Xms1g -Xmx2g -Duser.timezone=UTC "
 
 parallelExecution in Test := false
 
