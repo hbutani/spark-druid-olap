@@ -183,6 +183,9 @@ abstract class BaseTest extends fixture.FunSuite with
 
     TestHive.table("orderLineItemPartSupplierBase").cache()
 
+    TestHive.setConf(DruidPlanner.SPARKLINEDATA_CACHE_TABLES_TOCHECK.key,
+      "orderLineItemPartSupplierBase")
+
     // sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
 
     val cTOlap = s"""CREATE TABLE if not exists orderLineItemPartSupplier

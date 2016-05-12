@@ -75,7 +75,7 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
   def tablesToCheck : Array[String] = {
     val l = sqlContext.getConf(DruidPlanner.SPARKLINEDATA_CACHE_TABLES_TOCHECK)
     l match {
-      case l if l.isEmpty => sqlContext.tableNames()
+      case l if l.isEmpty => Array()
       case l if l.size == 1 && l(0).trim == "" => Array()
       case _ => l.toArray
     }

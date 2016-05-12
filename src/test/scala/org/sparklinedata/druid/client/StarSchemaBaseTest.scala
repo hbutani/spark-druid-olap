@@ -22,6 +22,7 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
+import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.scalatest.BeforeAndAfterAll
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 
@@ -288,6 +289,10 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       header "false", delimiter "|")""".stripMargin)
 
     TestHive.table("suppregion").cache
+
+    TestHive.setConf(DruidPlanner.SPARKLINEDATA_CACHE_TABLES_TOCHECK.key,
+      "orderLineItemPartSupplierBase,suppregion,suppnation," +
+        "custregion,custnation,customer,part,supplier,partsupp,orders,lineitembase")
 
     /*
      * for -ve testing only
