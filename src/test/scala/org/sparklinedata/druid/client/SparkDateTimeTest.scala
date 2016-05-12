@@ -222,7 +222,7 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |                      Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
         |                                     TIMESTAMP)), ' 00:00:00') AS TIMESTAMP)
       """.stripMargin,
-    0
+    1
   )
 
   test("intervalFilter",
@@ -247,6 +247,19 @@ class SparkDateTimeTest extends StarSchemaBaseTest {
         |                      Concat(To_date(lineitem.l_shipdate), ' 00:00:00') AS
         |                                     TIMESTAMP)), ' 00:00:00') AS TIMESTAMP)
       """.stripMargin
+  )
+
+  test("jsFilter2",
+    """
+      |SELECT Count(DISTINCT( rae.l_linenumber ))
+      |FROM   (SELECT *
+      |        FROM   orderLineItemPartSupplier) rae
+      |where  rae.l_commitdate != '' and
+      |       Month(Cast(Concat(To_date(l_shipdate), ' 00:00:00') AS TIMESTAMP)) < 4
+    """.stripMargin,
+    1,
+    true,
+    true
   )
 
 }

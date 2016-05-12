@@ -20,9 +20,10 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.types.LongType
+import org.apache.spark.sql.types.{BooleanType, LongType, StringType}
 import org.sparklinedata.druid.Debugging._
 import org.sparklinedata.druid._
+import org.sparklinedata.druid.jscodegen.JSCodeGenerator
 import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDimension}
 
 trait ProjectFilterTransfom {
@@ -201,7 +202,14 @@ trait ProjectFilterTransfom {
         for (f <- fil)
           yield NotFilterSpec("not", f)
       }
-      case _ => None
+      case _ => {
+        val codeGen = JSCodeGenerator(dqb, fe, false, false,
+          sqlContext.getConf(DruidPlanner.TZ_ID).toString,
+          BooleanType)
+        for (fn <- codeGen.fnCode) yield {
+          new JavascriptFilterSpec(codeGen.fnParams.last, fn)
+        }
+      }
     }
   }
 }

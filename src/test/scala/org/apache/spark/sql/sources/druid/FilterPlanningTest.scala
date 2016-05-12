@@ -77,12 +77,91 @@ class FilterPlanningTest extends PlanningTest {
     )
   }
 
+  // scalastyle:off line.size.limit
+  test("timestamp5") { td =>
+    validateFilter(
+      """Cast(
+                        Concat(To_date(o_orderdate), ' 00:00:00')
+                        AS TIMESTAMP)
+                    <=  Cast('1997-08-02 00:00:00' AS TIMESTAMP)
+      """,
+      true,
+      Some(
+        new JavascriptFilterSpec("javascript",
+          "o_orderdate",
+          "function (o_orderdate) {\n" +
+            "            \n" +
+            "            var v1 = new org.joda.time.DateTimeZone.forID(\"UTC\");var v2 = org.joda.time.format.ISODateTimeFormat.dateTimeParser();var v3 = v2.withZone(v1);\n" +
+            "              \n" +
+            "            \n" +
+            "\n" +
+            "            return((org.joda.time.DateTime.parse((((org.joda.time.LocalDate.parse(o_orderdate, v2).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3))  <=  ((new org.joda.time.DateTime(870480000000000, v1))));\n" +
+            "            }")
+      )
+    )
+  }
+
+
   test("monthTimestampFilter") { td =>
     validateFilter(
       """
         |Month(Cast(Concat(To_date(l_shipdate), ' 00:00:00') AS TIMESTAMP)) < 4
         | """.stripMargin,
-      false)
+      true,
+      Some(
+        new JavascriptFilterSpec("javascript",
+          "__time",
+          "function (__time) {\n" +
+            "            \n" +
+            "            var v1 = new org.joda.time.DateTimeZone.forID(\"UTC\");var v2 = org.joda.time.format.ISODateTimeFormat.dateTimeParser();var v3 = v2.withZone(v1);\n" +
+            "              \n" +
+            "            \n" +
+            "\n" +
+            "            return((org.joda.time.DateTime.parse((((org.joda.time.LocalDate.parse(__time, v2).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3).toLocalDate().getMonthOfYear())  <  (4));\n" +
+            "            }")
+      )
+    )
+  }
+  // scalastyle:on
+
+  test("jsUpper") { td =>
+    validateFilter(
+      """
+        |upper(s_name) = 'S1'
+        | """.stripMargin,
+      true,
+      Some(
+        new JavascriptFilterSpec("javascript",
+          "s_name",
+          "function (s_name) {\n" +
+            "            \n" +
+            "            \n" +
+            "            \n" +
+            "            \n\n" +
+            """            return(((s_name).toUpperCase())  ==  ("S1"));
+            |            }""".stripMargin)
+      )
+    )
+  }
+
+  test("jsCoalesce") { td =>
+    validateFilter(
+      """
+        |coalesce(s_name, 'no-supp') = 'S1'
+        | """.stripMargin,
+      true,
+      Some(
+        new JavascriptFilterSpec("javascript",
+          "s_name",
+          "function (s_name) {\n" +
+            "            \n" +
+            "            \n" +
+            "            \n" +
+            "            \n\n" +
+            """            return((((s_name) || ("no-supp")))  ==  ("S1"));
+              |            }""".stripMargin)
+      )
+    )
   }
 
 }
