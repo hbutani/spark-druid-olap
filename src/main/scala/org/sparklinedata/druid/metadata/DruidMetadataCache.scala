@@ -76,11 +76,11 @@ case class DataSourceSegmentInfo(name : String,
 
 case class DruidClusterInfo(host : String,
                             curatorConnection : CuratorConnection,
-                            dataSources : scala.collection.Map[String,
+                            druidDataSources : scala.collection.Map[String,
                               (DataSourceSegmentInfo, DruidDataSource)],
                             histServers : List[HistoricalServerInfo]) {
 
-  def historicalServers(datasource : String, ins : List[Interval]) :
+  def historicalServers(dRName : DruidRelationName, ins : List[Interval]) :
   List[HistoricalServerAssignment] = {
 
     val m : MMap[String, (HistoricalServerInfo, List[(DruidSegmentInfo, Interval)])] = MMap()
@@ -107,7 +107,7 @@ case class DruidClusterInfo(host : String,
     }
 
     for(in <- ins) {
-      dataSources(datasource)._1.segmentsToScan(in).map { seg =>
+      druidDataSources(dRName.druidDataSource)._1.segmentsToScan(in).map { seg =>
         val segIn = seg._interval.overlap(in)
         val s = histServers.filter(_.handlesSegment(seg.identifier)).sorted.head
         if (m.contains(s.host)) {
@@ -130,20 +130,17 @@ case class DruidClusterInfo(host : String,
 trait DruidMetadataCache {
   type DruidDataSourceInfo = (DataSourceSegmentInfo, DruidDataSource)
 
-  def getDruidClusterInfo(host : String,
+  def getDruidClusterInfo(druidRelName : DruidRelationName,
                           options : DruidRelationOptions) : DruidClusterInfo
 
-  def getDataSourceInfo(host : String,
-                        datasource : String,
+  def getDataSourceInfo(druidRelName : DruidRelationName,
                         options : DruidRelationOptions) : DruidDataSourceInfo
 
-  def assignHistoricalServers(host : String,
-                              dataSourceName : String,
+  def assignHistoricalServers(druidRelName : DruidRelationName,
                               options : DruidRelationOptions,
                               intervals : List[Interval]) : List[HistoricalServerAssignment]
 
-  def register(host : String,
-               dataSource : String,
+  def register(druidRelName : DruidRelationName,
                options : DruidRelationOptions) : Unit
 
   def clearCache(host : String) : Unit
@@ -155,7 +152,7 @@ trait DruidRelationInfoCache {
 
   type DruidDataSourceKey = (String, String)
 
-  private[metadata] val druidRelationInfoMap : MMap[DruidDataSourceKey, DruidRelationInfo] = MMap()
+  private[metadata] val druidRelationInfoMap : MMap[DruidRelationName, DruidRelationInfo] = MMap()
 
   // scalastyle:off parameter.number
   private def _druidRelation(sqlContext : SQLContext,
@@ -169,14 +166,18 @@ trait DruidRelationInfoCache {
                              starSchema : StarSchema,
                              options : DruidRelationOptions) : DruidRelationInfo = {
 
-    val druidDS = getDataSourceInfo(druidHost, dsName, options)._2
+    val fullName = DruidRelationName(starSchema.factTable.name, druidHost, dsName)
+
+    val druidDS = getDataSourceInfo(
+      fullName,
+      options)._2
     val sourceToDruidMapping =
       MappingBuilder.buildMapping(sqlContext, sourceDFName,
         starSchema, columnMapping, timeDimensionCol, druidDS)
     val fd = new FunctionalDependencies(druidDS, functionalDeps,
       DependencyGraph(druidDS, functionalDeps))
 
-    val dr = DruidRelationInfo(druidHost,
+    val dr = DruidRelationInfo(fullName,
       sourceDFName,
       timeDimensionCol,
       druidDS,
@@ -184,7 +185,7 @@ trait DruidRelationInfoCache {
       fd,
       starSchema,
       options)
-    druidRelationInfoMap((druidHost, sourceDFName)) = dr
+    druidRelationInfoMap(fullName) = dr
     dr
   }
 
@@ -199,7 +200,8 @@ trait DruidRelationInfoCache {
                     starSchema : StarSchema,
                     options : DruidRelationOptions) : DruidRelationInfo =
     druidRelationInfoMap.synchronized {
-      druidRelationInfoMap.getOrElse((druidHost, sourceDFName),
+      val fullName = DruidRelationName(starSchema.factTable.name, druidHost, dsName)
+      druidRelationInfoMap.getOrElse(fullName,
         _druidRelation(sqlContext, sourceDFName, sourceDF, dsName, timeDimensionCol,
           druidHost, columnMapping, functionalDeps, starSchema, options)
       )
@@ -236,30 +238,31 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
 
     private def dataSourceInfoFuture(dCI : DruidClusterInfo,
                                    histServer : HistoricalServerInfo,
-                                   datasource : String,
+                                     dRName : DruidRelationName,
                                      options : DruidRelationOptions) :
   Future[DruidDataSourceInfo] =
     clusterInfoFutures.synchronized {
-      if ( !dataSourceInfoFutures.contains(datasource)) {
-        dataSourceInfoFutures(datasource) = Future {
+      if ( !dataSourceInfoFutures.contains(dRName.druidDataSource)) {
+        dataSourceInfoFutures(dRName.druidDataSource) = Future {
           val dc = new DruidCoordinatorClient(dCI.curatorConnection.getCoordinator)
-          val r = dc.dataSourceInfo(datasource)
+          val r = dc.dataSourceInfo(dRName.druidDataSource)
           val bC = new DruidQueryServerClient(dCI.curatorConnection.getBroker)
-          val dds : DruidDataSource = bC.metadata(datasource, options.loadMetadataFromAllSegments)
+          val dds : DruidDataSource = bC.metadata(dRName.druidDataSource,
+            options.loadMetadataFromAllSegments)
           (r, dds)
         }
       }
-      dataSourceInfoFutures(datasource)
+      dataSourceInfoFutures(dRName.druidDataSource)
     }
 
-  private def _get(host : String,
+  private def _getClusterInfo(dRName : DruidRelationName,
                    options : DruidRelationOptions) :
   Either[DruidClusterInfo, Future[DruidClusterInfo]] =
     cache.synchronized {
-    if ( cache.contains(host)) {
-      Left(cache(host))
+    if ( cache.contains(dRName.druidHost)) {
+      Left(cache(dRName.druidHost))
     } else {
-      Right(clusterInfoFuture(host, options))
+      Right(clusterInfoFuture(dRName.druidHost, options))
     }
   }
 
@@ -268,11 +271,10 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     cache(dCI.host) = dCI
   }
 
-  private def getDruidClusterInfoFailure(hostKey : String,
+  private def handleClusterInfoFailure(dRName : DruidRelationName,
                           options : DruidRelationOptions,
-                                         datasource : String,
                           e : Throwable) : DruidClusterInfo = cache.synchronized {
-    clusterInfoFutures.remove(hostKey)
+    clusterInfoFutures.remove(dRName.druidHost)
     e match {
       case e : DruidDataSourceException => throw e
       case t : Throwable =>
@@ -280,11 +282,10 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     }
   }
 
-  private def getDataSourceInfoFailure(hostKey : String,
+  private def handleDataSourceFailure(dRName : DruidRelationName,
                                          options : DruidRelationOptions,
-                                       datasource : String,
                                          e : Throwable) : DruidDataSourceInfo = cache.synchronized {
-    dataSourceInfoFutures.remove(datasource)
+    dataSourceInfoFutures.remove(dRName.druidDataSource)
     e match {
       case e : DruidDataSourceException => throw e
       case t : Throwable =>
@@ -294,36 +295,34 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
 
   private def _add(dCI : DruidClusterInfo, i : DruidDataSourceInfo)
   : Unit = dCI.synchronized {
-    val m = dCI.dataSources.asInstanceOf[MMap[String, DruidDataSourceInfo]]
+    val m = dCI.druidDataSources.asInstanceOf[MMap[String, DruidDataSourceInfo]]
     m(i._1.name) = i
   }
 
-  private def _get(host : String,
-                   dataSource : String,
+  private def _getDataSourceInfo(dRName : DruidRelationName,
                    options : DruidRelationOptions) :
   Either[DruidDataSourceInfo, Future[DruidDataSourceInfo]] = {
-    _get(host, options) match {
+    _getClusterInfo(dRName, options) match {
       case Left(dCI) => dCI.synchronized {
-        if ( dCI.dataSources.contains(dataSource)) {
-          Left(dCI.dataSources(dataSource))
+        if ( dCI.druidDataSources.contains(dRName.druidDataSource)) {
+          Left(dCI.druidDataSources(dRName.druidDataSource))
         } else {
-          Right(dataSourceInfoFuture(dCI, dCI.histServers.head, dataSource, options))
+          Right(dataSourceInfoFuture(dCI, dCI.histServers.head, dRName, options))
         }
       }
       case Right(f) => Right(f.flatMap{ dCI =>
         _put(dCI)
-        dataSourceInfoFuture(dCI, dCI.histServers.head, dataSource, options)
+        dataSourceInfoFuture(dCI, dCI.histServers.head, dRName, options)
       })
     }
   }
 
-  private def awaitInfo[T](hostKey : String,
+  private def awaitInfo[T](dRName : DruidRelationName,
                            options : DruidRelationOptions,
-                           dataSource : String,
                             f : Future[T],
                            successAction : T => Unit,
                            failureAction :
-                           (String, DruidRelationOptions, String, Throwable) => T) : T = {
+                           (DruidRelationName, DruidRelationOptions, Throwable) => T) : T = {
     Await.ready(f, Duration.Inf)
     cache.synchronized {
       f.value match {
@@ -332,49 +331,46 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
           i
         }
         case Some(Failure(e)) =>
-          failureAction(hostKey, options, dataSource, e)
+          failureAction(dRName, options, e)
         case None =>
           throw new DruidDataSourceException("internal error: waiting for future didn't happen")
       }
     }
   }
 
-  def getDruidClusterInfo(hostKey : String,
+  def getDruidClusterInfo(dRName : DruidRelationName,
                           options : DruidRelationOptions) : DruidClusterInfo = {
-    _get(hostKey, options) match {
+    _getClusterInfo(dRName, options) match {
       case Left(i) => i
-      case Right(f) => awaitInfo[DruidClusterInfo](hostKey, options, null, f, _put(_),
-        getDruidClusterInfoFailure)
+      case Right(f) => awaitInfo[DruidClusterInfo](dRName, options, f, _put(_),
+        handleClusterInfoFailure)
     }
   }
 
-  def getDataSourceInfo(hostKey : String,
-                        datasource : String,
+  def getDataSourceInfo(dRName : DruidRelationName,
                         options : DruidRelationOptions) : DruidDataSourceInfo = {
-    _get(hostKey, datasource, options) match {
+    _getDataSourceInfo(dRName, options) match {
       case Left(i) => i
       case Right(f) =>
-        awaitInfo[DruidDataSourceInfo](hostKey, options, datasource, f,
-          _add(cache(hostKey), _), getDataSourceInfoFailure)
+        awaitInfo[DruidDataSourceInfo](dRName, options, f,
+          _add(cache(dRName.druidHost), _), handleDataSourceFailure)
     }
   }
 
   def hostKey(coordinator : String,
               port : Int) = s"$coordinator:$port"
 
-  def assignHistoricalServers(coordinator : String,
-                              dataSourceName : String,
+  def assignHistoricalServers(dRName : DruidRelationName,
                               options : DruidRelationOptions,
                               intervals : List[Interval]) : List[HistoricalServerAssignment] = {
-    getDruidClusterInfo(coordinator, options
-    ).historicalServers(dataSourceName, intervals)
+    getDruidClusterInfo(dRName, options
+    ).historicalServers(dRName, intervals)
 
   }
 
-  def register(host : String,
-               dataSource : String,
+  def register(dRName : DruidRelationName,
                options : DruidRelationOptions) : Unit = {
-    _get(host, dataSource, options)
+    _getDataSourceInfo(dRName, options)
   }
 
   def clearCache(host : String) : Unit = druidRelationInfoMap.synchronized {

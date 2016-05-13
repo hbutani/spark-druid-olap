@@ -93,8 +93,7 @@ class DruidRDD(sqlContext: SQLContext,
   override protected def getPartitions: Array[Partition] = {
     if (dQuery.queryHistoricalServer) {
     val hAssigns = DruidMetadataCache.assignHistoricalServers(
-      drInfo.host,
-      drInfo.druidDS.name,
+      drInfo.fullName,
       drInfo.options,
       dQuery.intervalSplits
     )
@@ -113,7 +112,7 @@ class DruidRDD(sqlContext: SQLContext,
       val l1 : Array[Partition] = Random.shuffle(l).toArray
       l1
   } else {
-      val broker = DruidMetadataCache.getDruidClusterInfo(drInfo.host,
+      val broker = DruidMetadataCache.getDruidClusterInfo(drInfo.fullName,
         drInfo.options).curatorConnection.getBroker
       dQuery.intervalSplits.zipWithIndex.map(t => new BrokerPartition(t._2, broker, t._1)).toArray
     }

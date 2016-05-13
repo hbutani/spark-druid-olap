@@ -23,7 +23,12 @@ import org.apache.spark.sql.types._
 
 import scala.collection.mutable.{Map => MMap}
 
-case class DruidRelationInfo(val host : String,
+case class DruidRelationName(
+                            sparkDataSource : String,
+                            druidHost : String,
+                            druidDataSource : String
+                            )
+case class DruidRelationInfo(val fullName : DruidRelationName,
                          val sourceDFName : String,
                             val timeDimensionCol : String,
                          val druidDS : DruidDataSource,
@@ -31,6 +36,8 @@ case class DruidRelationInfo(val host : String,
                          val fd : FunctionalDependencies,
                             val starSchema : StarSchema,
                          val options : DruidRelationOptions) {
+
+  val host : String = fullName.druidHost
 
   lazy val dimensionNamesSet = druidDS.dimensions.map(_.name).toSet
 

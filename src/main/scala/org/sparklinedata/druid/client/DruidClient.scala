@@ -307,66 +307,6 @@ class DruidQueryServerClient(host : String, port : Int)
   }
 }
 
-
-object DruidQueryServerClient {
-
-  type DruidDataSourceKey = (String, String)
-
-  val druidRelationInfoMap : MMap[DruidDataSourceKey, DruidRelationInfo] = MMap()
-
-  // scalastyle:off parameter.number
-  private def _druidRelation(sqlContext : SQLContext,
-            sourceDFName : String,
-            sourceDF : DataFrame,
-            dsName : String,
-            timeDimensionCol : String,
-            druidHost : String,
-            druidPort : Int,
-            columnMapping : Map[String, String],
-            functionalDeps : List[FunctionalDependency],
-            starSchema : StarSchema,
-            options : DruidRelationOptions) : DruidRelationInfo = {
-
-    val client = new DruidQueryServerClient(druidHost, druidPort)
-    val druidDS = client.metadata(dsName, options.loadMetadataFromAllSegments)
-    val sourceToDruidMapping =
-      MappingBuilder.buildMapping(sqlContext, sourceDFName,
-        starSchema, columnMapping, timeDimensionCol, druidDS)
-    val fd = new FunctionalDependencies(druidDS, functionalDeps,
-      DependencyGraph(druidDS, functionalDeps))
-
-    val dr = DruidRelationInfo(druidHost,
-      sourceDFName,
-      timeDimensionCol,
-      druidDS,
-      sourceToDruidMapping,
-      fd,
-      starSchema,
-      options)
-    druidRelationInfoMap((druidHost, sourceDFName)) = dr
-    dr
-  }
-
-  def druidRelation(sqlContext : SQLContext,
-                     sourceDFName : String,
-                     sourceDF : DataFrame,
-                     dsName : String,
-                     timeDimensionCol : String,
-                     druidHost : String,
-                     druidPort : Int,
-                     columnMapping : Map[String, String],
-                     functionalDeps : List[FunctionalDependency],
-                     starSchema : StarSchema,
-                     options : DruidRelationOptions) : DruidRelationInfo =
-    druidRelationInfoMap.synchronized {
-    druidRelationInfoMap.getOrElse((druidHost, sourceDFName),
-      _druidRelation(sqlContext, sourceDFName, sourceDF, dsName, timeDimensionCol,
-        druidHost, druidPort, columnMapping, functionalDeps, starSchema, options)
-    )
-  }
-
-}
-
 class DruidCoordinatorClient(host : String, port : Int)
   extends DruidClient(host, port) with Logging {
 
