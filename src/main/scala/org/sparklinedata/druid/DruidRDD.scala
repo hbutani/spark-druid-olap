@@ -206,13 +206,13 @@ object DruidValTransform {
 
   def sparkValue(druidVal: Any, tfName: String): Any = {
     var tDVal = druidVal
-    for (tf <- tfMap.get(tfName))
+    for (tf <- tfMap.get(tfName) if (tDVal != null))
       tDVal = tf(druidVal)
     tDVal
   }
 
   def getTFName(sparkDT: DataType, adjForTZ: Boolean = false): String = sparkDT match {
-    case TimestampType if adjForTZ => "toTSWithTZ"
+    case TimestampType if adjForTZ => "toTSWithTZAdj"
     case TimestampType if !adjForTZ => "toTS"
     case StringType if !adjForTZ => "toString"
     case ShortType | IntegerType => "toInt"
