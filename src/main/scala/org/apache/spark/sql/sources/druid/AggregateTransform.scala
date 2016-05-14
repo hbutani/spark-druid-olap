@@ -342,7 +342,8 @@ trait AggregateTransform {
            aggFnName <- jsag.aggFnName; fnName = dqb.nextAlias(aggFnName);
            fnparams <- jsag.fnParams; at <- jsag.druidType) yield {
         dqb.aggregate(JavascriptAggregationSpec("javascript", fnName,
-          fnparams, fna, fnc, fnr)).outputAttribute(fnName, aggExp, aggExp.dataType, at)
+          fnparams, fna, fnc, fnr)).
+          outputAttribute(fnName, aggExp, aggExp.dataType, at, jsag.valTransFormFn)
       }
     }
     case (_, c) => {

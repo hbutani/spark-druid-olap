@@ -57,7 +57,7 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
                              postAggregations: Option[List[PostAggregationSpec]] = None,
                              projectionAliasMap: Map[String, String] = Map(),
                              outputAttributeMap:
-                             Map[String, (Expression, DataType, DataType)] = Map(),
+                             Map[String, (Expression, DataType, DataType, String)] = Map(),
                             // avg expressions to perform in the Project Operator
                             // on top of Druid PhysicalScan
                              avgExpressions : Map[Expression, (String, String)] = Map(),
@@ -106,8 +106,10 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
       queryIntervals.gtECond(iC.dt).map(qI => this.copy(queryIntervals = qI))
   }
 
-  def outputAttribute(nm: String, e: Expression, originalDT: DataType, druidDT: DataType) = {
-    this.copy(outputAttributeMap = outputAttributeMap + (nm ->(e, originalDT, druidDT)))
+  def outputAttribute(nm: String, e: Expression, originalDT: DataType,
+                      druidDT: DataType, tfName: String = null) = {
+    val tf = if (tfName == null) DruidValTransform.getTFName(druidDT) else tfName
+    this.copy(outputAttributeMap = outputAttributeMap + (nm ->(e, originalDT, druidDT, tf)))
   }
 
   def avgExpression(e: Expression, sumAlias : String, cntAlias : String) = {

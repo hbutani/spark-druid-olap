@@ -84,7 +84,6 @@ private[jscodegen] object JSDateTimeCtx {
 
   private[jscodegen] def longToISODTCode(l: Any, ctx: JSDateTimeCtx): String = {
     ctx.createJodaTZ = true
-    ctx.createJodaISOFormatterWithTZ = true
     s"(new org.joda.time.DateTime($l, ${ctx.tzVar}))"
   }
 

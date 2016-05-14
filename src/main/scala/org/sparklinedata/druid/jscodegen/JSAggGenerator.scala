@@ -18,10 +18,11 @@
 package org.sparklinedata.druid.jscodegen
 
 import org.apache.spark.Logging
-import org.apache.spark.sql.catalyst.expressions.LeafExpression
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Cast, Expression, LeafExpression}
 import org.apache.spark.sql.types._
 import org.sparklinedata.druid.DruidQueryBuilder
+import org.sparklinedata.druid.metadata.DruidTimeDimension
 
 import scala.language.reflectiveCalls
 
@@ -66,23 +67,24 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
       case _ => None
     }
 
-  private[this] val jsc: Option[JSCodeGenerator] =
+  private[this] val jsc: Option[(JSCodeGenerator, String)] =
     for (c <- agg.children.headOption
          if (agg.children.size == 1 && !agg.isInstanceOf[Average]);
+         (sc, tf) <- JSAggGenerator.simplifyExpr(dqb, c, tz_id);
          commonType <- jsAggType) yield
-      JSCodeGenerator(dqb, c, true, true, tz_id, commonType)
+      (JSCodeGenerator(dqb, sc, true, true, tz_id, commonType), tf)
 
   val fnAggregate: Option[String] =
-    for (cg <- jsc; fne <- cg.fnElements; ret <- getAgg(fne._2)) yield
-      s"""function (${("current" :: cg.fnParams).mkString(", ")}) {${fne._1} return ${ret};}
+    for (cg <- jsc; fne <- cg._1.fnElements; ret <- getAgg(fne._2)) yield
+      s"""function (${("current" :: cg._1.fnParams).mkString(", ")}) {${fne._1} return ${ret};}
     """.stripMargin
 
   val fnCombine: Option[String] =
-    for (cg <- jsc; fne <- cg.fnElements; ret <- getCombine("partialA", "partialB")) yield
+    for (cg <- jsc; fne <- cg._1.fnElements; ret <- getCombine("partialA", "partialB")) yield
       s"""function (partialA, partialB) {return ${ret};}""".stripMargin
 
   val fnReset: Option[String] =
-    for (cg <- jsc; fne <- cg.fnElements; ret <- getReset) yield
+    for (cg <- jsc; fne <- cg._1.fnElements; ret <- getReset) yield
       s"""function() { return $ret; }"""
 
   val aggFnName: Option[String] = agg match {
@@ -92,7 +94,9 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
     case _ => None
   }
 
-  val fnParams: Option[List[String]] = for (cg <- jsc) yield cg.fnParams
+  val fnParams: Option[List[String]] = for (cg <- jsc) yield cg._1.fnParams
+
+  val valTransFormFn = if (!jsc.isEmpty) jsc.get._2 else null
 }
 
 object JSAggGenerator {
@@ -104,5 +108,15 @@ object JSAggGenerator {
         (af.children.head.references.map(_.name).toSet &
           dqb.drInfo.dimensionNamesSet).size > 0)) => true
     case _ => false
+  }
+
+  def simplifyExpr(dqb: DruidQueryBuilder, e: Expression, tz_id: String):
+  Option[(Expression, String)] = {
+    e match {
+      case Cast(a@AttributeReference(nm, _, _, _), TimestampType) =>
+        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidTimeDimension]) yield
+          (Cast(a, LongType), "toTSWithTZAdj")
+      case _ => Some(e, null)
+    }
   }
 }

@@ -38,7 +38,7 @@ class DruidOperatorSchema(val dqb : DruidQueryBuilder) {
     * The output schema for the PhysicalScan that wraps the Druid Query.
     */
   lazy val operatorSchema : List[Attribute] = operatorDruidAttributes.map {
-    case DruidOperatorAttribute(eId, nm, dT) => AttributeReference(nm, dT)(eId)
+    case DruidOperatorAttribute(eId, nm, dT, tf) => AttributeReference(nm, dT)(eId)
   }
 
   /**
@@ -54,12 +54,12 @@ class DruidOperatorSchema(val dqb : DruidQueryBuilder) {
   lazy val pushedDownExprToDruidAttr : Map[Expression, DruidOperatorAttribute] =
     buildPushDownDruidAttrsMap
 
-  private def pushDownExpressionMap : Map[String, (Expression, DataType, DataType)] =
+  private def pushDownExpressionMap : Map[String, (Expression, DataType, DataType, String)] =
     dqb.outputAttributeMap.filter(t => t._2._1 != null)
 
   private def buildPushDownDruidAttrsMap : Map[Expression, DruidOperatorAttribute] =
     (pushDownExpressionMap map {
-    case (nm, (e, oDT, dDT)) => {
+    case (nm, (e, oDT, dDT, tf)) => {
       (e -> druidAttrMap(nm))
     }
   })
@@ -67,13 +67,13 @@ class DruidOperatorSchema(val dqb : DruidQueryBuilder) {
 
   private def buildDruidOpAttr : Map[String, DruidOperatorAttribute] =
     (dqb.outputAttributeMap map {
-      case (nm, (e, oDT, dDT)) => {
+      case (nm, (e, oDT, dDT, tf)) => {
         val druidEid = e match {
           case null => NamedExpression.newExprId
           case n: NamedExpression => n.exprId
           case _ => NamedExpression.newExprId
         }
-        (nm -> DruidOperatorAttribute(druidEid, nm, dDT))
+        (nm -> DruidOperatorAttribute(druidEid, nm, dDT, tf))
       }
     }
       )

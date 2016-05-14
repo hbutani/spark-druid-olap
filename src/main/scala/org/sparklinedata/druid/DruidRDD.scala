@@ -20,7 +20,7 @@ package org.sparklinedata.druid
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRowWithSchema
 import org.apache.spark.sql.catalyst.util.DateTimeUtils.SQLTimestamp
-import org.apache.spark.sql.types.{LongType, StringType, StructField, TimestampType}
+import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
@@ -84,9 +84,11 @@ class DruidRDD(sqlContext: SQLContext,
     context.addTaskCompletionListener{ context => dr.closeIfNeeded() }
     val r = new InterruptibleIterator[QueryResultRow](context, dr)
     val schema = dQuery.schema(drInfo)
+    val nameToTF = dQuery.getValTFMap
     r.map { r =>
-      new GenericInternalRowWithSchema(schema.fields.map(f => sparkValue(f, r.event(f.name))),
-        schema)
+      new GenericInternalRowWithSchema(schema.fields.map
+      (f => DruidValTransform.sparkValue(
+        r.event(f.name), nameToTF.get(f.name).getOrElse(""))), schema)
     }
   }
 
@@ -117,24 +119,105 @@ class DruidRDD(sqlContext: SQLContext,
       dQuery.intervalSplits.zipWithIndex.map(t => new BrokerPartition(t._2, broker, t._1)).toArray
     }
   }
+}
 
-  /**
-   * conversion from Druid values to Spark values. Most of the conversion cases are handled by
-   * cast expressions in the [[org.apache.spark.sql.execution.Project]] operator above the
-   * DruidRelation Operator; but Strings need to be converted to [[UTF8String]] strings.
-    *
-    * @param f
-   * @param druidVal
-   * @return
-   */
-  def sparkValue(f : StructField, druidVal : Any) : Any = f.dataType match {
-    case TimestampType if druidVal.isInstanceOf[Double] =>
+/**
+  * conversion from Druid values to Spark values. Most of the conversion cases are handled by
+  * cast expressions in the [[org.apache.spark.sql.execution.Project]] operator above the
+  * DruidRelation Operator; but some values needs massaging like TimeStamps, Strings...
+  */
+object DruidValTransform {
+
+  private[this] val dTZ = org.joda.time.DateTimeZone.getDefault
+
+  private[this] val toTSWithTZAdj = (druidVal: Any) => {
+    val dvLong = if (druidVal.isInstanceOf[Double]) {
+      druidVal.asInstanceOf[Double].toLong
+    } else if (druidVal.isInstanceOf[BigInt]) {
+      druidVal.asInstanceOf[BigInt].toLong
+    } else if (druidVal.isInstanceOf[String]){
+      druidVal.asInstanceOf[String].toLong
+    }else {
+      druidVal
+    }
+
+    new org.joda.time.DateTime(dvLong, dTZ).getMillis() * 1000.asInstanceOf[SQLTimestamp]
+  }
+
+  private[this] val toTS = (druidVal: Any) => {
+    if (druidVal.isInstanceOf[Double]) {
       druidVal.asInstanceOf[Double].longValue().asInstanceOf[SQLTimestamp]
-    case StringType if druidVal != null => UTF8String.fromString(druidVal.toString)
-    case LongType if druidVal.isInstanceOf[BigInt] =>
-      druidVal.asInstanceOf[BigInt].longValue()
-    case LongType if druidVal.isInstanceOf[Double] =>
-      druidVal.asInstanceOf[Double].longValue()
-    case _ => druidVal
+    } else if (druidVal.isInstanceOf[BigInt]) {
+      druidVal.asInstanceOf[BigInt].toLong.asInstanceOf[SQLTimestamp]
+    } else {
+      druidVal
+    }
+  }
+
+  private[this] val toString = (druidVal: Any) => {
+    UTF8String.fromString(druidVal.toString)
+  }
+
+  private[this] val toInt = (druidVal: Any) => {
+    if (druidVal.isInstanceOf[Double]) {
+      druidVal.asInstanceOf[Double].toInt
+    } else if (druidVal.isInstanceOf[BigInt]) {
+      druidVal.asInstanceOf[BigInt].toInt
+    } else if (druidVal.isInstanceOf[String]) {
+      druidVal.asInstanceOf[String].toInt
+    }else {
+      druidVal
+    }
+  }
+
+  private[this] val toLong = (druidVal: Any) => {
+    if (druidVal.isInstanceOf[Double]) {
+      druidVal.asInstanceOf[Double].toLong
+    } else if (druidVal.isInstanceOf[BigInt]) {
+      druidVal.asInstanceOf[BigInt].toLong
+    } else if (druidVal.isInstanceOf[String]) {
+      druidVal.asInstanceOf[String].toLong
+    }else {
+      druidVal
+    }
+  }
+
+  private[this] val toFloat = (druidVal: Any) => {
+    if (druidVal.isInstanceOf[Double]) {
+      druidVal.asInstanceOf[Double].toFloat
+    } else if (druidVal.isInstanceOf[BigInt]) {
+      druidVal.asInstanceOf[BigInt].toFloat
+    } else if (druidVal.isInstanceOf[String]) {
+      druidVal.asInstanceOf[String].toFloat
+    }else {
+      druidVal
+    }
+  }
+
+  // TODO: create an enum of TFs
+  private[this] val tfMap: Map[String, Any => Any] = Map[String, Any => Any](
+    "toTSWithTZAdj" -> toTSWithTZAdj,
+    "toTS" -> toTS,
+    "toString" -> toString,
+    "toInt" -> toInt,
+    "toLong" -> toLong,
+    "toFloat" -> toFloat
+  )
+
+  def sparkValue(druidVal: Any, tfName: String): Any = {
+    var tDVal = druidVal
+    for (tf <- tfMap.get(tfName))
+      tDVal = tf(druidVal)
+    tDVal
+  }
+
+  def getTFName(sparkDT: DataType, adjForTZ: Boolean = false): String = sparkDT match {
+    case TimestampType if adjForTZ => "toTSWithTZ"
+    case TimestampType if !adjForTZ => "toTS"
+    case StringType if !adjForTZ => "toString"
+    case ShortType | IntegerType => "toInt"
+    case LongType => "toLong"
+    case FloatType => "toFloat"
+    case _ => ""
   }
 }

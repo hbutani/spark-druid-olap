@@ -19,14 +19,16 @@ package org.sparklinedata.druid
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Attribute, ExprId}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, ExprId}
+import org.apache.spark.sql.sources.{BaseRelation, TableScan}
+import org.apache.spark.sql.types.{DataType, StructField, StructType}
 import org.apache.spark.sql.{Row, SQLContext}
-import org.apache.spark.sql.sources.{TableScan, BaseRelation}
-import org.apache.spark.sql.types.{StructField, StructType, DataType}
 import org.joda.time.Interval
-import org.sparklinedata.druid.metadata.{DruidDataType, DruidRelationInfo}
+import org.sparklinedata.druid.metadata.DruidRelationInfo
 
-case class DruidOperatorAttribute(exprId : ExprId, name : String, dataType : DataType)
+
+case class DruidOperatorAttribute(exprId : ExprId, name : String, dataType : DataType,
+                                  tf: String = null)
 
 /**
  *
@@ -65,7 +67,7 @@ case class DruidQuery(q : QuerySpec,
 
   private def schemaFromOutputSpec : StructType = {
     val fields : List[StructField] = outputAttrSpec.get.map {
-      case DruidOperatorAttribute(eId, nm, dT) => new StructField(nm, dT)
+      case DruidOperatorAttribute(eId, nm, dT, tf) => new StructField(nm, dT)
     }
     StructType(fields)
   }
@@ -81,12 +83,20 @@ case class DruidQuery(q : QuerySpec,
 
   private def outputAttrsFromOutputSpec : Seq[Attribute] = {
     outputAttrSpec.get.map {
-      case DruidOperatorAttribute(eId, nm, dT) => AttributeReference(nm, dT)(eId)
+      case DruidOperatorAttribute(eId, nm, dT, tf) => AttributeReference(nm, dT)(eId)
     }
   }
 
   def outputAttrs(dInfo : DruidRelationInfo) : Seq[Attribute] =
     outputAttrSpec.map(o => outputAttrsFromOutputSpec).getOrElse(outputAttrsFromQuerySpec(dInfo))
+
+  def getValTFMap(): Map[String, String] = {
+    val m = new scala.collection.mutable.HashMap[String, String]
+    for ( lstOA <- outputAttrSpec; oa <- lstOA if oa.tf != null) {
+      m += oa.name -> oa.tf
+    }
+    m.toMap
+  }
 }
 
 case class DruidRelation (val info : DruidRelationInfo,
