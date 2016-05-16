@@ -373,10 +373,12 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
     _getDataSourceInfo(dRName, options)
   }
 
-  def clearCache(host : String) : Unit = druidRelationInfoMap.synchronized {
+  def clearCache : Unit = druidRelationInfoMap.synchronized {
     druidRelationInfoMap.clear()
     cache.synchronized(cache.clear())
   }
+
+  def clearCache(host : String) : Unit = clearCache
 
 
 }

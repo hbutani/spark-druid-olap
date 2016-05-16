@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.client
 
-import org.apache.spark.sql.hive.test.TestHive
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.sparklinedata.druid.Utils
 import org.sparklinedata.druid.metadata.{StarSchema, StarRelationInfo, StarSchemaInfo}
 

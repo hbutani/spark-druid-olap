@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.client
 
-import org.apache.spark.sql.hive.test.TestHive._
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.json4s.Extraction
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.DruidQuery

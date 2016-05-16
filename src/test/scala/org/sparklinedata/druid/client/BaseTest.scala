@@ -22,8 +22,8 @@ import java.util.TimeZone
 import org.apache.spark.Logging
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.hive.test.TestHive
-import org.apache.spark.sql.hive.test.TestHive._
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.scalatest.{BeforeAndAfterAll, fixture}
 import org.sparklinedata.druid.Utils
@@ -153,7 +153,7 @@ abstract class BaseTest extends fixture.FunSuite with
     TestHive.sparkContext.setLogLevel("INFO")
 
     register(TestHive)
-    DruidPlanner(TestHive)
+    // DruidPlanner(TestHive)
 
     val cT = s"""CREATE TABLE if not exists orderLineItemPartSupplierBase(o_orderkey integer,
              o_custkey integer,

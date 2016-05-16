@@ -17,14 +17,19 @@
 
 package org.apache.spark.sql.hive.thriftserver.sparklinedata
 
+import java.io.PrintStream
+import scala.collection.JavaConverters._
 import org.apache.hive.service.server.HiveServerServerOptionsProcessor
-import org.apache.spark.Logging
-import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv
-import org.apache.spark.util.ShutdownHookManager
-import org.apache.spark.sql.hive.thriftserver.{HiveThriftServer2 => RealHiveThriftServer2 }
-
-import org.sparklinedata.spark.dateTime.Functions
+import org.apache.spark.scheduler.StatsReportListener
+import org.apache.spark.{Logging, SparkConf, SparkContext}
+import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
+import org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver
+import org.apache.spark.sql.hive.thriftserver.{SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
+import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
 import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.apache.spark.util.{ShutdownHookManager, Utils}
+import org.sparklinedata.spark.dateTime.Functions
 
 /**
   * A wrapper for spark's [[org.apache.spark.sql.hive.thriftserver.HiveThriftServer2]].
@@ -40,7 +45,7 @@ object HiveThriftServer2 extends Logging {
     }
 
     logInfo("Starting SparkContext")
-    SparkSQLEnv.init()
+    SparklineSQLEnv.init()
 
     Functions.register(SparkSQLEnv.hiveContext)
     DruidPlanner(SparkSQLEnv.hiveContext)
@@ -66,3 +71,44 @@ object HiveThriftServer2 extends Logging {
 
 }
 
+object SparklineSQLEnv extends Logging {
+  logDebug("Initializing SparkSQLEnv")
+
+  def init() {
+    if (hiveContext == null) {
+      val sparkConf = new SparkConf(loadDefaults = true)
+      val maybeSerializer = sparkConf.getOption("spark.serializer")
+      val maybeKryoReferenceTracking = sparkConf.getOption("spark.kryo.referenceTracking")
+      // If user doesn't specify the appName, we want to get [SparkSQL::localHostName] instead of
+      // the default appName [SparkSQLCLIDriver] in cli or beeline.
+      val maybeAppName = sparkConf
+        .getOption("spark.app.name")
+        .filterNot(_ == classOf[SparkSQLCLIDriver].getName)
+
+      sparkConf
+        .setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
+        .set(
+          "spark.serializer",
+          maybeSerializer.getOrElse("org.apache.spark.serializer.KryoSerializer"))
+        .set(
+          "spark.kryo.referenceTracking",
+          maybeKryoReferenceTracking.getOrElse("false"))
+
+      sparkContext = new SparkContext(sparkConf)
+      sparkContext.addSparkListener(new StatsReportListener())
+      hiveContext = new SparklineDataContext(sparkContext)
+
+      hiveContext.metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
+      hiveContext.metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
+      hiveContext.metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
+
+      hiveContext.setConf("spark.sql.hive.version", HiveContext.hiveExecutionVersion)
+
+      if (log.isDebugEnabled) {
+        hiveContext.hiveconf.getAllProperties.asScala.toSeq.sorted.foreach { case (k, v) =>
+          logDebug(s"HiveConf var: $k=$v")
+        }
+      }
+    }
+  }
+}

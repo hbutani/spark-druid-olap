@@ -88,7 +88,7 @@ class DruidRDD(sqlContext: SQLContext,
     r.map { r =>
       new GenericInternalRowWithSchema(schema.fields.map
       (f => DruidValTransform.sparkValue(
-        r.event(f.name), nameToTF.get(f.name).getOrElse(""))), schema)
+        f, r.event(f.name), nameToTF.get(f.name))), schema)
     }
   }
 
@@ -194,6 +194,26 @@ object DruidValTransform {
     }
   }
 
+  /**
+    * conversion from Druid values to Spark values. Most of the conversion cases are handled by
+    * cast expressions in the [[org.apache.spark.sql.execution.Project]] operator above the
+    * DruidRelation Operator; but Strings need to be converted to [[UTF8String]] strings.
+    *
+    * @param f
+    * @param druidVal
+    * @return
+    */
+  def defaultValueConversion(f : StructField, druidVal : Any) : Any = f.dataType match {
+    case TimestampType if druidVal.isInstanceOf[Double] =>
+      druidVal.asInstanceOf[Double].longValue().asInstanceOf[SQLTimestamp]
+    case StringType if druidVal != null => UTF8String.fromString(druidVal.toString)
+    case LongType if druidVal.isInstanceOf[BigInt] =>
+      druidVal.asInstanceOf[BigInt].longValue()
+    case LongType if druidVal.isInstanceOf[Double] =>
+      druidVal.asInstanceOf[Double].longValue()
+    case _ => druidVal
+  }
+
   // TODO: create an enum of TFs
   private[this] val tfMap: Map[String, Any => Any] = Map[String, Any => Any](
     "toTSWithTZAdj" -> toTSWithTZAdj,
@@ -204,11 +224,11 @@ object DruidValTransform {
     "toFloat" -> toFloat
   )
 
-  def sparkValue(druidVal: Any, tfName: String): Any = {
-    var tDVal = druidVal
-    for (tf <- tfMap.get(tfName) if (tDVal != null))
-      tDVal = tf(druidVal)
-    tDVal
+  def sparkValue(f : StructField, druidVal: Any, tfName: Option[String]): Any = {
+    tfName match {
+      case Some(tf) if (tfMap.contains(tf) && druidVal != null) => tfMap(tf)(druidVal)
+      case _ => defaultValueConversion(f, druidVal)
+    }
   }
 
   def getTFName(sparkDT: DataType, adjForTZ: Boolean = false): String = sparkDT match {

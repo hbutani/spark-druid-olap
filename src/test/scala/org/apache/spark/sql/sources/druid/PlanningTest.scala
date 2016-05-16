@@ -22,7 +22,7 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.expressions.{Expression, PredicateHelper}
 import org.apache.spark.sql.catalyst.plans.logical.Filter
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.hive.test.TestHive
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.scalatest.BeforeAndAfterEach
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.client.BaseTest

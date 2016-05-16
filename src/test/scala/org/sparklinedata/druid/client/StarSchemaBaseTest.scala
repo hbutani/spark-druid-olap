@@ -20,8 +20,8 @@ package org.sparklinedata.druid.client
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.apache.spark.sql.hive.test.TestHive
-import org.apache.spark.sql.hive.test.TestHive._
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.scalatest.BeforeAndAfterAll
 import org.sparklinedata.spark.dateTime.dsl.expressions._

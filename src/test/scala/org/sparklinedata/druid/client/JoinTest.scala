@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.client
 
-import org.apache.spark.sql.hive.test.TestHive
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 
 class JoinTest extends StarSchemaBaseTest {
 
