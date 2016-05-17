@@ -18,14 +18,17 @@
 package org.apache.spark.sql.hive.sparklinedata
 
 import org.apache.spark.api.java.JavaSparkContext
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.{Logging, SparkContext}
-import org.apache.spark.sql.catalyst.ParserDialect
+import org.apache.spark.sql.catalyst.{ParserDialect, SqlParser, TableIdentifier}
 import org.apache.spark.sql.execution.CacheManager
 import org.apache.spark.sql.execution.ui.SQLListener
-import org.apache.spark.sql.hive.{HiveContext, HiveQLDialect}
+import org.apache.spark.sql.hive.{HiveContext, HiveMetastoreCatalog, HiveQLDialect}
 import org.apache.spark.sql.hive.client.{ClientInterface, ClientWrapper}
 import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidMetadataViews}
 
 
 class SparklineDataContext(
@@ -62,5 +65,21 @@ class SparklineDataContext(
       execHive = executionHive.newSession(),
       metaHive = metadataHive.newSession(),
       isRootContext = false)
+  }
+
+  override protected[sql] lazy val catalog =
+    new SparklineMetastoreCatalog(metadataHive, this) with OverrideCatalog
+}
+
+class SparklineMetastoreCatalog(client: ClientInterface, hive: HiveContext) extends
+  HiveMetastoreCatalog(client: ClientInterface, hive: HiveContext) {
+
+  override def lookupRelation(
+                               tableIdent: TableIdentifier,
+                               alias: Option[String]): LogicalPlan = {
+    val tableName = tableIdent.table
+    DruidMetadataViews.metadataDFs.get(tableName).map{ f =>
+      f(hive).queryExecution.logical
+    }.getOrElse(super.lookupRelation(tableIdent, alias))
   }
 }

@@ -214,7 +214,7 @@ case class HistoricalServerAssignment(server : HistoricalServerInfo,
 
 object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCache {
 
-  private val cache : MMap[String, DruidClusterInfo] = MMap()
+  private[metadata] val cache : MMap[String, DruidClusterInfo] = MMap()
   private val clusterInfoFutures : MMap[String, Future[DruidClusterInfo]] = MMap()
   private val dataSourceInfoFutures : MMap[String, Future[DruidDataSourceInfo]] = MMap()
 

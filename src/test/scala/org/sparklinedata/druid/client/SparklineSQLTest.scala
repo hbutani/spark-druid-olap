@@ -21,6 +21,26 @@ import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 
 class SparklineSQLTest extends BaseTest {
 
+  test("druidrelations") { td =>
+
+    sql("select * from `d$druidrelations`").show(500, false)
+  }
+
+  test("druidservers") { td =>
+
+    sql("select * from `d$druidservers`").show(500, false)
+  }
+
+  test("druidsegments") { td =>
+
+    sql("select * from `d$druidsegments`").show(500, false)
+  }
+
+  test("druidserverassignments") { td =>
+
+    sql("select * from `d$druidserverassignments`").show(500, false)
+  }
+
   test("clearCache") { td =>
 
     sql("clear druid cache localhost").show()
@@ -30,5 +50,7 @@ class SparklineSQLTest extends BaseTest {
 
     sql("clear druid cache").show()
   }
+
+
 
 }
