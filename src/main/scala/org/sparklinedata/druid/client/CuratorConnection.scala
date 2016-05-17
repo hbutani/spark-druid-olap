@@ -102,7 +102,7 @@ class CuratorConnection(val zkHosts : String,
     import Utils._
     import collection.JavaConversions._
 
-    val n = if (options.zkQualifyDiscoveryNames ) s"druid:$name" else name
+    val n = if (options.zkQualifyDiscoveryNames ) s"${options.zkDruidPath}:$name" else name
 
     val sPath = ZKPaths.makePath(discoveryPath, n)
     val b: java.util.List[String] =
