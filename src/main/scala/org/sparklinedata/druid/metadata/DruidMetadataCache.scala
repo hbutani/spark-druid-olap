@@ -363,6 +363,7 @@ object DruidMetadataCache extends DruidMetadataCache  with DruidRelationInfoCach
   def assignHistoricalServers(dRName : DruidRelationName,
                               options : DruidRelationOptions,
                               intervals : List[Interval]) : List[HistoricalServerAssignment] = {
+    getDataSourceInfo(dRName, options)
     getDruidClusterInfo(dRName, options
     ).historicalServers(dRName, intervals)
 
