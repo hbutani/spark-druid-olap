@@ -61,7 +61,12 @@ class CuratorConnection(val zkHosts : String,
 
   val listener = new PathChildrenCacheListener {
     override def childEvent(client: CuratorFramework, event: PathChildrenCacheEvent): Unit = {
-      cache.clearCache(zkHosts)
+      event.getType match {
+        case PathChildrenCacheEvent.Type.CHILD_ADDED |
+             PathChildrenCacheEvent.Type.CHILD_REMOVED |
+             PathChildrenCacheEvent.Type.CHILD_UPDATED => cache.clearCache(zkHosts)
+        case _ => ()
+      }
     }
   }
 

@@ -17,6 +17,8 @@
 
 package org.sparklinedata.druid.metadata
 
+import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
+
 import scala.language.implicitConversions
 import org.apache.spark.sql.{DataFrame, SQLContext}
 
@@ -175,9 +177,10 @@ object DruidMetadataViews {
   )
 
   def getDruidRelationView(sqlContext: SQLContext): DataFrame = {
-    val l = DruidMetadataCache.druidRelationInfoMap.map {
-      case (n, i) => DruidRelationView.toDruidRelationInfoView(i)
-    }.toSeq
+    val spklCtx = sqlContext.asInstanceOf[SparklineDataContext]
+    val l = spklCtx.catalog.druidRelations.map {
+      DruidRelationView.toDruidRelationInfoView(_)
+    }
     sqlContext.createDataFrame(l)
   }
 

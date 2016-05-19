@@ -143,6 +143,8 @@ class DruidRDD(sqlContext: SQLContext,
       val l1 : Array[Partition] = Random.shuffle(l).toArray
       l1
   } else {
+      // ensure DataSource is in the Metadata Cache.
+      DruidMetadataCache.getDataSourceInfo(drInfo.fullName, drInfo.options)
       val broker = DruidMetadataCache.getDruidClusterInfo(drInfo.fullName,
         drInfo.options).curatorConnection.getBroker
       dQuery.intervalSplits.zipWithIndex.map(t => new BrokerPartition(t._2, broker, t._1)).toArray

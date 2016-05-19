@@ -17,18 +17,21 @@
 
 package org.apache.spark.sql.hive.sparklinedata
 
+import com.google.common.cache.LoadingCache
 import org.apache.spark.api.java.JavaSparkContext
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.{DataFrame, SQLContext}
-import org.apache.spark.{Logging, SparkContext}
-import org.apache.spark.sql.catalyst.{ParserDialect, SqlParser, TableIdentifier}
+import org.apache.spark.sql.catalyst.{ParserDialect, TableIdentifier}
 import org.apache.spark.sql.execution.CacheManager
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.ui.SQLListener
-import org.apache.spark.sql.hive.{HiveContext, HiveMetastoreCatalog, HiveQLDialect}
 import org.apache.spark.sql.hive.client.{ClientInterface, ClientWrapper}
+import org.apache.spark.sql.hive.{HiveContext, HiveMetastoreCatalog}
 import org.apache.spark.sql.sources.druid.DruidPlanner
-import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidMetadataViews}
+import org.apache.spark.{Logging, SparkContext}
+import org.sparklinedata.druid.DruidRelation
+import org.sparklinedata.druid.metadata.{DruidMetadataViews, DruidRelationInfo}
 
 
 class SparklineDataContext(
@@ -67,7 +70,7 @@ class SparklineDataContext(
       isRootContext = false)
   }
 
-  override protected[sql] lazy val catalog =
+  override lazy val catalog =
     new SparklineMetastoreCatalog(metadataHive, this) with OverrideCatalog
 }
 
@@ -81,5 +84,21 @@ class SparklineMetastoreCatalog(client: ClientInterface, hive: HiveContext) exte
     DruidMetadataViews.metadataDFs.get(tableName).map{ f =>
       f(hive).queryExecution.logical
     }.getOrElse(super.lookupRelation(tableIdent, alias))
+  }
+
+  def druidRelations : Seq[DruidRelationInfo] = {
+
+    Seq()
+
+//    TODO: fix this
+//    Scala compiler generates a function invocation for the expression `cachedDataSourceTables`
+//    since it implements the com.google.common.base.Function interface,
+    // which has an apply method.
+//
+//    import collection.JavaConversions._
+//
+//    cachedDataSourceTables.asMap().values.collect {
+//      case LogicalRelation(DruidRelation(info, _), _) => info
+//    }.toSeq
   }
 }
