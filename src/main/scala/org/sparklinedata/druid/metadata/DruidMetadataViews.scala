@@ -170,7 +170,8 @@ object DruidMetadataViews {
     "d$druidrelations" -> getDruidRelationView _,
     "d$druidservers" -> getDruidServersView _,
     "d$druidsegments" -> getDruidSegmentsView _,
-    "d$druidserverassignments" -> getDruidServerAssignmentsView _
+    "d$druidserverassignments" -> getDruidServerAssignmentsView _,
+    "d$druidqueries" -> getDruidQueryHistory _
   )
 
   def getDruidRelationView(sqlContext: SQLContext): DataFrame = {
@@ -213,6 +214,10 @@ object DruidMetadataViews {
       ).toSeq
 
     sqlContext.createDataFrame(l)
+  }
+
+  def getDruidQueryHistory(sqlContext: SQLContext): DataFrame = {
+    sqlContext.createDataFrame(DruidQueryHistory.getHistory)
   }
 
 }

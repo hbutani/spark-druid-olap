@@ -26,12 +26,10 @@ import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.sparklinedata.execution.metrics.DruidQueryExecutionMetric
 import org.joda.time.Interval
 import org.sparklinedata.druid.client.{DruidQueryServerClient, QueryResultRow}
-import org.sparklinedata.druid.metadata.DruidMetadataCache
-import org.sparklinedata.druid.metadata.DruidRelationInfo
-import org.sparklinedata.druid.metadata.DruidSegmentInfo
-import org.sparklinedata.druid.metadata.HistoricalServerAssignment
+import org.sparklinedata.druid.metadata._
 
 import scala.util.Random
 
@@ -72,20 +70,51 @@ class BrokerPartition(idx: Int,
 class DruidRDD(sqlContext: SQLContext,
               val drInfo : DruidRelationInfo,
                 val dQuery : DruidQuery)  extends  RDD[InternalRow](sqlContext.sparkContext, Nil) {
+
+  val druidQueryAcc : DruidQueryExecutionMetric = new DruidQueryExecutionMetric()
+
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
-
 
     val p = split.asInstanceOf[DruidPartition]
     val mQry = p.setIntervalsOnQuerySpec(dQuery.q)
     Utils.logQuery(mQry)
     val client = p.queryClient
+
+    val qrySTime = System.currentTimeMillis()
+    val qrySTimeStr = s"${new java.util.Date()}"
     val dr = client.executeQueryAsStream(mQry)
-    context.addTaskCompletionListener{ context => dr.closeIfNeeded() }
+    val druidExecTime = (System.currentTimeMillis() - qrySTime)
+    var numRows : Int = 0
+
+    context.addTaskCompletionListener{ context =>
+      val queryExecTime = (System.currentTimeMillis() - qrySTime)
+      druidQueryAcc.add(
+        DruidQueryExecutionView(
+          context.stageId,
+          context.partitionId(),
+          context.taskAttemptId(),
+          s"${client.host}:${client.port}",
+          if (p.segIntervals == null) None else {
+            Some(
+              p.segIntervals.map(t => (t._1.identifier, t._2.toString))
+            )
+          },
+          qrySTimeStr,
+          druidExecTime,
+          queryExecTime,
+          numRows,
+          Utils.queryToString(mQry)
+        )
+      )
+      dr.closeIfNeeded()
+    }
+
     val r = new InterruptibleIterator[QueryResultRow](context, dr)
     val schema = dQuery.schema(drInfo)
     val nameToTF = dQuery.getValTFMap
     r.map { r =>
+      numRows += 1
       new GenericInternalRowWithSchema(schema.fields.map
       (f => DruidValTransform.sparkValue(
         f, r.event(f.name), nameToTF.get(f.name))), schema)
