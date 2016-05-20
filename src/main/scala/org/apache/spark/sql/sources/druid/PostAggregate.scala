@@ -47,6 +47,12 @@ class PostAggregate(val druidOpSchema : DruidOperatorSchema) {
       case FunctionAggregationSpec("doubleMin", nm, _) => Some(Min(attrRef(dOpAttr)))
       case FunctionAggregationSpec("longMax", nm, _) => Some(Max(attrRef(dOpAttr)))
       case FunctionAggregationSpec("doubleMax", nm, _) => Some(Max(attrRef(dOpAttr)))
+      case JavascriptAggregationSpec(_, aggnm, _, _, _, _) if aggnm.startsWith("MIN") =>
+        Some(Min(attrRef(dOpAttr)))
+      case JavascriptAggregationSpec(_, aggnm, _, _, _, _) if aggnm.startsWith("MAX") =>
+        Some(Max(attrRef(dOpAttr)))
+      case JavascriptAggregationSpec(_, aggnm, _, _, _, _) if aggnm.startsWith("SUM") =>
+        Some(Sum(attrRef(dOpAttr)))
       case _ => None
     }
   }
