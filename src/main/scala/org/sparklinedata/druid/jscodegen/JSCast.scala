@@ -84,7 +84,8 @@ case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
   // TODO: Handle parsing failure as in Spark
   private[this] def castToDateCode: Option[JSExpr] = from.fnDT match {
     case StringType =>
-      Some(new JSExpr(stringToDateCode(from.getRef, ctx.dateTimeCtx), DateType))
+      Some(new JSExpr(if (from.timeDim) {longToDateCode(from.getRef, ctx.dateTimeCtx)}
+      else {stringToDateCode(from.getRef, ctx.dateTimeCtx)}, DateType))
     case TimestampType =>
       Some(new JSExpr(dtToDateCode(from.getRef), DateType))
     case _ => None

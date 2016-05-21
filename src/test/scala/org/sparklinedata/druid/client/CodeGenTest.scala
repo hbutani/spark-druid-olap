@@ -413,4 +413,17 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     """.stripMargin,
     0, true, true
   )
+
+  test("cf",
+    s"""
+        |SELECT Min(Cast(Concat(To_date(Cast(Concat(To_date(l_shipdate),' 00:00:00')
+        |AS TIMESTAMP)),' 00:00:00') AS TIMESTAMP)) AS mi,
+        |max(cast(concat(to_date(cast(concat(to_date(l_shipdate),' 00:00:00') AS timestamp)),
+        |' 00:00:00') AS timestamp)) AS ma,
+        |count(1) as c
+        |FROM   orderLineItemPartSupplier
+        |HAVING (count(1) > 0)
+     """.stripMargin,
+    1,
+    true, true)
 }

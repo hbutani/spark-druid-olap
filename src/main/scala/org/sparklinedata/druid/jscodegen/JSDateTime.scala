@@ -64,6 +64,11 @@ private[jscodegen] object JSDateTimeCtx {
     s"org.joda.time.LocalDate.parse(${ts}, ${ctx.isoFormatterVar})"
   }
 
+  private[jscodegen] def longToDateCode(ts: String, ctx: JSDateTimeCtx) = {
+    ctx.createJodaTZ = true
+    s"new org.joda.time.LocalDate(${ts}, ${ctx.tzVar})"
+  }
+
   private[jscodegen] def noDaysToDateCode(ts: String) =
     s"new org.joda.time.LocalDate(${ts} * $mSecsInDay)"
 
