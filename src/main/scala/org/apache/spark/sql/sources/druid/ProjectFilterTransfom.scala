@@ -20,11 +20,12 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.types.{BooleanType, LongType, StringType}
+import org.apache.spark.sql.types.{BooleanType, LongType}
+import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid.Debugging._
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.jscodegen.JSCodeGenerator
-import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDimension}
+import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDimension, DruidMetric, DruidTimeDimension}
 
 trait ProjectFilterTransfom {
   self: DruidPlanner =>
@@ -66,7 +67,7 @@ trait ProjectFilterTransfom {
       val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
       translateProjectFilter(dqb,
         projectList,
-        filters)
+        simplifyFil(dqb.get, filters))
     }
     case _ => Seq()
   }
@@ -202,6 +203,10 @@ trait ProjectFilterTransfom {
         for (f <- fil)
           yield NotFilterSpec("not", f)
       }
+      case IsNotNull(AttributeReference(nm,_,_,_)) => {
+        for (c <- dqb.druidColumn(nm) if c.isInstanceOf[DruidDimension]) yield
+             NotFilterSpec("not", new SelectorFilterSpec(nm, ""))
+      }
       case _ => {
         val codeGen = JSCodeGenerator(dqb, fe, false, false,
           sqlContext.getConf(DruidPlanner.TZ_ID).toString,
@@ -212,5 +217,21 @@ trait ProjectFilterTransfom {
       }
     }
   }
+
+  private[this] def simplifyFil(dqb: DruidQueryBuilder, fil: Seq[Expression])
+  : Seq[Expression] = {
+    fil.foldLeft(List[Expression]()) { (l, e) => e match {
+      case IsNotNull(e) if ExprUtil.nullPreserving(e) &&
+        timeDimOrMetric(dqb, e.references) => l
+      case _ => (e :: l.asInstanceOf[List[Expression]]).asInstanceOf[List[Expression]]
+    }
+    }
+  }
+
+  private[this] def timeDimOrMetric(dqb: DruidQueryBuilder, attrs: AttributeSet): Boolean =
+    attrs.foldLeft(true) { (s, a) => val c = dqb.druidColumn(a.name).getOrElse(None)
+      val b = s && (c.isInstanceOf[DruidTimeDimension] || c.isInstanceOf[DruidMetric])
+      if (b) true else return false
+    }
 }
 
