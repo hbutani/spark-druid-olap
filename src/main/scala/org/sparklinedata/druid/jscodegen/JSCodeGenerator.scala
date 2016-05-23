@@ -250,8 +250,19 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
         }
       case Remainder(l, r) => Some(genBArithmeticExprCode(l, r, e, "%")).flatten
       case Pmod(le, re) =>
-        for (te <- genBArithmeticExprCode(le, re, e, "%")) yield
-          JSExpr(None, te.linesSoFar, s"""Math.abs(${te.getRef})""".stripMargin, te.fnDT)
+      {
+        for (lex <- genExprCode(le); rex <- genExprCode(re)) yield {
+          val v = makeUniqueVarName
+          JSExpr(Some(v),
+            lex.linesSoFar + rex.linesSoFar +
+            s"""var ${v} = 0;
+                if (${lex.getRef} < 0) {
+                |${v} = (${lex.getRef} + ${rex.getRef}) % ${rex.getRef};
+                } else {
+                  ${v} =${lex.getRef} % ${rex.getRef};
+                }""".stripMargin, "", e.dataType)
+          }
+      }
       case _ => None.flatten
     }
   }

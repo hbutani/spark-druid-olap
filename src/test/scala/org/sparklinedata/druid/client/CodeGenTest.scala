@@ -442,9 +442,9 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
 
   test("pmod1",
     """
-      |SELECT pmod(-5, o_orderkey) as s
+      |SELECT max(pmod(o_totalprice, -5)) as s
       |   FROM orderLineItemPartSupplier
-      |   group by pmod(-5, o_orderkey)
+      |   group by s_region
       |   order by s
     """.stripMargin,
     1, true, true
@@ -452,9 +452,29 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
 
   test("pmod1B",
     """
-      |SELECT pmod(-5, o_orderkey) as s
+      |SELECT max(pmod(o_totalprice, -5)) as s
       |   FROM orderLineItemPartSupplierBase
-      |   group by pmod(-5, o_orderkey)
+      |   group by s_region
+      |   order by s
+    """.stripMargin,
+    0, true, true
+  )
+
+  test("pmod2",
+    """
+      |SELECT max(pmod(-5, o_totalprice)) as s
+      |   FROM orderLineItemPartSupplier
+      |   group by s_region
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("pmod2B",
+    """
+      |SELECT max(pmod(-5, o_totalprice)) as s
+      |   FROM orderLineItemPartSupplierBase
+      |   group by s_region
       |   order by s
     """.stripMargin,
     0, true, true
