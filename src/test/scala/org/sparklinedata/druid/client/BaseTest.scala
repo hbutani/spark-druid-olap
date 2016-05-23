@@ -194,6 +194,7 @@ abstract class BaseTest extends fixture.FunSuite with
       timeDimensionColumn "l_shipdate",
       druidDatasource "tpch",
       druidHost "localhost",
+      zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema')""".stripMargin

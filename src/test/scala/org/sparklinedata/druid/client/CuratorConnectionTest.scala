@@ -36,7 +36,7 @@ class CuratorConnectionTest extends fixture.FunSuite with
       true,
       "/druid",
       false,
-      false,
+      true,
       Int.MaxValue
     )
 

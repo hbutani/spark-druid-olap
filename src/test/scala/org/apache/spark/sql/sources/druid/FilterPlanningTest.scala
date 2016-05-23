@@ -117,7 +117,7 @@ class FilterPlanningTest extends PlanningTest {
             "              \n" +
             "            \n" +
             "\n" +
-            "            return((org.joda.time.DateTime.parse((((org.joda.time.LocalDate.parse(__time, v2).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3).toLocalDate().getMonthOfYear())  <  (4));\n" +
+            "            return((org.joda.time.DateTime.parse((((new org.joda.time.LocalDate(__time, v1).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3).toLocalDate().getMonthOfYear())  <  (4));\n" +
             "            }")
       )
     )

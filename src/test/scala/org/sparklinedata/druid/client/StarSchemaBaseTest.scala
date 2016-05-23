@@ -314,6 +314,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       timeDimensionColumn "l_shipdate",
       druidDatasource "tpch",
       druidHost "localhost",
+      zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
       functionalDependencies '$functionalDependencies',
       starSchema '$starSchema')""".stripMargin
