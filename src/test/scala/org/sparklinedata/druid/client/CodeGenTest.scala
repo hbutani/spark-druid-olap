@@ -427,7 +427,6 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     1,
     true, true)
 
-
   test("aggTest3B",
     s"""
        |SELECT Min(Cast(Concat(To_date(Cast(Concat(To_date(l_shipdate),' 00:00:00')
@@ -440,4 +439,24 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
      """.stripMargin,
     0,
     true, true)
+
+  test("pmod1",
+    """
+      |SELECT pmod(-5, o_orderkey) as s
+      |   FROM orderLineItemPartSupplier
+      |   group by pmod(-5, o_orderkey)
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("pmod1B",
+    """
+      |SELECT pmod(-5, o_orderkey) as s
+      |   FROM orderLineItemPartSupplierBase
+      |   group by pmod(-5, o_orderkey)
+      |   order by s
+    """.stripMargin,
+    0, true, true
+  )
 }

@@ -249,6 +249,9 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           }
         }
       case Remainder(l, r) => Some(genBArithmeticExprCode(l, r, e, "%")).flatten
+      case Pmod(le, re) =>
+        for (te <- genBArithmeticExprCode(le, re, e, "%")) yield
+          JSExpr(None, te.linesSoFar, s"""Math.abs(${te.getRef})""".stripMargin, te.fnDT)
       case _ => None.flatten
     }
   }
