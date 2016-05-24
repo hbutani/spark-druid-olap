@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.sources.druid
 
+import java.util.TimeZone
+
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.expressions.{Expression, PredicateHelper}
@@ -29,6 +31,8 @@ import org.sparklinedata.druid.client.BaseTest
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 
 trait PlanningTestHelper extends PredicateHelper {
+  System.setProperty("user.timezone", "UTC")
+  TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
 
   override def splitConjunctivePredicates(condition: Expression): Seq[Expression] = {
     super.splitConjunctivePredicates(condition)

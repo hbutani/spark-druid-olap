@@ -221,8 +221,12 @@ trait ProjectFilterTransfom {
   private[this] def simplifyFil(dqb: DruidQueryBuilder, fil: Seq[Expression])
   : Seq[Expression] = {
     fil.foldLeft(List[Expression]()) { (l, e) => e match {
+      case Not(IsNull(e)) if ExprUtil.nullPreserving(e) &&
+        timeDimOrMetric(dqb, e.references) => l
       case IsNotNull(e) if ExprUtil.nullPreserving(e) &&
         timeDimOrMetric(dqb, e.references) => l
+      case Not(IsNull(e)) =>
+        (IsNotNull(e) :: l.asInstanceOf[List[Expression]]).asInstanceOf[List[Expression]]
       case _ => (e :: l.asInstanceOf[List[Expression]]).asInstanceOf[List[Expression]]
     }
     }
