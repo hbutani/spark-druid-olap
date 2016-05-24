@@ -479,4 +479,54 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     """.stripMargin,
     0, true, true
   )
+
+  test("abs1",
+    """
+      |SELECT sum(abs(o_totalprice * -5)) as s
+      |   FROM orderLineItemPartSupplier
+      |   group by s_region
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("floor1",
+    """
+      |SELECT sum(floor(o_totalprice/3.5))  as s
+      |   FROM orderLineItemPartSupplier
+      |   group by s_region
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("ceil1",
+    """
+      |SELECT sum(ceil(o_totalprice/3.5))  as s
+      |   FROM orderLineItemPartSupplier
+      |   group by s_region
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("sqrt1",
+    """
+      |SELECT sum(sqrt(o_totalprice)) as s
+      |   FROM orderLineItemPartSupplier
+      |   group by s_region
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("Log1",
+    """
+      |SELECT sum(Log(o_totalprice)) as s
+      |   FROM orderLineItemPartSupplier
+      |   group by s_region
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
 }

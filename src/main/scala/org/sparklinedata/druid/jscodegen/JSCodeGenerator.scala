@@ -263,6 +263,11 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                 }""".stripMargin, "", e.dataType)
           }
       }
+      case Abs(ve) => genUnaryExprCode(ve, "Math.abs")
+      case Floor(ve) => genUnaryExprCode(ve, "Math.floor")
+      case Ceil(ve) => genUnaryExprCode(ve, "Math.ceil")
+      case Sqrt(ve) => genUnaryExprCode(ve, "Math.sqrt")
+      case Logarithm(Literal(2.718281828459045, DoubleType), ve) => genUnaryExprCode(ve, "Math.log")
       case _ => None.flatten
     }
   }
@@ -273,6 +278,12 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
       JSExpr(None,
         s"${lc.linesSoFar} ${rc.linesSoFar} ",
         s"((${lc.getRef}) $op (${rc.getRef}))", ce.dataType)
+  }
+
+  private[this] def genUnaryExprCode(e: Expression, op: String): Option[JSExpr] = {
+    for (te <- genExprCode(e)) yield
+      JSExpr(None, te.linesSoFar,
+        s"""$op(${te.getRef})""".stripMargin, te.fnDT)
   }
 
   private[this] def genComparisonCode(l: Expression, r: Expression, op: String): Option[JSExpr] = {
