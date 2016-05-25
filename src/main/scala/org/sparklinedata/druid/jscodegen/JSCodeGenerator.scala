@@ -268,6 +268,8 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
       case Ceil(ve) => genUnaryExprCode(ve, "Math.ceil")
       case Sqrt(ve) => genUnaryExprCode(ve, "Math.sqrt")
       case Logarithm(Literal(2.718281828459045, DoubleType), ve) => genUnaryExprCode(ve, "Math.log")
+      case UnaryMinus(ve) => genUnaryExprCode(ve, "-")
+      case UnaryPositive(ve) => genUnaryExprCode(ve, "+")
       case _ => None.flatten
     }
   }
@@ -294,7 +296,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
   }
 
   private[this] def genCastExprCode(e: Expression, dt: DataType): Option[JSExpr] = {
-    for (fn <- genExprCode(e);
+    for (fn <- genExprCode(simplifyCast(e, dt));
          cs <- JSCast(fn, dt, this).castCode) yield
       JSExpr(cs.fnVar, fn.linesSoFar + cs.linesSoFar, cs.curLine, dt)
   }
@@ -302,5 +304,12 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
   private[this] def validInParams(inParam: String): Boolean = {
     inParams += inParam
     if (!mulInParamsAllowed && (inParams.size > 1)) false else true
+  }
+
+  private[this] def simplifyCast(e: Expression, edt: DataType): Expression = e match {
+    case Cast(ie, idt) if edt.isInstanceOf[NumericType] && (idt.isInstanceOf[DoubleType] ||
+      idt.isInstanceOf[FloatType] || idt.isInstanceOf[DecimalType]) =>
+      Cast(ie, edt)
+    case _ => e
   }
 }

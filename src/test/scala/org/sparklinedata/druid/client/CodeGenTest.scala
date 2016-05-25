@@ -529,4 +529,48 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     """.stripMargin,
     1, true, true
   )
+
+  test("simplifyCastTst1",
+    """
+      |SELECT sum(Log(o_totalprice)) as s
+      |   FROM orderLineItemPartSupplier
+      |   group by
+      |   cast(l_shipdate as int)
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+
+  test("unaryMinus1",
+    """
+      |SELECT
+      | cast(concat(date_add(cast(l_shipdate AS timestamp),
+      | cast(-((1 + pmod(datediff(to_date(cast(l_shipdate AS timestamp)),
+      | '1995-01-01'), 7)) - 1) AS int)),' 00:00:00') AS timestamp)
+      |as s
+      |   FROM orderLineItemPartSupplier
+      |   group by
+      |   cast(concat(date_add(cast(l_shipdate AS timestamp),
+      |   cast(-((1 + pmod(datediff(to_date(cast(l_shipdate AS timestamp)), '1995-01-01'), 7))
+      |    - 1) AS int)),' 00:00:00') AS timestamp)
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
+  test("unaryPlus1",
+    """
+      |SELECT
+      | cast(concat(date_add(cast(l_shipdate AS timestamp),
+      | cast(+((1 + pmod(datediff(to_date(cast(l_shipdate AS timestamp)),
+      | '1995-01-01'), 7)) - 1) AS int)),' 00:00:00') AS timestamp)
+      |as s
+      |   FROM orderLineItemPartSupplier
+      |   group by
+      |   cast(concat(date_add(cast(l_shipdate AS timestamp),
+      |   cast(+((1 + pmod(datediff(to_date(cast(l_shipdate AS timestamp)), '1995-01-01'), 7))
+      |    - 1) AS int)),' 00:00:00') AS timestamp)
+      |   order by s
+    """.stripMargin,
+    1, true, true
+  )
 }
