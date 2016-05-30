@@ -32,17 +32,20 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                            metricAllowed: Boolean, tz_id: String,
                            retType: DataType = StringType) extends Logging {
   private[this] var uid: Int = 0
+
   private[jscodegen] def makeUniqueVarName: String = {
     uid += 1
     "v" + uid
   }
+
   private[this] var inParams: mutable.HashSet[String] = mutable.HashSet()
   private[jscodegen] val dateTimeCtx = new JSDateTimeCtx(tz_id, this)
 
   private[jscodegen] def fnElements: Option[(String, String)] =
     for (fnb <- genExprCode(e) if inParams.nonEmpty;
          rStmt <- JSCast(fnb, retType, this).castCode) yield {
-      (s"""
+      (
+        s"""
             ${dateTimeCtx.dateTimeInitCode}
             ${fnb.linesSoFar}
             ${rStmt.linesSoFar}""".stripMargin, rStmt.getRef)
@@ -65,212 +68,269 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
     case _ => false
   }
 
-  private[this] def genExprCode(e: Expression): Option[JSExpr] = {
-    e match {
-      case AttributeReference(nm, dT, _, _) =>
-        for (dD <- dqb.druidColumn(nm);
-             v = dqb.druidColumn(nm).get.name
-             if ((dD.isInstanceOf[DruidTimeDimension] ||
-               (metricAllowed && dD.isInstanceOf[DruidMetric]) ||
-               dD.isInstanceOf[DruidDimension]) && validInParams(v))) yield {
-          new JSExpr(v, e.dataType, dD.isInstanceOf[DruidTimeDimension])
-        }
+  private[this] def genExprCode(oe: Any): Option[JSExpr] = {
+    if (oe.isInstanceOf[Expression]) {
+      val e: Expression = oe.asInstanceOf[Expression]
+      e match {
+        case AttributeReference(nm, dT, _, _) =>
+          for (dD <- dqb.druidColumn(nm);
+               v = dqb.druidColumn(nm).get.name
+               if ((dD.isInstanceOf[DruidTimeDimension] ||
+                 (metricAllowed && dD.isInstanceOf[DruidMetric]) ||
+                 dD.isInstanceOf[DruidDimension]) && validInParams(v))) yield {
+            new JSExpr(v, e.dataType, dD.isInstanceOf[DruidTimeDimension])
+          }
 
-      case Literal(value, dataType) => {
-        dataType match {
-          case IntegerType | LongType | ShortType | DoubleType | FloatType =>
-            Some(new JSExpr(value.toString, dataType))
-          case StringType => Some(new JSExpr(s""""${e.toString}"""", dataType))
-          case NullType => Some(new JSExpr("null", dataType))
-          case DateType if value.isInstanceOf[Int] =>
-            Some(new JSExpr(noDaysToDateCode(value.toString), dataType))
-          case TimestampType if value.isInstanceOf[Long] =>
-            Some(new JSExpr(longToISODTCode(value.asInstanceOf[Long], dateTimeCtx), dataType))
-          case _ => JSCast(
-            new JSExpr(value.toString, StringType), dataType, this).castCode
-        }
-      }
-
-      case Cast(s, dt) => Some(genCastExprCode(s, dt)).flatten
-
-      case Concat(eLst) =>
-        // TODO: If second gencode failed then this should return none
-        // TODO: Use FoldLeft
-        var cJSFn: Option[JSExpr] = None
-        for (ex <- eLst; exCode <- genExprCode(ex)) {
-          if (cJSFn.isEmpty) {
-            cJSFn = Some(exCode)
-          } else {
-            cJSFn = Some(JSExpr(None,
-              s"${cJSFn.get.linesSoFar} ${exCode.linesSoFar} ",
-              s"((${cJSFn.get.getRef}).concat(${exCode.getRef}))",
-              StringType))
+        case Literal(value, dataType) => {
+          dataType match {
+            case IntegerType | LongType | ShortType | DoubleType | FloatType =>
+              Some(new JSExpr(value.toString, dataType))
+            case StringType => Some(new JSExpr(s""""${e.toString}"""", dataType))
+            case NullType => Some(new JSExpr("null", dataType))
+            case DateType if value.isInstanceOf[Int] =>
+              Some(new JSExpr(noDaysToDateCode(value.toString), dataType))
+            case TimestampType if value.isInstanceOf[Long] =>
+              Some(new JSExpr(longToISODTCode(value.asInstanceOf[Long], dateTimeCtx), dataType))
+            case _ => JSCast(
+              new JSExpr(value.toString, StringType), dataType, this).castCode
           }
         }
-        cJSFn
-      case Upper(u) =>
-        for (exCode <- genExprCode(u) if u.dataType.isInstanceOf[StringType]) yield
-          JSExpr(None,
-            exCode.linesSoFar, s"(${exCode.getRef}).toUpperCase()", StringType)
-      case Lower(l) =>
-        for (exCode <- genExprCode(l) if l.dataType.isInstanceOf[StringType]) yield
-          JSExpr(None,
-            exCode.linesSoFar, s"(${exCode.getRef}).toLowerCase()", StringType)
-      case Substring(str, pos, len) =>
-        for (strcode <- genExprCode(str); posL <- genExprCode(pos)
-             if pos.isInstanceOf[Literal]; lenL <- genExprCode(len)
-             if len.isInstanceOf[Literal]) yield
-          JSExpr(None, s"${strcode.linesSoFar} ${posL.linesSoFar}",
-            s"(${strcode.getRef}).substr(${posL.getRef}, ${lenL.getRef})",
-            StringType)
-      case Coalesce(le) => {
-        val l = le.flatMap(e => genExprCode(e))
-        if (le.size == l.size) {
-          val cl = l.foldLeft(new JSExpr("", StringType))((a, j) =>
-            JSExpr(None,
-              a.linesSoFar + j.linesSoFar,
-              if (a.getRef.isEmpty) s"(${j.getRef})" else s"${a.getRef} || (${j.getRef})", j.fnDT))
-          Some(JSExpr(None, cl.linesSoFar, s"(${cl.getRef})", cl.fnDT))
-        } else {
-          None
-        }
-      }
 
-      case CaseWhen(le) => {
-        val l = le.flatMap(e => genExprCode(e))
-        if (l.length == le.length) {
-          val v1 = makeUniqueVarName
-          val jv = ((0 until l.length / 2).foldLeft(
-            JSExpr(Some(v1), s"var ${v1} = false;", "", BooleanType)) { (a, i) =>
-            val cond = l(i * 2)
-            val res = l(i * 2 + 1)
-            JSExpr(a.fnVar, a.linesSoFar +
-              s"""
+        case Cast(s, dt) => Some(genCastExprCode(s, dt)).flatten
+
+        case Concat(eLst) =>
+          // TODO: If second gencode failed then this should return none
+          // TODO: Use FoldLeft
+          var cJSFn: Option[JSExpr] = None
+          for (ex <- eLst; exCode <- genExprCode(ex)) {
+            if (cJSFn.isEmpty) {
+              cJSFn = Some(exCode)
+            } else {
+              cJSFn = Some(JSExpr(None,
+                s"${cJSFn.get.linesSoFar} ${exCode.linesSoFar} ",
+                s"((${cJSFn.get.getRef}).concat(${exCode.getRef}))",
+                StringType))
+            }
+          }
+          cJSFn
+        case Upper(u) =>
+          for (exCode <- genExprCode(u) if u.dataType.isInstanceOf[StringType]) yield
+            JSExpr(None,
+              exCode.linesSoFar, s"(${exCode.getRef}).toUpperCase()", StringType)
+        case Lower(l) =>
+          for (exCode <- genExprCode(l) if l.dataType.isInstanceOf[StringType]) yield
+            JSExpr(None,
+              exCode.linesSoFar, s"(${exCode.getRef}).toLowerCase()", StringType)
+        case Substring(str, pos, len) =>
+          for (strcode <- genExprCode(str); posL <- genExprCode(pos)
+               if pos.isInstanceOf[Literal]; lenL <- genExprCode(len)
+               if len.isInstanceOf[Literal]) yield
+            JSExpr(None, s"${strcode.linesSoFar} ${posL.linesSoFar}",
+              s"(${strcode.getRef}).substr(${posL.getRef}, ${lenL.getRef})",
+              StringType)
+        case Coalesce(le) => {
+          val l = le.flatMap(e => genExprCode(e))
+          if (le.size == l.size) {
+            val cl = l.foldLeft(new JSExpr("", StringType))((a, j) =>
+              JSExpr(None,
+                a.linesSoFar + j.linesSoFar,
+                if (a.getRef.isEmpty) s"(${j.getRef})" else s"${a.getRef} || (${j.getRef})",
+                j.fnDT))
+            Some(JSExpr(None, cl.linesSoFar, s"(${cl.getRef})", cl.fnDT))
+          } else {
+            None
+          }
+        }
+
+        case CaseWhen(le) => {
+          val l = le.flatMap(e => genExprCode(e))
+          if (l.length == le.length) {
+            val v1 = makeUniqueVarName
+            val jv = ((0 until l.length / 2).foldLeft(
+              JSExpr(Some(v1), s"var ${v1} = false;", "", BooleanType)) { (a, i) =>
+              val cond = l(i * 2)
+              val res = l(i * 2 + 1)
+              JSExpr(a.fnVar, a.linesSoFar +
+                s"""
                   ${cond.linesSoFar}
               if (!${v1} && (${cond.getRef})) {
               ${res.linesSoFar}
               ${v1} = ${res.getRef};
         }""".stripMargin, "", a.fnDT)
-          })
-          val de = l(l.length - 1)
-          Some(JSExpr(jv.fnVar, jv.linesSoFar +
-            s"""
+            })
+            val de = l(l.length - 1)
+            Some(JSExpr(jv.fnVar, jv.linesSoFar +
+              s"""
               if (!${v1}) {
               ${de.linesSoFar}
               ${v1} = ${de.getRef};
         }""".stripMargin, "", de.fnDT))
-        } else {
-          None
+          } else {
+            None
+          }
         }
-      }
-      case LessThan(l, r) => genComparisonCode(l, r, " < ")
-      case LessThanOrEqual(l, r) => genComparisonCode(l, r, " <= ")
-      case GreaterThan(l, r) => genComparisonCode(l, r, " > ")
-      case GreaterThanOrEqual(l, r) => genComparisonCode(l, r, " >= ")
-      case EqualTo(l, r) => genComparisonCode(l, r, " == ")
-      case And(l, r) => genComparisonCode(l, r, " && ")
-      case Or(l, r) => genComparisonCode(l, r, " || ")
-      case Not(e) => {
-        for (j <- genExprCode(e)) yield
-          JSExpr(None, j.linesSoFar, s"!(${j.getRef})", BooleanType)
-      }
+        case LessThan(l, r) => genComparisonCode(l, r, " < ")
+        case LessThanOrEqual(l, r) => genComparisonCode(l, r, " <= ")
+        case GreaterThan(l, r) => genComparisonCode(l, r, " > ")
+        case GreaterThanOrEqual(l, r) => genComparisonCode(l, r, " >= ")
+        case EqualTo(l, r) => genComparisonCode(l, r, " == ")
+        case And(l, r) => genComparisonCode(l, r, " && ")
+        case Or(l, r) => genComparisonCode(l, r, " || ")
+        case Not(e) => {
+          for (j <- genExprCode(e)) yield
+            JSExpr(None, j.linesSoFar, s"!(${j.getRef})", BooleanType)
+        }
+        case In(c, vl) if vl.forall(v => v.isInstanceOf[Literal]) => {
+          val nnVL = vl.filter(v => !v.dataType.isInstanceOf[NullType] &&
+            v.asInstanceOf[Literal].value != null)
+          val nnVEL = for (nnv <- nnVL; nnve <- genExprCode(nnv)) yield nnve
+          if (!nnVL.isEmpty && !nnVEL.isEmpty && nnVEL.size == nnVL.size) {
+            for (ce <- genExprCode(c)) yield {
+              val vlJSE = nnVEL.foldLeft[JSExpr](new JSExpr("", IntegerType))((s, nnve) =>
+                JSExpr(None, s.linesSoFar + nnve.linesSoFar,
+                  if (s.getRef.isEmpty) {
+                    s"""${nnve.getRef}:true""".stripMargin
+                  } else {s"""${s.getRef}, ${nnve.getRef}:true""".stripMargin}, nnve.fnDT)
+              )
+              JSExpr(None, ce.linesSoFar + vlJSE.linesSoFar,
+                s"""${ce.getRef} in {${vlJSE.getRef}}""".stripMargin, BooleanType)
+            }
+          } else {
+            None
+          }
+        }
+        case InSet(c, vs) if vs.forall(v => !v.isInstanceOf[Expression]) => {
+          val nnVS = vs.filter(v => v != null)
+          val nnVES = for (nnv <- nnVS; nnve <- genExprCode(nnv)) yield nnve
+          if (!nnVS.isEmpty && !nnVES.isEmpty && nnVES.size == nnVS.size) {
+            for (ce <- genExprCode(c)) yield {
+              val vlJSE = nnVES.toList.foldLeft[JSExpr](new JSExpr("", IntegerType))((s, nnve) =>
+                JSExpr(None, s.linesSoFar + nnve.linesSoFar,
+                  if (s.getRef.isEmpty) {
+                    s"""${nnve.getRef}:true""".stripMargin
+                  } else {s"""${s.getRef}, ${nnve.getRef}:true""".stripMargin}, nnve.fnDT)
+              )
+              JSExpr(None, ce.linesSoFar + vlJSE.linesSoFar,
+                s"""${ce.getRef} in {${vlJSE.getRef}}""".stripMargin, BooleanType)
+            }
+          } else {
+            None
+          }
+        }
 
-      case ToDate(de) =>
-        for (fn <- genExprCode(de); cFn <- JSCast(fn, DateType, this).castCode)
-          yield JSExpr(None, fn.linesSoFar + cFn.linesSoFar, cFn.getRef, DateType)
-      case DateAdd(sd, nd) =>
-        for (sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode;
-             nde <- genExprCode(nd); cnde <- JSCast(nde, IntegerType, this).castCode;
-             ade <- JSCast(new JSExpr(dateAdd(csde.getRef, cnde.getRef), DateType),
-               StringType, this).castCode)
-          yield JSExpr(None,
-            sde.linesSoFar + csde.linesSoFar + nde.linesSoFar + cnde.linesSoFar + ade.linesSoFar,
-            ade.getRef, StringType)
-      case DateSub(sd, nd) =>
-        for (sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode;
-             nde <- genExprCode(nd); cnde <- JSCast(nde, IntegerType, this).castCode)
-          yield JSExpr(None,
-            sde.linesSoFar + csde.linesSoFar + nde.linesSoFar + cnde.linesSoFar,
-            dateSub(csde.getRef, cnde.getRef), DateType)
-      case DateDiff(ed, sd) =>
-        for (ede <- genExprCode(ed); cede <- JSCast(ede, DateType, this).castCode;
-             sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode)
-          yield JSExpr(None,
-            ede.linesSoFar + cede.linesSoFar + sde.linesSoFar + csde.linesSoFar,
-            dateDiff(cede.getRef, csde.getRef), IntegerType)
-      case Year(y) =>
-        for (ye <- genExprCode(y); cye <- JSCast(ye, DateType, this).castCode) yield
-          JSExpr(None, ye.linesSoFar + cye.linesSoFar, dTYear(cye.getRef), IntegerType)
-      case Quarter(q) =>
-        for (qe <- genExprCode(q); cqe <- JSCast(qe, DateType, this).castCode) yield
-          JSExpr(None, qe.linesSoFar + cqe.linesSoFar, dTQuarter(cqe.getRef), IntegerType)
-      case Month(mo) =>
-        for (moe <- genExprCode(mo); cmoe <- JSCast(moe, DateType, this).castCode)
-          yield
-            JSExpr(None, moe.linesSoFar + cmoe.linesSoFar, dTMonth(cmoe.getRef), IntegerType)
-      case DayOfMonth(d) =>
-        for (de <- genExprCode(d); cde <- JSCast(de, DateType, this).castCode)
-          yield
-            JSExpr(None, de.linesSoFar + cde.linesSoFar, dTDayOfMonth(cde.getRef), IntegerType)
-      case WeekOfYear(w) =>
-        for (we <- genExprCode(w); cwe <- JSCast(we, DateType, this).castCode)
-          yield
-            JSExpr(None, we.linesSoFar + cwe.linesSoFar, dTWeekOfYear(cwe.getRef), IntegerType)
-      case Hour(h) =>
-        for (he <- genExprCode(h); che <- JSCast(he, TimestampType, this).castCode)
-          yield
-            JSExpr(None, he.linesSoFar + che.linesSoFar, dTHour(che.getRef), IntegerType)
-      case Minute(m) =>
-        for (me <- genExprCode(m); cme <- JSCast(me, TimestampType, this).castCode)
-          yield
-            JSExpr(None, me.linesSoFar + cme.linesSoFar, dTMinute(cme.getRef), IntegerType)
-      case Second(s) =>
-        for (se <- genExprCode(s); cse <- JSCast(se, TimestampType, this).castCode)
-          yield
-            JSExpr(None, se.linesSoFar + cse.linesSoFar, dTSecond(cse.getRef), IntegerType)
-      case FromUnixTime(s, f) if f.isInstanceOf[Literal] =>
-        for (se <- genExprCode(s); cse <- JSCast(se, LongType, this).castCode) yield
-          JSExpr(None, se.linesSoFar + cse.linesSoFar,
-            dtToStrCode(longToISODTCode(cse.getRef, dateTimeCtx),
-              s""""${f.toString()}"""".stripMargin), StringType)
-      case UnixTimestamp(t, f) if f.isInstanceOf[Literal] =>
-        for (te <- genExprCode(t)) yield
-          JSExpr(None, te.linesSoFar,
-            dtToSecondsCode(stringToISODTCode(te.getRef, dateTimeCtx)), LongType)
-      case Add(l, r) => Some(genBArithmeticExprCode(l, r, e, "+")).flatten
-      case Subtract(l, r) => Some(genBArithmeticExprCode(l, r, e, "-")).flatten
-      case Multiply(l, r) => Some(genBArithmeticExprCode(l, r, e, "*")).flatten
-      case Divide(l, r) => for (ae <- genBArithmeticExprCode(l, r, e, "/")) yield
-        {
+        case ToDate(de) =>
+          for (fn <- genExprCode(de); cFn <- JSCast(fn, DateType, this).castCode)
+            yield JSExpr(None, fn.linesSoFar + cFn.linesSoFar, cFn.getRef, DateType)
+        case DateAdd(sd, nd) =>
+          for (sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode;
+               nde <- genExprCode(nd); cnde <- JSCast(nde, IntegerType, this).castCode;
+               ade <- JSCast(new JSExpr(dateAdd(csde.getRef, cnde.getRef), DateType),
+                 StringType, this).castCode)
+            yield JSExpr(None,
+              sde.linesSoFar + csde.linesSoFar + nde.linesSoFar + cnde.linesSoFar + ade.linesSoFar,
+              ade.getRef, StringType)
+        case DateSub(sd, nd) =>
+          for (sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode;
+               nde <- genExprCode(nd); cnde <- JSCast(nde, IntegerType, this).castCode)
+            yield JSExpr(None,
+              sde.linesSoFar + csde.linesSoFar + nde.linesSoFar + cnde.linesSoFar,
+              dateSub(csde.getRef, cnde.getRef), DateType)
+        case DateDiff(ed, sd) =>
+          for (ede <- genExprCode(ed); cede <- JSCast(ede, DateType, this).castCode;
+               sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode)
+            yield JSExpr(None,
+              ede.linesSoFar + cede.linesSoFar + sde.linesSoFar + csde.linesSoFar,
+              dateDiff(cede.getRef, csde.getRef), IntegerType)
+        case Year(y) =>
+          for (ye <- genExprCode(y); cye <- JSCast(ye, DateType, this).castCode) yield
+            JSExpr(None, ye.linesSoFar + cye.linesSoFar, dTYear(cye.getRef), IntegerType)
+        case Quarter(q) =>
+          for (qe <- genExprCode(q); cqe <- JSCast(qe, DateType, this).castCode) yield
+            JSExpr(None, qe.linesSoFar + cqe.linesSoFar, dTQuarter(cqe.getRef), IntegerType)
+        case Month(mo) =>
+          for (moe <- genExprCode(mo); cmoe <- JSCast(moe, DateType, this).castCode)
+            yield
+              JSExpr(None, moe.linesSoFar + cmoe.linesSoFar, dTMonth(cmoe.getRef), IntegerType)
+        case DayOfMonth(d) =>
+          for (de <- genExprCode(d); cde <- JSCast(de, DateType, this).castCode)
+            yield
+              JSExpr(None, de.linesSoFar + cde.linesSoFar, dTDayOfMonth(cde.getRef), IntegerType)
+        case WeekOfYear(w) =>
+          for (we <- genExprCode(w); cwe <- JSCast(we, DateType, this).castCode)
+            yield
+              JSExpr(None, we.linesSoFar + cwe.linesSoFar, dTWeekOfYear(cwe.getRef), IntegerType)
+        case Hour(h) =>
+          for (he <- genExprCode(h); che <- JSCast(he, TimestampType, this).castCode)
+            yield
+              JSExpr(None, he.linesSoFar + che.linesSoFar, dTHour(che.getRef), IntegerType)
+        case Minute(m) =>
+          for (me <- genExprCode(m); cme <- JSCast(me, TimestampType, this).castCode)
+            yield
+              JSExpr(None, me.linesSoFar + cme.linesSoFar, dTMinute(cme.getRef), IntegerType)
+        case Second(s) =>
+          for (se <- genExprCode(s); cse <- JSCast(se, TimestampType, this).castCode)
+            yield
+              JSExpr(None, se.linesSoFar + cse.linesSoFar, dTSecond(cse.getRef), IntegerType)
+        case FromUnixTime(s, f) if f.isInstanceOf[Literal] =>
+          for (se <- genExprCode(s); cse <- JSCast(se, LongType, this).castCode) yield
+            JSExpr(None, se.linesSoFar + cse.linesSoFar,
+              dtToStrCode(longToISODTCode(cse.getRef, dateTimeCtx),
+                s""""${f.toString()}"""".stripMargin), StringType)
+        case UnixTimestamp(t, f) if f.isInstanceOf[Literal] =>
+          for (te <- genExprCode(t)) yield
+            JSExpr(None, te.linesSoFar,
+              dtToSecondsCode(stringToISODTCode(te.getRef, dateTimeCtx)), LongType)
+        case Add(l, r) => Some(genBArithmeticExprCode(l, r, e, "+")).flatten
+        case Subtract(l, r) => Some(genBArithmeticExprCode(l, r, e, "-")).flatten
+        case Multiply(l, r) => Some(genBArithmeticExprCode(l, r, e, "*")).flatten
+        case Divide(l, r) => for (ae <- genBArithmeticExprCode(l, r, e, "/")) yield {
           if (SPIntegralNumeric(e.dataType)) {
             JSExpr(None, ae.linesSoFar, s"Math.floor(${ae.getRef})", e.dataType)
           } else {
             ae
           }
         }
-      case Remainder(l, r) => Some(genBArithmeticExprCode(l, r, e, "%")).flatten
-      case Pmod(le, re) =>
-      {
-        for (lex <- genExprCode(le); rex <- genExprCode(re)) yield {
-          val v = makeUniqueVarName
-          JSExpr(Some(v),
-            lex.linesSoFar + rex.linesSoFar +
-            s"""var ${v} = 0;
+        case Remainder(l, r) => Some(genBArithmeticExprCode(l, r, e, "%")).flatten
+        case Pmod(le, re) => {
+          for (lex <- genExprCode(le); rex <- genExprCode(re)) yield {
+            val v = makeUniqueVarName
+            JSExpr(Some(v),
+              lex.linesSoFar + rex.linesSoFar +
+                s"""var ${v} = 0;
                 if (${lex.getRef} < 0) {
-                |${v} = (${lex.getRef} + ${rex.getRef}) % ${rex.getRef};
+                    |${v} = (${lex.getRef} + ${rex.getRef}) % ${rex.getRef};
                 } else {
                   ${v} =${lex.getRef} % ${rex.getRef};
                 }""".stripMargin, "", e.dataType)
           }
+        }
+        case Abs(ve) => genUnaryExprCode(ve,
+          "Math.abs")
+        case Floor(ve) => genUnaryExprCode(
+          ve, "Math.floor")
+        case Ceil(ve) =>
+          genUnaryExprCode(ve, "Math.ceil")
+        case Sqrt(ve) =>
+          genUnaryExprCode(ve, "Math.sqrt")
+        case Logarithm(Literal(2.718281828459045, DoubleType), ve)
+        => genUnaryExprCode(ve, "Math.log")
+        case
+          UnaryMinus(ve) => genUnaryExprCode(ve, "-")
+        case UnaryPositive(ve) =>
+          genUnaryExprCode(ve, "+")
+        case _ => None.flatten
       }
-      case Abs(ve) => genUnaryExprCode(ve, "Math.abs")
-      case Floor(ve) => genUnaryExprCode(ve, "Math.floor")
-      case Ceil(ve) => genUnaryExprCode(ve, "Math.ceil")
-      case Sqrt(ve) => genUnaryExprCode(ve, "Math.sqrt")
-      case Logarithm(Literal(2.718281828459045, DoubleType), ve) => genUnaryExprCode(ve, "Math.log")
-      case UnaryMinus(ve) => genUnaryExprCode(ve, "-")
-      case UnaryPositive(ve) => genUnaryExprCode(ve, "+")
-      case _ => None.flatten
+    } else {
+      oe match {
+        case _: Short => Some(new JSExpr(s"$oe", ShortType))
+        case _: Integer => Some(new JSExpr(s"$oe", IntegerType))
+        case _: Long => Some(new JSExpr(s"$oe", LongType))
+        case _: Float => Some(new JSExpr(s"$oe", FloatType))
+        case _: Double => Some(new JSExpr(s"$oe", DoubleType))
+        // case Short|Integer|Long|Float|Double => Some(new JSExpr(s"Number($oe)", IntegerType))
+        case _: String => Some(new JSExpr(oe.asInstanceOf[String], StringType))
+        case _ => None
+      }
     }
   }
 
