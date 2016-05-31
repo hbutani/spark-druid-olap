@@ -673,5 +673,42 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       |order by x, y
     """.stripMargin
     ,0,true,true)
-
+  test("inclause-insetTest1",
+    s"""select c_name, sum(c_acctbal) as bal
+      from orderLineItemPartSupplier
+      where to_Date(o_orderdate) >= cast('1993-01-01' as date) and to_Date(o_orderdate) <= cast('1997-12-31' as date)
+      and cast(order_year as int) in (1985,1986,1987,1988,1989,1990,1991,1992,
+      1993,1994,1995,1996,1997,1998,1999,2000, null)
+      group by c_name
+      order by c_name, bal""".stripMargin,
+    1,
+    true, true)
+  test("inclause-insetTest1B",
+    s"""select c_name, sum(c_acctbal) as bal
+      from orderLineItemPartSupplierBase
+      where to_Date(o_orderdate) >= cast('1993-01-01' as date) and to_Date(o_orderdate) <= cast('1997-12-31' as date)
+      and cast(order_year as int) in (1985,1986,1987,1988,1989,1990,1991,1992,
+      1993,1994,1995,1996,1997,1998,1999,2000, null)
+      group by c_name
+      order by c_name, bal""".stripMargin,
+    0,
+    true, true)
+  test("inclause-inTest1",
+    s"""select c_name, sum(c_acctbal) as bal
+      from orderLineItemPartSupplier
+      where to_Date(o_orderdate) >= cast('1993-01-01' as date) and to_Date(o_orderdate) <= cast('1997-12-31' as date)
+       and cast(order_year as int) in (1993,1994,1995, null)
+      group by c_name
+      order by c_name, bal""".stripMargin,
+    1,
+    true, true)
+  test("inclause-inTest1B",
+    s"""select c_name, sum(c_acctbal) as bal
+      from orderLineItemPartSupplierBase
+      where to_Date(o_orderdate) >= cast('1993-01-01' as date) and to_Date(o_orderdate) <= cast('1997-12-31' as date)
+       and cast(order_year as int) in (1993,1994,1995, null)
+      group by c_name
+      order by c_name, bal""".stripMargin,
+    0,
+    true, true)
 }
