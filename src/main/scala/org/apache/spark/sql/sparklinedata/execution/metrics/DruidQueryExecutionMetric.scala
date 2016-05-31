@@ -17,30 +17,55 @@
 
 package org.apache.spark.sql.sparklinedata.execution.metrics
 
-import org.apache.spark.{Accumulable, AccumulableParam}
+import org.apache.spark.{Accumulable, GrowableAccumulableParam}
 import org.sparklinedata.druid.metadata.{DruidQueryExecutionView, DruidQueryHistory}
 
+import scala.collection.mutable.ArrayBuffer
+import scala.util.{Success, Try}
 
-class DruidQueryExecutionMetricParam extends AccumulableParam[String, DruidQueryExecutionView] {
 
-  override def addAccumulator(r: String, t: DruidQueryExecutionView): String = {
-    DruidQueryHistory.add(t)
-    r
-  }
-
-  override def addInPlace(r1: String, r2: String): String = {
-    r1
-  }
-
-  override def zero(initialValue: String): String = {
-    initialValue
-  }
+class DruidQueryExecutionMetricParam extends
+  GrowableAccumulableParam[ArrayBuffer[DruidQueryExecutionView], DruidQueryExecutionView] {
 }
 
 class DruidQueryExecutionMetric extends
-  Accumulable[String, DruidQueryExecutionView]("",
+  Accumulable[ArrayBuffer[DruidQueryExecutionView], DruidQueryExecutionView](
+    ArrayBuffer(),
     new DruidQueryExecutionMetricParam(),
-    None,
+    Some("druidQueryMetric"),
     true) {
+
+  private def isInDriver : Boolean = {
+    Try(value) match {
+      case Success(v) => true
+      case _ => false
+    }
+  }
+
+  private def addTermToHistory(term: DruidQueryExecutionView) : Unit = {
+    if ( isInDriver ) {
+      DruidQueryHistory.add(term)
+    }
+  }
+
+  override def += (term: DruidQueryExecutionView) {
+    addTermToHistory(term)
+    super.+=(term)
+  }
+
+  override def add(term: DruidQueryExecutionView) {
+    addTermToHistory(term)
+    super.add(term)
+  }
+
+  override def ++= (terms: ArrayBuffer[DruidQueryExecutionView]) {
+    terms.foreach(addTermToHistory(_))
+    super.++=(terms)
+  }
+
+  override def merge(terms: ArrayBuffer[DruidQueryExecutionView]) {
+    terms.foreach(addTermToHistory(_))
+    super.merge(terms)
+  }
 
 }
