@@ -95,7 +95,7 @@ class FilterPlanningTest extends PlanningTest {
             "              \n" +
             "            \n" +
             "\n" +
-            "            return((org.joda.time.DateTime.parse((((org.joda.time.LocalDate.parse(o_orderdate, v2).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3))  <=  ((new org.joda.time.DateTime(870480000000000, v1))));\n" +
+            "            return(((org.joda.time.DateTime.parse((((org.joda.time.LocalDate.parse(o_orderdate, v2).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3)).compareTo((new org.joda.time.DateTime(870480000000000, v1))) <= 0));\n" +
             "            }")
       )
     )

@@ -124,4 +124,13 @@ private[jscodegen] object JSDateTimeCtx {
   private[jscodegen] def dTMinute(dt: String) = s"$dt.getMinuteOfHour()"
 
   private[jscodegen] def dTSecond(ts: String) = s"$ts.getSecondOfMinute()"
+
+  private[jscodegen] def dComparison(l: String, r: String, op: String): Option[String] = op match {
+    case " < " => Some(s"""(($l).isBefore($r))""".stripMargin)
+    case " <= " => Some(s"""(($l).compareTo($r) <= 0)""".stripMargin)
+    case " == " => Some(s"""(($l).equals($r))""".stripMargin)
+    case " >= " => Some(s"""(($l).compareTo($r) >= 0)""".stripMargin)
+    case " > " => Some(s"""(($l).isAfter($r) > 0)""".stripMargin)
+    case _ => None
+  }
 }

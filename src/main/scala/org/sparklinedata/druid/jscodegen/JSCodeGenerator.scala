@@ -289,10 +289,33 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
   }
 
   private[this] def genComparisonCode(l: Expression, r: Expression, op: String): Option[JSExpr] = {
-    for (le <- genExprCode(l); re <- genExprCode(r)) yield
+    for (le <- genExprCode(l); re <- genExprCode(r);
+         cstr <- genComparisonStr(l, le, r, re, op)) yield {
       JSExpr(le.fnVar.filter(_.nonEmpty).orElse(re.fnVar),
         le.linesSoFar + re.linesSoFar,
-        s"(${le.getRef}) ${op} (${re.getRef})", BooleanType)
+        cstr, BooleanType)
+    }
+  }
+
+  /**
+    * Generate comparison string for various left/right data types.
+    * Assumption: Spark will make sure both left and right is same type family.
+    *
+    * @param l
+    * @param ljs
+    * @param r
+    * @param rjs
+    * @param op
+    * @return
+    */
+  private[this] def genComparisonStr(l: Expression, ljs: JSExpr,
+                                     r: Expression, rjs: JSExpr, op: String): Option[String] = {
+    if (l.dataType.isInstanceOf[DateType] || l.dataType.isInstanceOf[TimestampType] ||
+      r.dataType.isInstanceOf[DateType] || r.dataType.isInstanceOf[TimestampType]) {
+      dComparison(ljs.getRef, rjs.getRef, op)
+    } else  {
+      Some(s"""(${ljs.getRef}) ${op} (${rjs.getRef})""".stripMargin)
+    }
   }
 
   private[this] def genCastExprCode(e: Expression, dt: DataType): Option[JSExpr] = {

@@ -573,4 +573,105 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     """.stripMargin,
     1, true, true
   )
+
+  test("strGTLTEq1",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplier
+      |where (o_orderdate <= '1993-12-12') and
+      |(o_orderdate >= '1993-10-12')
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+  test("strGTLTEq1B",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplierBase
+      |where (o_orderdate <= '1993-12-12') and
+      |(o_orderdate >= '1993-10-12')
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,0,true,true)
+  test("dateEq1",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplier
+      |where cast(o_orderdate as date) = cast('1994-06-30' as Date)
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+  test("dateEq1B",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplierBase
+      |where cast(o_orderdate as date) = cast('1994-06-30' as Date)
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,0,true,true)
+  test("dateGTLTEq1",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplier
+      |where (cast(o_orderdate as date) <= cast('1993-12-12' as Date))
+      | and (cast(o_orderdate as date) >= cast('1993-10-12' as Date))
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+  test("dateGTLTEq1B",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplierBase
+      |where (cast(o_orderdate as date) <= cast('1993-12-12' as Date))
+      | and (cast(o_orderdate as date) >= cast('1993-10-12' as Date))
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,0,true,true)
+  /*
+  test("tsEq1",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplier
+      |where cast(l_shipdate as timestamp) = cast('1994-06-30 00:00:00' as timestamp)
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+
+  test("tsEq1B",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplierBase
+      |where cast(l_shipdate as timestamp) = cast('1994-06-30 00:00:00' as timestamp)
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,0,true,true)
+    */
+  test("tsGTLTEq1",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplier
+      |where (cast(l_shipdate as timestamp) <= cast('1993-12-12 00:00:00' as timestamp))
+      | and (cast(l_shipdate as timestamp) >= cast('1993-10-12 00:00:00' as timestamp))
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+  test("tsGTLTEq1B",
+    """
+      |select o_orderstatus as x, cast(o_orderdate as date) as y
+      |from orderLineItemPartSupplierBase
+      |where (cast(l_shipdate as timestamp) <= cast('1993-12-12 00:00:00' as timestamp))
+      | and (cast(l_shipdate as timestamp) >= cast('1993-10-12 00:00:00' as timestamp))
+      |group by o_orderstatus, cast(o_orderdate as date)
+      |order by x, y
+    """.stripMargin
+    ,0,true,true)
+
 }
