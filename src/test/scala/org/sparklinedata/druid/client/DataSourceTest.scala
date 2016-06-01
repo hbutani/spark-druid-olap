@@ -17,10 +17,13 @@
 
 package org.sparklinedata.druid.client
 
+import org.apache.spark.sql.util.PlanUtil
+import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.json4s.Extraction
 import org.json4s.jackson.JsonMethods._
-import org.sparklinedata.druid.DruidQuery
+import org.sparklinedata.druid.{DruidQuery, DruidRelation}
 import org.sparklinedata.druid.metadata.{FunctionalDependency, FunctionalDependencyType}
 
 class DataSourceTest extends BaseTest {
@@ -81,6 +84,15 @@ class DataSourceTest extends BaseTest {
     )
 
     sql("select * from orderLineItemPartSupplier2").show(10)
+  }
+
+  test("direct") { td =>
+    val dq = new DruidQuery(TPCHQueries.q1MonthGrain)
+    val drInfo = PlanUtil.druidRelationInfo("orderLineItemPartSupplier")(TestHive)
+    val df = PlanUtil.dataFrame(drInfo.get, dq)(TestHive)
+
+    println(df.queryExecution.optimizedPlan)
+    df.show(10)
   }
 
   test("t2") { td =>

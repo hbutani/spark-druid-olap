@@ -21,9 +21,10 @@ import org.apache.spark.sql.catalyst.AbstractSparkSQLParser
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.hive.{HiveContext, HiveQLDialect, HiveQl}
 import org.apache.spark.sql.sparklinedata.commands.ClearMetadata
+import org.apache.spark.sql.util.PlanUtil
 
 class SparklineDataDialect(sqlContext: HiveContext) extends HiveQLDialect(sqlContext) {
-  val parser = new SparklineDataParser()
+  val parser = new SparklineDataParser(sqlContext)
 
   override def parse(sqlText: String): LogicalPlan = {
     sqlContext.executionHive.withHiveState {
@@ -32,11 +33,17 @@ class SparklineDataDialect(sqlContext: HiveContext) extends HiveQLDialect(sqlCon
   }
 }
 
-class SparklineDataParser extends AbstractSparkSQLParser {
+class SparklineDataParser(sqlContext: HiveContext) extends AbstractSparkSQLParser {
 
   protected val CLEAR = Keyword("CLEAR")
   protected val DRUID = Keyword("DRUID")
   protected val CACHE = Keyword("CACHE")
+  protected val DRUIDDATASOURCE = Keyword("DRUIDDATASOURCE")
+  protected val ON = Keyword("ON")
+  protected val EXECUTE = Keyword("EXECUTE")
+  protected val QUERY = Keyword("QUERY")
+  protected val USING = Keyword("USING")
+  protected val HISTORICAL = Keyword("HISTORICAL")
 
   def parse2(input: String): Option[LogicalPlan] = synchronized {
     // Initialize the Keywords.
@@ -48,11 +55,19 @@ class SparklineDataParser extends AbstractSparkSQLParser {
   }
 
   protected override lazy val start: Parser[LogicalPlan] =
-    clearDruidCache
+    clearDruidCache | execDruidQuery
 
   protected lazy val clearDruidCache: Parser[LogicalPlan] =
     CLEAR ~> DRUID ~> CACHE ~> opt(ident) ^^ {
       case id => ClearMetadata(id)
+    }
+
+  protected lazy val execDruidQuery : Parser[LogicalPlan] =
+    (ON ~> DRUIDDATASOURCE ~> ident) ~ (USING ~> HISTORICAL).? ~
+      (EXECUTE ~> opt(QUERY) ~> restInput) ^^ {
+      case ds ~ hs ~ query => {
+        PlanUtil.logicalPlan(ds, query, hs.isDefined)(sqlContext)
+      }
     }
 
 }
