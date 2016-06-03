@@ -72,6 +72,7 @@ class DruidRDD(sqlContext: SQLContext,
                 val dQuery : DruidQuery)  extends  RDD[InternalRow](sqlContext.sparkContext, Nil) {
 
   val druidQueryAcc : DruidQueryExecutionMetric = new DruidQueryExecutionMetric()
+  val numSegmentsPerQuery = drInfo.options.numSegmentsPerHistoricalQuery(sqlContext)
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
@@ -129,7 +130,6 @@ class DruidRDD(sqlContext: SQLContext,
       dQuery.intervalSplits
     )
       var idx = -1
-      val numSegmentsPerQuery = drInfo.options.numSegmentsPerHistoricalQuery
 
       val l  = (for(
         hA <- hAssigns;

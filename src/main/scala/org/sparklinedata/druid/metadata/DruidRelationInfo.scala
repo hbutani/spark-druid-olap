@@ -43,6 +43,7 @@ case class DruidRelationInfo(val fullName : DruidRelationName,
 
   def sourceDF(sqlContext : SQLContext) = sqlContext.table(sourceDFName)
 
+
 }
 
 case class DruidRelationOptions(val maxCardinality : Long,
@@ -55,7 +56,18 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 zkDruidPath : String,
                                 queryHistoricalServers : Boolean,
                                 zkQualifyDiscoveryNames : Boolean,
-                                numSegmentsPerHistoricalQuery : Int)
+                                numSegmentsPerHistoricalQuery : Int) {
+
+  def sqlContextOption(nm : String) = s"spark.sparklinedata.druid.option.$nm"
+
+  def numSegmentsPerHistoricalQuery(sqlContext : SQLContext) : Int = {
+    sqlContext.getConf(
+      sqlContextOption("numSegmentsPerHistoricalQuery"),
+        numSegmentsPerHistoricalQuery.toString
+    ).toInt
+  }
+
+}
 
 private[druid] object MappingBuilder extends Logging {
 
