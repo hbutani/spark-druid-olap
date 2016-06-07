@@ -440,6 +440,15 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     0,
     true, true)
 
+  test("aggTest4",
+    s"""
+       |SELECT max(cast(FROM_UNIXTIME(unix_timestamp(l_shipdate)*1000, 'yyyy-MM-dd 00:00:00') as timestamp))
+       |FROM   orderLineItemPartSupplier
+       |group by s_region
+     """.stripMargin,
+    1,
+    true, true)
+
   test("pmod1",
     """
       |SELECT max(pmod(o_totalprice, -5)) as s
@@ -632,27 +641,17 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       |order by x, y
     """.stripMargin
     ,0,true,true)
-  /*
+
   test("tsEq1",
     """
       |select o_orderstatus as x, cast(o_orderdate as date) as y
       |from orderLineItemPartSupplier
-      |where cast(l_shipdate as timestamp) = cast('1994-06-30 00:00:00' as timestamp)
+      |where cast(l_shipdate as timestamp) = cast('1996-05-17T17:00:00.000-07:00' as timestamp)
       |group by o_orderstatus, cast(o_orderdate as date)
       |order by x, y
     """.stripMargin
     ,1,true,true)
 
-  test("tsEq1B",
-    """
-      |select o_orderstatus as x, cast(o_orderdate as date) as y
-      |from orderLineItemPartSupplierBase
-      |where cast(l_shipdate as timestamp) = cast('1994-06-30 00:00:00' as timestamp)
-      |group by o_orderstatus, cast(o_orderdate as date)
-      |order by x, y
-    """.stripMargin
-    ,0,true,true)
-    */
   test("tsGTLTEq1",
     """
       |select o_orderstatus as x, cast(o_orderdate as date) as y

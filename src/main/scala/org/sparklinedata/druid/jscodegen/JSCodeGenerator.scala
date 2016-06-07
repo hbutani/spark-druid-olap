@@ -90,7 +90,9 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
             case DateType if value.isInstanceOf[Int] =>
               Some(new JSExpr(noDaysToDateCode(value.toString), dataType))
             case TimestampType if value.isInstanceOf[Long] =>
-              Some(new JSExpr(longToISODTCode(value.asInstanceOf[Long], dateTimeCtx), dataType))
+              // Spark gives values in micro seconds - we convert it to Milli
+              Some(new JSExpr(longToISODTCode(value.asInstanceOf[Long]/1000, dateTimeCtx),
+                dataType))
             case _ => JSCast(
               new JSExpr(value.toString, StringType), dataType, this).castCode
           }
@@ -277,9 +279,9 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
               dtToStrCode(longToISODTCode(cse.getRef, dateTimeCtx),
                 s""""${f.toString()}"""".stripMargin), StringType)
         case UnixTimestamp(t, f) if f.isInstanceOf[Literal] =>
-          for (te <- genExprCode(t)) yield
-            JSExpr(None, te.linesSoFar,
-              dtToSecondsCode(stringToISODTCode(te.getRef, dateTimeCtx)), LongType)
+          for (te <- genExprCode(t); cte <- JSCast(te, TimestampType, this).castCode) yield
+            JSExpr(None, te.linesSoFar + cte.linesSoFar,
+              dtToSecondsCode(cte.getRef), LongType)
         case Add(l, r) => Some(genBArithmeticExprCode(l, r, e, "+")).flatten
         case Subtract(l, r) => Some(genBArithmeticExprCode(l, r, e, "-")).flatten
         case Multiply(l, r) => Some(genBArithmeticExprCode(l, r, e, "*")).flatten
