@@ -211,7 +211,7 @@ abstract class BaseTest extends fixture.FunSuite with
                      df1 : DataFrame,
                     df2 : DataFrame
                    ) : Unit = {
-    assert(result(df1) == result(df2))
+    assert(result(df1) ==  result(df2))
   }
 
   def test(nm : String, sql : String,
@@ -229,6 +229,25 @@ abstract class BaseTest extends fixture.FunSuite with
         if (showResults ) { df.show() }
       } finally {
         turnOffTransformDebugging
+      }
+    }
+  }
+
+
+  def cTest(nm : String,
+            dsql: String,
+            bsql : String,
+            debugTransforms : Boolean = false) : Unit = {
+    test(nm) {td =>
+      try {
+        println("modifiefff")
+        if (debugTransforms) turnOnTransformDebugging
+        val df1 = sqlAndLog(nm, dsql)
+        val df2 = sqlAndLog(nm, bsql)
+        assert(isTwoDataFrameEqual(df1, df2))
+      } finally {
+        turnOffTransformDebugging
+
       }
     }
   }
@@ -261,6 +280,101 @@ abstract class BaseTest extends fixture.FunSuite with
 
   def turnOffTransformDebugging : Unit = {
     TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "false")
+  }
+
+
+  def isTwoDataFrameEqual(df1 : DataFrame,
+                       df2 : DataFrame,
+                       Sorted : Boolean = false,
+                       chooseRounding : Boolean = true): Boolean = {
+    val df1_count = df1.count()
+    val df2_count = df2.count()
+    if(df1_count != df2_count){
+      println(df1_count + "\t" + df2_count)
+      println("The row count is not equal")
+      return false
+    }
+
+    val df1_column = df1.columns
+    val df2_column = df2.columns
+    val column1_length = df1_column.length
+    val column2_length = df2_column.length
+    if (column1_length != column2_length){
+      println(column1_length + "\t" + column2_length)
+      println("The column length is not equal")
+      return false
+    }
+
+    var df1_list = df1.collectAsList()
+    var df2_list = df2.collectAsList()
+    if (!Sorted) {
+      var df11 = df1.sort(df1_column(0))
+      var df22 = df2.sort(df2_column(0))
+      for (i <- 1 to column1_length - 1) {
+        df11 = df11.sort(df1_column(i))
+        df22 = df22.sort(df2_column(i))
+      }
+      df1_list = df11.collectAsList()
+      df2_list = df22.collectAsList()
+    }
+    if(!chooseRounding) {
+      for (i <- 0 to df1_count.toInt - 1){
+        for (j <- 0 to column1_length - 1){
+          if(df1_list.get(i).get(j) !=
+            df2_list.get(i).get(j)){
+            println(df1_list.get(i).get(j) + "\t" + df2_list.get(i).get(j))
+            println("The row content is not equal")
+            return false
+          }
+        }
+      }
+    }else{
+      for (i <- 0 to df1_count.toInt - 1){
+        for (j <- 0 to column1_length - 1){
+          if (df1_list.get(i).get(j) == null ||
+            df2_list.get(i).get(j) == null){
+            if (df1_list.get(i).get(j) !=
+              df2_list.get(i).get(j)){
+              println(df1_list.get(i).get(j) + "\t" + df2_list.get(i).get(j))
+              println("The row content is not equal null")
+              return false
+            }
+          }else{
+            var raw1 = (df1_list.get(i).get(j)).toString
+            var raw2 = (df2_list.get(i).get(j)).toString
+            if (raw1.endsWith("f") || raw1.endsWith("F")){
+              raw1 = raw1.substring(0, raw1.length - 1)
+            }
+            if (raw2.endsWith("f") || raw2.endsWith("F")){
+              raw2 = raw2.substring(0, raw2.length - 1)
+            }
+            try {
+              val res1 = BigDecimal(raw1)
+                .setScale(2, BigDecimal.RoundingMode.HALF_UP)
+                .toDouble
+              val res2 = BigDecimal(raw2)
+                .setScale(2, BigDecimal.RoundingMode.HALF_UP)
+                .toDouble
+              if(res1 != res2){
+                println(res1 + "\t" + res2)
+                println("The rouding row content is not equal null")
+                return false
+              }
+            }catch{
+              case ex: Exception => {
+                if(raw1 != raw2){
+                  println(raw1 + "\t" + raw2)
+                  println("The rouding exce row content is not equal null")
+                  return false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    println("The two dataframe is equal " + df1_count)
+    return true
   }
 
 }
