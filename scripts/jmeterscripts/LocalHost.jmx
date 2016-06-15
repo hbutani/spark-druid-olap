@@ -1,0 +1,575 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="2.9" jmeter="3.0 r1743807">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Local Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost1" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request1" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select sum(c_acctbal) as bal from orderLineItemPartSupplier group by 
+      (substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), &apos;T00:00:00.000&apos;)
+       AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by bal
+</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost2" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request2" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select o_orderdate, 
+      (substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), &apos;T00:00:00.000Z&apos;) 
+      AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) x,
+      sum(c_acctbal) as bal from orderLineItemPartSupplier  group by
+      o_orderdate, (substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate),
+       &apos;T00:00:00.000Z&apos;) AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by o_orderdate, x, bal</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost3" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request3" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select o_orderdate, 
+      (DateDiff(cast(o_orderdate as date), cast(&apos;2015-07-21 10:10:10 PST&apos; as date))) as x 
+      from orderLineItemPartSupplier  group by o_orderdate, 
+      cast(&apos;2015-07-21 10:10:10 PST&apos; as date), 
+       (DateDiff(cast(o_orderdate as date), cast(&apos;2015-07-21 10:10:10 PST&apos; as date))) 
+      order by o_orderdate, x
+</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost4" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request4" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select (Date_add(cast(o_orderdate as date), 360+3))  as x 
+      from orderLineItemPartSupplier group by 
+      (Date_add(cast(o_orderdate as date), 360+3)) order by x
+</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost5" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request5" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select (Date_sub(cast(o_orderdate as date), 360+3))  as x 
+      from orderLineItemPartSupplier group by 
+      (Date_sub(cast(o_orderdate as date), 360+3)) order by x
+</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost6" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request6" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select o_orderdate, (weekofyear(Date_Add(cast(o_orderdate as date), 1))) as x 
+      from orderLineItemPartSupplier group by o_orderdate, 
+      (weekofyear(Date_Add(cast(o_orderdate as date), 1))) order by o_orderdate
+</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost7" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request7" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select o_orderdate, (unix_timestamp(Date_Add(cast(o_orderdate as date), 1))) as x 
+      from orderLineItemPartSupplier group by o_orderdate, 
+      (unix_timestamp(Date_Add(cast(o_orderdate as date), 1))) order by o_orderdate, x</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost8" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request8" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">SELECT o_orderdate, Cast(Concat(Year(Cast(o_orderdate AS TIMESTAMP)), 
+      (CASE WHEN Month(Cast(o_orderdate AS TIMESTAMP))&lt;4 
+      THEN &apos;-01&apos; WHEN Month(Cast(o_orderdate AS TIMESTAMP))&lt;7 
+      THEN &apos;-04&apos; WHEN Month(Cast(o_orderdate AS TIMESTAMP))&lt;10 
+      THEN &apos;-07&apos; ELSE &apos;-10&apos;  END), &apos;-01 00:00:00&apos;) 
+      AS TIMESTAMP) AS x 
+      FROM (SELECT * FROM   orderLineItemPartSupplier) m 
+      GROUP BY o_orderdate, cast(concat(year(cast(o_orderdate AS timestamp)), 
+      (CASE WHEN month(cast(o_orderdate AS timestamp))&lt;4 THEN &apos;-01&apos; 
+      WHEN month(cast(o_orderdate AS timestamp))&lt;7 THEN &apos;-04&apos; 
+      WHEN month(cast(o_orderdate AS timestamp))&lt;10 
+      THEN &apos;-07&apos; ELSE &apos;-10&apos; END), &apos;-01 00:00:00&apos;) AS timestamp)
+       order by o_orderdate, x
+</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost9" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request9" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">select o_orderdate as x 
+      from orderLineItemPartSupplier group by 
+      o_orderdate, (unix_timestamp(Date_Add(cast(o_orderdate as date), 1))) 
+      order by o_orderdate, x</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="LocalHost10" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">10</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <longProp name="ThreadGroup.start_time">1465592749000</longProp>
+        <longProp name="ThreadGroup.end_time">1465592749000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="LocalHostConfig" enabled="true">
+          <boolProp name="autocommit">true</boolProp>
+          <stringProp name="checkQuery">Select 1</stringProp>
+          <stringProp name="connectionAge">5000</stringProp>
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="dbUrl">jdbc:hive2://localhost:10000/default</stringProp>
+          <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+          <boolProp name="keepAlive">true</boolProp>
+          <stringProp name="password"></stringProp>
+          <stringProp name="poolMax">100</stringProp>
+          <stringProp name="timeout">1000000</stringProp>
+          <stringProp name="transactionIsolation">DEFAULT</stringProp>
+          <stringProp name="trimInterval">6000000</stringProp>
+          <stringProp name="username"></stringProp>
+        </JDBCDataSource>
+        <hashTree/>
+        <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="JDBC Request10" enabled="true">
+          <stringProp name="dataSource">local</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">SELECT CAST((MONTH(CAST(o_orderdate AS TIMESTAMP)) - 1) / 3 + 1 AS BIGINT) 
+      AS `qr_row_hr_ok`, YEAR(CAST(o_orderdate AS TIMESTAMP)) AS `yr_row_hr_ok` 
+      FROM ( select * from orderLineItemPartSupplier) custom_sql_query 
+      GROUP BY  
+      CAST((MONTH(CAST(o_orderdate AS TIMESTAMP)) - 1) / 3 + 1 AS BIGINT), 
+      YEAR(CAST(o_orderdate AS TIMESTAMP)) order by qr_row_hr_ok, yr_row_hr_ok
+</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCSampler>
+        <hashTree/>
+      </hashTree>
+      <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ResultCollector guiclass="GraphVisualizer" testclass="ResultCollector" testname="Graph Results" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ConstantTimer guiclass="ConstantTimerGui" testclass="ConstantTimer" testname="Constant Timer" enabled="true">
+        <stringProp name="ConstantTimer.delay"></stringProp>
+      </ConstantTimer>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
