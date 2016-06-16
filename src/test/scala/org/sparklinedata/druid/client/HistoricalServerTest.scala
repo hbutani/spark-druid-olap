@@ -293,5 +293,28 @@ class HistoricalServerTest extends StarSchemaBaseTest with BeforeAndAfterAll wit
     1,
     false)
 
+  // timeseries query
+  testCompare("timeseries",
+    "orderLineItemPartSupplier",
+    """
+      | SELECT min(cast(cast(`tmp_sed_druid_20160201_20160331_v6_sparkline`.`l_shipdate` AS timestamp) AS timestamp)) AS `x_measure__0`,
+      |      min(cast(cast(`tmp_sed_druid_20160201_20160331_v6_sparkline`.`l_shipdate` AS timestamp) AS timestamp)) AS `x_measure__1`,
+      |      min(cast(cast(`tmp_sed_druid_20160201_20160331_v6_sparkline`.`l_shipdate` AS timestamp) AS timestamp)) AS `x_measure__2`,
+      |      max(cast(cast(`tmp_sed_druid_20160201_20160331_v6_sparkline`.`l_shipdate` AS timestamp) AS timestamp)) AS `x_measure__3`,
+      |      max(cast(cast(`tmp_sed_druid_20160201_20160331_v6_sparkline`.`l_shipdate` AS timestamp) AS timestamp)) AS `x_measure__4`,
+      |      max(cast(cast(`tmp_sed_druid_20160201_20160331_v6_sparkline`.`l_shipdate` AS timestamp) AS timestamp)) AS `x_measure__5`,
+      |      count(1)                                                                                                AS `x__alias__0`
+      | FROM   %s `tmp_sed_druid_20160201_20160331_v6_sparkline`
+      | WHERE  (
+      |          NOT (
+      |                 cast(`tmp_sed_druid_20160201_20160331_v6_sparkline`.`l_shipdate` AS timestamp) IS NULL))
+      | HAVING count(1) > 0
+    """.stripMargin,
+    1,
+    true,
+    true,
+    true
+  )
+
 
 }

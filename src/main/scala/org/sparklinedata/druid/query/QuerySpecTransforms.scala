@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.query
 
 import org.apache.spark.Logging
-import org.sparklinedata.druid.{FunctionAggregationSpec, GroupByQuerySpec, QuerySpec}
+import org.sparklinedata.druid.{FunctionAggregationSpec, GroupByQuerySpec, QuerySpec, TimeSeriesQuerySpec}
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 
 
@@ -108,10 +108,34 @@ object AddCountAggregateForNoMetricsGroupByQuerySpec extends Transform {
 
 }
 
+object AllGroupingGroupByQuerySpecToTimeSeriesSpec extends Transform {
+
+  override def apply(drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec =
+    qSpec match {
+
+      case gbSpec : GroupByQuerySpec
+        if (gbSpec.dimensions.isEmpty &&
+          !gbSpec.having.isDefined &&
+          !gbSpec.limitSpec.isDefined
+          ) =>
+        new TimeSeriesQuerySpec(
+          gbSpec.dataSource,
+          gbSpec.intervals,
+          Left("all"),
+          gbSpec.filter,
+          gbSpec.aggregations,
+          gbSpec.postAggregations
+        )
+      case _ => qSpec
+    }
+
+}
+
 object QuerySpecTransforms extends TransformExecutor {
 
-  override  protected val batches: Seq[Batch] = Seq(Batch(
-    "dimensionQueries", Once, AddCountAggregateForNoMetricsGroupByQuerySpec
-  ))
+  override  protected val batches: Seq[Batch] = Seq(
+    Batch("dimensionQueries", Once, AddCountAggregateForNoMetricsGroupByQuerySpec),
+    Batch("timeseries", Once, AllGroupingGroupByQuerySpecToTimeSeriesSpec)
+  )
 
 }
