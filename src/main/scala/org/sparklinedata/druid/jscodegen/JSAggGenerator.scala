@@ -21,19 +21,23 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Cast, Expression, LeafExpression}
 import org.apache.spark.sql.types._
-import org.sparklinedata.druid.DruidQueryBuilder
+import org.sparklinedata.druid.{JavascriptAggregationSpec, DruidQueryBuilder}
 import org.sparklinedata.druid.metadata.DruidTimeDimension
 
 import scala.language.reflectiveCalls
 
-
+// TODO: Handle NULL in dimension (non Time Dim)
+// 1. If there is at least one non null value then Sum/Min/Max/Count would work
+// but would fail otherwise. Needs to handle the case where every value is NULL.
+// 2. When every value is null for a dim, how do we encode null in the value to spark.
 case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
                           tz_id: String) extends Logging {
 
   private[this] def getAgg(arg: String): Option[String] = agg match {
     case Sum(e) => Some(s"""current + $arg""".stripMargin)
-    case Min(e) => Some(s"""Math.min(current, $arg)""".stripMargin)
+    case Min(e) => Some(s"""(($arg) ? Math.min(current, $arg) : current)""".stripMargin)
     case Max(e) => Some(s"""Math.max(current, $arg)""".stripMargin)
+    case Count(e) => Some(s"""(($arg) ? (current + 1) : current)""".stripMargin)
     case _ => None
   }
 
@@ -41,6 +45,7 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
     case Sum(e) => Some(s"""($partialA + $partialB)""".stripMargin)
     case Min(e) => Some(s"""Math.min($partialA, $partialB)""".stripMargin)
     case Max(e) => Some(s"""Math.max($partialA, $partialB)""".stripMargin)
+    case Count(e) => Some(s"""($partialA + $partialB)""".stripMargin)
     case _ => None
   }
 
@@ -48,6 +53,7 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
     case Sum(e) => Some(s"""0""".stripMargin)
     case Min(e) => Some(s"""Number.POSITIVE_INFINITY""".stripMargin)
     case Max(e) => Some(s"""Number.NEGATIVE_INFINITY""".stripMargin)
+    case Count(e) => Some(s"""0""".stripMargin)
     case _ => None
   }
 
@@ -91,6 +97,7 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
     case Sum(e) => Some("SUM")
     case Min(e) => Some("MIN")
     case Max(e) => Some("MAX")
+    case Count(e) => Some("COUNT")
     case _ => None
   }
 
@@ -100,9 +107,19 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
 }
 
 object JSAggGenerator {
-  def JSAggCandidate(dqb: DruidQueryBuilder, af: AggregateFunction):
+  def jSAvgCandidate(dqb: DruidQueryBuilder, af: AggregateFunction):
   Boolean = af match {
-    case Sum(_) | Min(_) | Max(_)
+    case Average(_)
+      if ((af.children.size == 1) && (!af.children.head.isInstanceOf[LeafExpression] ||
+        af.children.head.references.map(_.name).toSet.size > 1 ||
+        (af.children.head.references.map(_.name).toSet &
+          dqb.drInfo.dimensionNamesSet).size > 0)) => true
+    case _ => false
+  }
+
+  def jSAggCandidate(dqb: DruidQueryBuilder, af: AggregateFunction):
+  Boolean = af match {
+    case Sum(_) | Min(_) | Max(_) | Average(_) | Count(_)
       if ((af.children.size == 1) && (!af.children.head.isInstanceOf[LeafExpression] ||
         af.children.head.references.map(_.name).toSet.size > 1 ||
         (af.children.head.references.map(_.name).toSet &
@@ -117,6 +134,18 @@ object JSAggGenerator {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidTimeDimension]) yield
           (Cast(a, LongType), "toTSWithTZAdj")
       case _ => Some(e, null)
+    }
+  }
+
+  def jsAgg(dqb: DruidQueryBuilder, aggExp: Expression,
+            c: AggregateFunction, tz: String): Option[(DruidQueryBuilder, String)] = {
+    val jsag = JSAggGenerator(dqb, c, tz);
+    for (fna <- jsag.fnAggregate; fnc <- jsag.fnCombine; fnr <- jsag.fnReset;
+         aggFnName <- jsag.aggFnName; fnName = dqb.nextAlias(aggFnName);
+         fnparams <- jsag.fnParams; at <- jsag.druidType) yield {
+      (dqb.aggregate(JavascriptAggregationSpec("javascript", fnName,
+        fnparams, fna, fnc, fnr)).
+        outputAttribute(fnName, aggExp, aggExp.dataType, at, jsag.valTransFormFn), fnName)
     }
   }
 }

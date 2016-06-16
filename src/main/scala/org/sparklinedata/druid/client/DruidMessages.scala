@@ -53,6 +53,12 @@ class QueryResultRowSerializer extends CustomSerializer[QueryResultRow](format =
     ) =>
       val m : Map[String, Any] = obj.map(t => (t._1, t._2.values)).toMap
       QueryResultRow(v, t, m)
+    case JObject(
+      JField("timestamp", JString(t)) ::
+      JField("result", JObject(obj)) :: Nil
+    ) =>
+      val m : Map[String, Any] = obj.map(t => (t._1, t._2.values)).toMap
+      QueryResultRow("", t, m)
   },
   {
     case x: QueryResultRow =>

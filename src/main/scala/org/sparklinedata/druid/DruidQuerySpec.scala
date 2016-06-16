@@ -544,7 +544,36 @@ case class TimeSeriesQuerySpec(
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
   def intervalList: List[String] = intervals
 
-  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec = ???
+  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec =
+    TimeSeriesQuerySpecWithSegIntervals(
+      queryType,
+      dataSource,
+      granularity,
+      filters,
+      aggregations,
+      postAggregations,
+      null
+    ).setSegIntervals(segIns)
+}
+
+case class TimeSeriesQuerySpecWithSegIntervals(
+                                             val queryType: String,
+                                             val dataSource: String,
+                                             val granularity: Either[String,GranularitySpec],
+                                             val filter: Option[FilterSpec],
+                                             override val aggregations: List[AggregationSpec],
+                                             override val postAggregations:
+                                             Option[List[PostAggregationSpec]],
+                                             val intervals: SegmentIntervals
+                                           ) extends QuerySpec {
+
+  override def intervalList: List[String] = intervals.segments.map(_.itvl)
+
+  override def setSegIntervals(segInAssignments: List[(DruidSegmentInfo, Interval)]): QuerySpec = {
+    this.copy(intervals = new SegmentIntervals(segInAssignments))
+  }
+
+  override def setIntervals(ins: List[Interval]): QuerySpec = ???
 }
 
 case class TopNQuerySpec(
