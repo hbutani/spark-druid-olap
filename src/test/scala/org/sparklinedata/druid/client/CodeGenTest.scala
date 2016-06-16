@@ -449,6 +449,38 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     1,
     true, true)
 
+  test("aggTest5",
+    s"""
+       |SELECT avg((l_quantity + ps_availqty)/10) as x
+       |FROM   orderLineItemPartSupplier
+       |group by s_region
+       |order by x
+     """.stripMargin,
+    1,
+    true, true)
+
+  test("aggTest5B",
+    s"""
+       |SELECT avg((l_quantity + ps_availqty)/10) as x
+       |FROM   orderLineItemPartSupplierBase
+       |where cast(l_shipdate as date) >= cast('1993-01-01' as date) and
+       |cast(l_shipdate as date) <= cast('1997-12-30' as date)
+       |group by s_region
+       |order by x
+     """.stripMargin,
+    0,
+    true, true)
+
+  test("aggTest6",
+    s"""
+       |SELECT avg(unix_timestamp(l_shipdate)*1000) as x
+       |FROM   orderLineItemPartSupplier
+       |group by s_region
+       |order by x
+     """.stripMargin,
+    1,
+    true, true)
+
   test("pmod1",
     """
       |SELECT max(pmod(o_totalprice, -5)) as s

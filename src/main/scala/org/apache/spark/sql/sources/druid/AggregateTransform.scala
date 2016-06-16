@@ -335,16 +335,30 @@ trait AggregateTransform {
       Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
         outputAttribute(a, aggExp, aggExp.dataType, LongType))
     }
-      // TODO: Make this the last option
-    case (_, c) if JSAggGenerator.JSAggCandidate(dqb, c) => {
-      val jsag = JSAggGenerator(dqb, c, sqlContext.getConf(DruidPlanner.TZ_ID).toString);
-      for (fna <- jsag.fnAggregate; fnc <- jsag.fnCombine; fnr <- jsag.fnReset;
-           aggFnName <- jsag.aggFnName; fnName = dqb.nextAlias(aggFnName);
-           fnparams <- jsag.fnParams; at <- jsag.druidType) yield {
-        dqb.aggregate(JavascriptAggregationSpec("javascript", fnName,
-          fnparams, fna, fnc, fnr)).
-          outputAttribute(fnName, aggExp, aggExp.dataType, at, jsag.valTransFormFn)
-      }
+
+    // TODO:
+    // Instead of JS rewriting AVG as Sum, Cnt, Sum/Cnt
+    // the expression should be rewritten generically. Introduce
+    // a project on top with expr sum/cnt and push agg Sum, Count below.
+    // This would avoid specialized average handling in JS and non JS paths.
+    // This also neeeds to keep track of original aggregate and remove synthetic vc if
+    // query didn't get pushed down.
+    case (_, c) if JSAggGenerator.jSAvgCandidate(dqb, c) => {
+      val sumAgg = new Sum(c.children.head)
+      val countAgg = new Count(c.children)
+      for (jsSumInf <- JSAggGenerator.jsAgg(dqb, new AggregateExpression(sumAgg, Partial, false),
+        sumAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString);
+           jsCountInf <- JSAggGenerator.jsAgg(jsSumInf._1,
+             new AggregateExpression(countAgg, Partial, false),
+             countAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
+        jsCountInf._1.avgExpression(aggExp, jsSumInf._2, jsCountInf._2)
+    }
+
+    // TODO: Make this the last option
+    case (_, c) if JSAggGenerator.jSAggCandidate(dqb, c) => {
+      for (jsADQB <- JSAggGenerator.jsAgg(dqb, aggExp, c,
+        sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
+        jsADQB._1
     }
     case (_, c) => {
       val a = dqb.nextAlias
