@@ -32,7 +32,7 @@ trait AggregateTransform {
   self: DruidPlanner =>
 
   def aggExpressions(aEs : Seq[Expression]) : Seq[AggregateExpression] =
-  aEs.flatMap(_ collect { case a: AggregateExpression => a })
+  aEs.flatMap(_ collect { case a: AggregateExpression => a }).distinct
 
   /**
    * Match the following as a rewritable Grouping Expression:
