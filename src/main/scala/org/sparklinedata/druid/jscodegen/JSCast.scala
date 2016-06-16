@@ -39,7 +39,7 @@ case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
 
   private[this] def castToBooleanCode: Option[JSExpr] = from.fnDT match {
     case StringType | IntegerType | LongType | FloatType | DoubleType =>
-      Some(new JSExpr(s"Boolean(f${from.getRef})", BooleanType))
+      Some(new JSExpr(s"Boolean(${from.getRef})", BooleanType))
     case DateType =>
       // Hive would return null when cast from date to boolean
       Some(new JSExpr(s"null", BooleanType))

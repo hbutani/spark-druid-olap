@@ -80,7 +80,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                  dD.isInstanceOf[DruidDimension]) && validInParams(v))) yield {
             new JSExpr(v, e.dataType, dD.isInstanceOf[DruidTimeDimension])
           }
-
+        case Literal(null, dataType) => Some(new JSExpr("null", dataType))
         case Literal(value, dataType) => {
           dataType match {
             case IntegerType | LongType | ShortType | DoubleType | FloatType =>

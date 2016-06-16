@@ -742,4 +742,12 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       order by c_name, bal""".stripMargin,
     0,
     true, true)
+
+  test("caseWhen",
+    s"""select SUM((CASE WHEN 1000 = 0 THEN NULL ELSE CAST(l_suppkey AS DOUBLE) / 1000 END)) as x1
+       |from orderLineItemPartSupplier
+       |group by s_region
+       |order by x1""".stripMargin,
+    1,
+    true, true)
 }
