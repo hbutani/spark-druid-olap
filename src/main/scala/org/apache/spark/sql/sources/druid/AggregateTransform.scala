@@ -327,12 +327,12 @@ trait AggregateTransform {
   Option[DruidQueryBuilder] = (aggExp, aggExp.aggregateFunction) match {
     case (_, Count(Literal(1, IntegerType) :: Nil)) => {
       val a = dqb.nextAlias
-      Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
+      Some(dqb.aggregate(FunctionAggregationSpec("longSum", a, "count")).
         outputAttribute(a, aggExp, aggExp.dataType, LongType))
     }
     case (_, Count(AttributeReference("1", _, _, _) :: Nil)) => {
       val a = dqb.nextAlias
-      Some(dqb.aggregate(FunctionAggregationSpec("count", a, "count")).
+      Some(dqb.aggregate(FunctionAggregationSpec("longSum", a, "count")).
         outputAttribute(a, aggExp, aggExp.dataType, LongType))
     }
 
@@ -380,7 +380,7 @@ trait AggregateTransform {
             Some(
               dqb.aggregate(FunctionAggregationSpec(aggFunc, sumAlias, dC.name)).
                 outputAttribute(sumAlias, null, aggFuncDType, aggFuncDType).
-                aggregate(FunctionAggregationSpec("count", countAlias, "count")).
+                aggregate(FunctionAggregationSpec("longSum", countAlias, "count")).
                 outputAttribute(countAlias, null, LongType, LongType).
                 avgExpression(aggExp, sumAlias, countAlias)
             )
