@@ -146,67 +146,6 @@ class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll wi
     )
   }
 
-  def checkEqualResultStrings(s1 : String, s2 : String) : Unit = {
-    val l1 = s1.split("\n").sorted
-    val l2 = s2.split("\n").sorted
-    assert(l1.length == l2.length)
-    l1.zip(l2).forall {
-      case (s1, s2) => s1 == s2
-    }
-  }
-
-  def checkHistoricalQueries(df : DataFrame,
-                             runInHistorical : Boolean) : Unit = {
-    assert(
-      DruidPlanner.getDruidQuerySpecs(df.queryExecution.sparkPlan).forall { dq =>
-        runInHistorical == dq.queryHistoricalServer
-      }
-    )
-  }
-
-  def testCompare(nm: String,
-                  tableName: String,
-                  sqlTemplate: String,
-                  numDruidQueries: Int = 1,
-                  runInHistorical : Boolean = true,
-                  showPlan: Boolean = true,
-                  showResults: Boolean = true,
-                  debugTransforms: Boolean = false): Unit = {
-    import org.apache.spark.sql.DataFrameUtils._
-    test(nm) { td =>
-      try {
-        if (debugTransforms) turnOnTransformDebugging
-        val df1 = sqlAndLog(nm, sqlTemplate.format(tableName))
-        assertDruidQueries(td.name, df1, numDruidQueries)
-
-        if (showPlan) logPlan(nm, df1)
-        logDruidQueries(td.name, df1)
-        logPlan(nm, df1)
-        logDruidQueries(td.name, df1)
-        val r1 = if (showResults) df1.dumpResult else null
-
-        val df2 = sqlAndLog(nm, sqlTemplate.format(tableName + "_historical"))
-        assertDruidQueries(td.name, df2, numDruidQueries)
-        logPlan(nm, df2)
-        logDruidQueries(td.name, df2)
-        checkHistoricalQueries(df2, runInHistorical)
-        val r2 = if (showResults) df2.dumpResult else null
-
-        if (showResults) {
-          println("Query Result run against Broker:")
-          println(r1)
-          println("Query Result run against Historicals:")
-          println(r2)
-        }
-
-        checkEqualResultStrings(r1, r2)
-
-      } finally {
-        turnOffTransformDebugging
-      }
-    }
-
-  }
 
   cTest("hscT1",
     {
@@ -294,6 +233,8 @@ class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll wi
     from customer,
     orders, lineitem, custnation
     where c_custkey = o_custkey
+                           |and l_shipdate  >= '1994-01-01'
+                           |and l_shipdate <= '1997-01-01'
                            |and l_orderkey = o_orderkey
                            |and c_nationkey = cn_nationkey and
       $q10DtP1 and
@@ -309,8 +250,10 @@ class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll wi
     select c_name, cn_name, c_address, c_phone, c_comment,
            round(sum(l_extendedprice),2) as price
     from customer,
-    orders,lineitem, custnation
+    orders,lineitembase, custnation
     where c_custkey = o_custkey
+                       |and l_shipdate  >= '1994-01-01'
+                       |and l_shipdate <= '1997-01-01'
                        |and l_orderkey = o_orderkey
                        |and c_nationkey = cn_nationkey and
       $q10DtP1 and
