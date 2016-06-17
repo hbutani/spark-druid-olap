@@ -444,15 +444,14 @@ class SparkDateTimeCTest extends StarSchemaBaseTest with BeforeAndAfterAll with 
       |SELECT Count(DISTINCT( rae.l_linenumber ))
       |FROM   (SELECT *
       |        FROM   orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01') rae
-      |where  rae.l_commitdate != '' and
+      | where  rae.l_commitdate != '' and
       |       Month(Cast(Concat(To_date(l_shipdate), ' 00:00:00') AS TIMESTAMP)) < 4
     """.stripMargin,
     """
       |SELECT Count(DISTINCT( rae.l_linenumber ))
       |FROM   (SELECT *
       |        FROM   orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01') rae
-      | ) rae
-      |where  rae.l_commitdate != '' and
+      | where  rae.l_commitdate != '' and
       |       Month(Cast(Concat(To_date(l_shipdate), ' 00:00:00') AS TIMESTAMP)) < 4
     """.stripMargin
   )

@@ -19,24 +19,29 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
   val q1Predicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 3.day)
 
   cTest("sstqcT1",
-    date"""select l_returnflag, l_linestatus,
-     count(*), sum(l_extendedprice) as s,
-     max(ps_supplycost) as m,
-     avg(ps_availqty) as a,count(distinct o_orderkey)
-     from lineitem
-     where $q1Predicate
-     group by l_returnflag, l_linestatus""".stripMargin,
-    date"""select l_returnflag, l_linestatus,
-                            count(*), sum(l_extendedprice) as s,
-              max(ps_supplycost) as m,
+    date"""select l_returnflag, l_linestatus,count(*), sum(l_extendedprice) as s,
+       max(ps_supplycost) as m,
        avg(ps_availqty) as a,count(distinct o_orderkey)
-       from lineitembase
+       from lineitem, partsupp, orders
        where $q1Predicate
+       and l_shipdate  >= '1994-01-01'
+       and l_shipdate <= '1997-01-01'
+       and l_orderkey = o_orderkey and l_suppkey = ps_suppkey and l_partkey = ps_partkey
+       group by l_returnflag, l_linestatus""".stripMargin,
+    date"""select l_returnflag, l_linestatus,
+       count(*), sum(l_extendedprice) as s,
+       max(ps_supplycost) as m,
+       avg(ps_availqty) as a,count(distinct o_orderkey)
+       from lineitembase, partsupp, orders
+       where $q1Predicate
+       and l_shipdate  >= '1994-01-01'
+       and l_shipdate <= '1997-01-01'
+       and l_orderkey = o_orderkey and l_suppkey = ps_suppkey and l_partkey = ps_partkey
        group by l_returnflag, l_linestatus""".stripMargin
   )
 
 
-  val q3OrderDtPredicate = dateTime('o_orderdate) < dateTime("1995-03-15")
+ val q3OrderDtPredicate = dateTime('o_orderdate) < dateTime("1995-03-15")
   val q3ShipDtPredicate = dateTime('l_shipdate) > dateTime("1995-03-15")
   cTest("sstqcT2",
     date"""
@@ -50,6 +55,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
       where c_mktsegment = 'BUILDING' and $q3OrderDtPredicate and $q3ShipDtPredicate
        |and c_custkey = o_custkey
        |and l_orderkey = o_orderkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
       group by o_orderkey,
       o_orderdate,
       o_shippriority
@@ -65,6 +72,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
       where c_mktsegment = 'BUILDING' and $q3OrderDtPredicate and $q3ShipDtPredicate
        |and c_custkey = o_custkey
        |and l_orderkey = o_orderkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
       group by o_orderkey,
       o_orderdate,
       o_shippriority
@@ -92,6 +101,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
        |and l_orderkey = o_orderkey
        |and l_suppkey = ps_suppkey
        |and l_partkey = ps_partkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and ps_suppkey = s_suppkey
        |and s_nationkey = sn_nationkey
        |and sn_regionkey = sr_regionkey
@@ -109,6 +120,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
        |and l_orderkey = o_orderkey
        |and l_suppkey = ps_suppkey
        |and l_partkey = ps_partkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and ps_suppkey = s_suppkey
        |and s_nationkey = sn_nationkey
        |and sn_regionkey = sr_regionkey
@@ -139,6 +152,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
     where ps_suppkey = s_suppkey
        |and l_suppkey = ps_suppkey
        |and l_partkey = ps_partkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and o_orderkey = l_orderkey
        |and c_custkey = o_custkey
        |and s_nationkey = n1.sn_nationkey and c_nationkey = n2.cn_nationkey and
@@ -156,6 +171,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
     where ps_suppkey = s_suppkey
        |and l_suppkey = ps_suppkey
        |and l_partkey = ps_partkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and o_orderkey = l_orderkey
        |and c_custkey = o_custkey
        |and s_nationkey = n1.sn_nationkey and c_nationkey = n2.cn_nationkey and
@@ -190,6 +207,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
        |and ps_partkey = p_partkey
        |and ps_suppkey = s_suppkey
        |and l_orderkey = o_orderkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and o_custkey = c_custkey
        |and c_nationkey = n1.cn_nationkey and
        |n1.cn_regionkey = cr_regionkey and
@@ -208,6 +227,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
        |and ps_partkey = p_partkey
        |and ps_suppkey = s_suppkey
        |and l_orderkey = o_orderkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and o_custkey = c_custkey
        |and c_nationkey = n1.cn_nationkey and
        |n1.cn_regionkey = cr_regionkey and
@@ -232,6 +253,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
     orders, lineitem, custnation
     where c_custkey = o_custkey
        |and l_orderkey = o_orderkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and c_nationkey = cn_nationkey and
       $q10DtP1 and
       $q10DtP2 and
@@ -246,6 +269,8 @@ class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterA
     orders, lineitembase, custnation
     where c_custkey = o_custkey
        |and l_orderkey = o_orderkey
+       |and l_shipdate  >= '1994-01-01'
+       |and l_shipdate <= '1997-01-01'
        |and c_nationkey = cn_nationkey and
       $q10DtP1 and
       $q10DtP2 and
