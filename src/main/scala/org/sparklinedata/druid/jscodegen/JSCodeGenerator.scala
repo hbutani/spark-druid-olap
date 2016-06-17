@@ -155,7 +155,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
               JSExpr(a.fnVar, a.linesSoFar +
                 s"""
                   ${cond.linesSoFar}
-              if (!${v1} && (${cond.getRef})) {
+              if ((${v1} != null) && !${v1} && (${cond.getRef})) {
               ${res.linesSoFar}
               ${v1} = ${res.getRef};
         }""".stripMargin, "", a.fnDT)
@@ -163,7 +163,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
             val de = l(l.length - 1)
             Some(JSExpr(jv.fnVar, jv.linesSoFar +
               s"""
-              if (!${v1}) {
+              if ((${v1} != null) && !${v1}) {
               ${de.linesSoFar}
               ${v1} = ${de.getRef};
         }""".stripMargin, "", de.fnDT))
