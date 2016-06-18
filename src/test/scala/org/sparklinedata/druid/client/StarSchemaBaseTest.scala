@@ -36,8 +36,8 @@ object StarSchemaTpchQueries {
                             count(*), sum(l_extendedprice) as s,
               max(ps_supplycost) as m,
        avg(ps_availqty) as a,count(distinct o_orderkey)
-       from lineitem
-       where $q1Predicate
+       from lineitem, partsupp, orders
+       where $q1Predicate and l_orderkey = o_orderkey and l_suppkey = ps_suppkey and l_partkey = ps_partkey
        group by l_returnflag, l_linestatus""".stripMargin
 
   val q3OrderDtPredicate = dateTime('o_orderdate) < dateTime("1995-03-15")

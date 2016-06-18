@@ -124,5 +124,4 @@ class JoinTest extends StarSchemaBaseTest {
     1,
     true
   )
-
 }
