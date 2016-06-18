@@ -166,7 +166,7 @@ object StarSchemaTpchQueries {
 
 class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
 
-  val TPCH_BASE_DIR = sys.env("HOME") + "/tpch/datascale1"
+  val TPCH_BASE_DIR = System.getProperty("user.dir") + "/quickstart/tpch/datascale1.sample"
 
   def tpchDataFolder(tableName : String) = s"$TPCH_BASE_DIR/$tableName/"
 
