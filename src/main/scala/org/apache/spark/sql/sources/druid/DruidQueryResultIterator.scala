@@ -101,6 +101,35 @@ private class DruidQueryResultIterator2(val is : InputStream,
   override protected def close(): Unit = ()
 }
 
+case class SearchQueryResult(
+                            timestamp : String,
+                            result : List[QueryResultRow]
+                            )
+
+class SearchQueryResultIterator(val is : InputStream,
+                                onDone : => Unit = ())
+  extends NextIterator[QueryResultRow] with CloseableIterator[QueryResultRow] {
+
+  import Utils._
+
+  val s = IOUtils.toString(is)
+  onDone
+  val jV = parse(s)
+  val searchResult = jV.extract[SearchQueryResult]
+  val it = searchResult.result.iterator
+
+  override protected def getNext(): QueryResultRow = {
+    if (it.hasNext) {
+      it.next.copy(timestamp = searchResult.timestamp)
+    } else {
+      finished = true
+      null
+    }
+  }
+
+  override protected def close(): Unit = ()
+}
+
 object DruidQueryResultIterator {
   def apply(is : InputStream,
             onDone : => Unit = (),

@@ -286,5 +286,52 @@ class DruidRewritesTest extends BaseTest {
     true
     )
 
+  test("noMetricsCName", {
+    """select c_name
+      from orderLineItemPartSupplier group by c_name"""
+  },
+    1,
+    true, true
+  )
+
+  test("noMetricsPSize", {
+    """select p_size
+      from orderLineItemPartSupplier group by p_size"""
+  },
+    1,
+    true, true
+  )
+
+  test("noMetricsPRetailPrice", {
+    """select p_retailprice
+      from orderLineItemPartSupplier group by p_retailprice"""
+  },
+    1,
+    true, true
+  )
+
+  test("noMetricsYearExpr", {
+
+    val orderDtYrGroup = dateTime('o_orderdate) year
+
+    date"""select $orderDtYrGroup
+      from orderLineItemPartSupplier group by $orderDtYrGroup"""
+  },
+    1,
+    true, true
+  )
+
+  test("noMetricsTimestamp", {
+
+    val orderDtYrGroup = dateTime('o_orderdate) year
+
+    date"""select Cast(Concat(To_date(l_shipdate), ' 00:00:00') AS TIMESTAMP)
+      from orderLineItemPartSupplier
+      group by Cast(Concat(To_date(l_shipdate), ' 00:00:00') AS TIMESTAMP)"""
+  },
+    1,
+    true, true
+  )
+
 }
 

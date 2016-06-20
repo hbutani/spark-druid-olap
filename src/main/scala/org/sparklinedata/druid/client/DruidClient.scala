@@ -127,6 +127,7 @@ abstract class DruidClient(val host : String,
   @throws(classOf[DruidDataSourceException])
   protected def performQuery(url : String,
                             reqType : String => HttpRequestBase,
+                             qrySpec : QuerySpec,
                            payload : String,
                            reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
     var resp: CloseableHttpResponse = null
@@ -142,7 +143,7 @@ abstract class DruidClient(val host : String,
       resp = req.execute(request)
       val status = resp.getStatusLine().getStatusCode();
       if (status >= 200 && status < 300) {
-        DruidQueryResultIterator(resp.getEntity.getContent, {release(resp)})
+        qrySpec(resp.getEntity.getContent, {release(resp)})
       } else {
         throw new DruidDataSourceException(s"Unexpected response status: ${resp.getStatusLine} " +
           s"on $url for query: \n $payload")
@@ -160,10 +161,11 @@ abstract class DruidClient(val host : String,
     perform(url, postRequest _, payload, reqHeaders)
 
   protected def postQuery(url : String,
+                          qrySpec : QuerySpec,
                           payload : String,
                         reqHeaders: Map[String, String] = null ) :
   CloseableIterator[QueryResultRow] =
-    performQuery(url, postRequest _, payload, reqHeaders)
+    performQuery(url, postRequest _, qrySpec, payload, reqHeaders)
 
   protected def get(url : String,
                     payload : String = null,
@@ -192,7 +194,7 @@ abstract class DruidClient(val host : String,
   def executeQueryAsStream(url : String,
                            qry : QuerySpec) : CloseableIterator[QueryResultRow] = {
     val jR = compact(render(Extraction.decompose(qry)))
-    postQuery(url, jR)
+    postQuery(url, qry, jR)
   }
 
   def timeBoundary(dataSource : String) : Interval

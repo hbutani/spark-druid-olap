@@ -166,11 +166,36 @@ object BetweenFilterSpec extends Transform {
 
 }
 
+object SearchQuerySpecTransform extends Transform {
+
+  override def apply(drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = qSpec match {
+    case GroupByQuerySpec(_, ds,
+    List(DefaultDimensionSpec(_, dName, oName)),
+    None,
+    None,
+    granularity,
+    filter,
+    List(),
+    None,
+    intervals
+    ) if dName == oName =>
+      new SearchQuerySpec(
+        ds,
+        intervals,
+        granularity,
+        filter,
+        List(dName),
+        new InsensitiveContainsSearchQuerySpec()
+      )
+    case _ => qSpec
+  }
+}
+
 object QuerySpecTransforms extends TransformExecutor {
 
   override  protected val batches: Seq[Batch] = Seq(
     Batch("dimensionQueries", FixedPoint(100),
-      AddCountAggregateForNoMetricsGroupByQuerySpec, BetweenFilterSpec),
+      SearchQuerySpecTransform, AddCountAggregateForNoMetricsGroupByQuerySpec, BetweenFilterSpec),
     Batch("timeseries", Once, AllGroupingGroupByQuerySpecToTimeSeriesSpec)
   )
 

@@ -316,5 +316,22 @@ class HistoricalServerTest extends StarSchemaBaseTest with BeforeAndAfterAll wit
     true
   )
 
+  testCompare("noMetricsCName",
+    "orderLineItemPartSupplier",
+    """select c_name
+      from %s group by c_name"""
+  ,
+    1,
+    true, true
+  )
+
+  testCompare("noMetricsCNameCountDistinct",
+    "orderLineItemPartSupplier",
+    """select count(distinct c_name)
+      from %s"""
+    ,
+    1,
+    true, true
+  )
 
 }

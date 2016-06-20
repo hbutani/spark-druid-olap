@@ -17,11 +17,15 @@
 
 package org.sparklinedata.druid
 
+import java.io.InputStream
 import java.util.Locale
+
+import org.apache.spark.sql.sources.druid.{DruidQueryResultIterator, SearchQueryResultIterator}
 
 import scala.collection.breakOut
 import org.apache.spark.sql.types.{DataType, DoubleType, LongType, StringType}
 import org.joda.time.Interval
+import org.sparklinedata.druid.client.QueryResultRow
 import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDataType, DruidSegmentInfo}
 
 sealed trait ExtractionFunctionSpec {
@@ -462,6 +466,21 @@ object SegmentIntervals {
   }
 }
 
+trait SearchQueryQuerySpec {
+  self : Product =>
+}
+
+case class InsensitiveContainsSearchQuerySpec (
+                                                `type` : String,
+                                                value : String
+                                              ) extends SearchQueryQuerySpec {
+  def this() = this("insensitive_contains", "")
+}
+
+case class SortSearchQuerySpec(
+                                `type` : String
+                              )
+
 // TODO: look into exposing ContextSpec
 sealed trait QuerySpec {
   self : Product =>
@@ -479,6 +498,11 @@ sealed trait QuerySpec {
   def filter : Option[FilterSpec]
 
   def setFilter(fSpec : FilterSpec) : QuerySpec
+
+  def apply(is : InputStream,
+    onDone : => Unit = (),
+  fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
+    DruidQueryResultIterator(is, onDone, fromList)
 }
 
 case class GroupByQuerySpec(
@@ -632,4 +656,86 @@ case class TopNQuerySpec(
 
   def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec = ???
   def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
+}
+
+case class SearchQuerySpec(
+                            val queryType: String,
+                            val dataSource: String,
+                            val intervals: List[String],
+                            val granularity: Either[String,GranularitySpec],
+                            val filter: Option[FilterSpec],
+                            val searchDimensions : List[String],
+                            val query : SearchQueryQuerySpec,
+                            val sort : Option[SortSearchQuerySpec]
+                          ) extends QuerySpec {
+
+  def this(dataSource: String,
+           intervals: List[String],
+           granularity: Either[String,GranularitySpec],
+           filter: Option[FilterSpec],
+           searchDimensions : List[String],
+           query : SearchQueryQuerySpec,
+           sort : Option[SortSearchQuerySpec] = None
+  ) = this("search", dataSource, intervals, granularity, filter, searchDimensions, query, sort)
+
+  override def intervalList: List[String] = intervals
+
+  override def setSegIntervals(segIns: List[(DruidSegmentInfo, Interval)]): QuerySpec =
+    SearchQuerySpecWithSegIntervals(
+      queryType,
+      dataSource,
+      null,
+      granularity,
+      filter,
+      searchDimensions,
+      query,
+      sort
+    ).setSegIntervals(segIns)
+
+  override def setIntervals(ins: List[Interval]): QuerySpec =
+    this.copy(intervals = ins.map(_.toString))
+
+  override def setFilter(fSpec: FilterSpec): QuerySpec = this.copy(filter = Some(fSpec))
+
+  override def apply(is : InputStream,
+            onDone : => Unit = (),
+            fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
+    new SearchQueryResultIterator(is, onDone)
+}
+
+case class SearchQuerySpecWithSegIntervals(
+                            val queryType: String,
+                            val dataSource: String,
+                            val intervals: SegmentIntervals,
+                            val granularity: Either[String,GranularitySpec],
+                            val filter: Option[FilterSpec],
+                            val searchDimensions : List[String],
+                            val query : SearchQueryQuerySpec,
+                            val sort : Option[SortSearchQuerySpec]
+                          ) extends QuerySpec {
+
+  def this(dataSource: String,
+           intervals: SegmentIntervals,
+           granularity: Either[String,GranularitySpec],
+           filter: Option[FilterSpec],
+           searchDimensions : List[String],
+           query : SearchQueryQuerySpec,
+           sort : Option[SortSearchQuerySpec] = None
+          ) =
+    this("search", dataSource, intervals, granularity, filter, searchDimensions, query, sort)
+
+  override def intervalList: List[String] = intervals.segments.map(_.itvl)
+
+  override def setSegIntervals(segInAssignments: List[(DruidSegmentInfo, Interval)]): QuerySpec = {
+    this.copy(intervals = new SegmentIntervals(segInAssignments))
+  }
+
+  override def setIntervals(ins: List[Interval]): QuerySpec = ???
+
+  override def setFilter(fSpec: FilterSpec): QuerySpec = this.copy(filter = Some(fSpec))
+
+  override def apply(is : InputStream,
+                     onDone : => Unit = (),
+                     fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
+    new SearchQueryResultIterator(is, onDone)
 }
