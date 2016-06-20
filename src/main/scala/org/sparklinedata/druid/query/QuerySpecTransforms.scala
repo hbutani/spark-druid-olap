@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.query
 
 import org.apache.spark.Logging
-import org.sparklinedata.druid.{FunctionAggregationSpec, GroupByQuerySpec, QuerySpec, TimeSeriesQuerySpec}
+import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 
 
@@ -131,10 +131,46 @@ object AllGroupingGroupByQuerySpecToTimeSeriesSpec extends Transform {
 
 }
 
+object BetweenFilterSpec extends Transform {
+
+  def mergeIntoBetween(fSpec: FilterSpec): FilterSpec = fSpec match {
+    case LogicalFilterSpec("and",
+    List(
+    BoundFilterSpec(_, dim1, Some(lower), lowerStrict, None, _, alphaNumeric1),
+    BoundFilterSpec(_, dim2, None, None, Some(upper), upperStrict, alphaNumeric2)
+    )
+    ) if dim1 == dim2 => {
+      new BoundFilterSpec(dim1, Some(lower), lowerStrict, Some(upper), upperStrict, alphaNumeric1)
+    }
+    case LogicalFilterSpec("and",
+    List(
+    BoundFilterSpec(_, dim2, None, None, Some(upper), upperStrict, alphaNumeric2),
+    BoundFilterSpec(_, dim1, Some(lower), lowerStrict, None, _, alphaNumeric1)
+    )
+    ) if dim1 == dim2 => {
+      new BoundFilterSpec(dim1, Some(lower), lowerStrict, Some(upper), upperStrict, alphaNumeric1)
+    }
+    case LogicalFilterSpec(typ, fields) => LogicalFilterSpec(typ, fields.map(mergeIntoBetween))
+    case NotFilterSpec(typ, field) => NotFilterSpec(typ, mergeIntoBetween(field))
+    case _ => fSpec
+  }
+
+  override def apply(drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = {
+    if (!qSpec.filter.isDefined) {
+      qSpec
+    } else {
+      val fSpec = qSpec.filter.get
+      qSpec.setFilter(mergeIntoBetween(fSpec))
+    }
+  }
+
+}
+
 object QuerySpecTransforms extends TransformExecutor {
 
   override  protected val batches: Seq[Batch] = Seq(
-    Batch("dimensionQueries", Once, AddCountAggregateForNoMetricsGroupByQuerySpec),
+    Batch("dimensionQueries", FixedPoint(100),
+      AddCountAggregateForNoMetricsGroupByQuerySpec, BetweenFilterSpec),
     Batch("timeseries", Once, AllGroupingGroupByQuerySpecToTimeSeriesSpec)
   )
 

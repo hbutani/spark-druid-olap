@@ -29,6 +29,26 @@ import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
 import org.sparklinedata.druid.client.{CuratorConnection, DruidCoordinatorClient, DruidQueryServerClient}
 
+
+case class ModuleInfo(
+                     name : String,
+                     artifact : String,
+                     version : String
+                     )
+
+case class ServerMemory(
+                         maxMemory: Long,
+                         totalMemory: Long,
+                         freeMemory: Long,
+                         usedMemory: Long
+                       )
+
+case class ServerStatus(
+                        version : String,
+                        modules : List[ModuleInfo],
+                        memory : ServerMemory
+                       )
+
 case class DruidNode(name: String,
                      id: String,
                      address: String,
@@ -76,6 +96,7 @@ case class DataSourceSegmentInfo(name: String,
 
 case class DruidClusterInfo(host: String,
                             curatorConnection: CuratorConnection,
+                            coordinatorStatus : ServerStatus,
                             druidDataSources: scala.collection.Map[String,
                               (DataSourceSegmentInfo, DruidDataSource)],
                             histServers: List[HistoricalServerInfo]) {
@@ -204,8 +225,9 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
         val cc = new CuratorConnection(host, options, this, this.thrdPool)
         val svr = cc.getCoordinator
         val dc = new DruidCoordinatorClient(svr)
+        val ss = dc.serverStatus
         val r = dc.serversInfo.filter(_.`type` == "historical")
-        val dCI = new DruidClusterInfo(host, cc, MMap[String, DruidDataSourceInfo](), r)
+        val dCI = new DruidClusterInfo(host, cc, ss, MMap[String, DruidDataSourceInfo](), r)
         cache(dCI.host) = dCI
         dCI
       }
@@ -222,8 +244,9 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
         val dc = new DruidCoordinatorClient(dCI.curatorConnection.getCoordinator)
         val r = dc.dataSourceInfo(dRName.druidDataSource)
         val bC = new DruidQueryServerClient(dCI.curatorConnection.getBroker)
-        val dds: DruidDataSource = bC.metadata(dRName.druidDataSource,
+        var dds: DruidDataSource = bC.metadata(dRName.druidDataSource,
           options.loadMetadataFromAllSegments)
+        dds = dds.copy(druidVersion = dCI.coordinatorStatus.version)
         val i: DruidDataSourceInfo = (r, dds)
         val m = dCI.druidDataSources.asInstanceOf[MMap[String, DruidDataSourceInfo]]
         m(i._1.name) = i

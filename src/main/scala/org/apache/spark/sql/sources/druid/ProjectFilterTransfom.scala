@@ -20,12 +20,12 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.types.{BooleanType, LongType}
+import org.apache.spark.sql.types.{BooleanType, DataType, LongType}
 import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid.Debugging._
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.jscodegen.JSCodeGenerator
-import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDimension, DruidMetric, DruidTimeDimension}
+import org.sparklinedata.druid.metadata._
 
 trait ProjectFilterTransfom {
   self: DruidPlanner =>
@@ -119,6 +119,51 @@ trait ProjectFilterTransfom {
     case _ => None
   }
 
+  private def javascriptFilter(dC : DruidColumn,
+                       compOp : String,
+                       value : Any) : FilterSpec = {
+
+    JavascriptFilterSpec.create(dC.name, compOp, value.toString)
+  }
+
+  private def boundFilter(dC : DruidColumn,
+                  lowerValue : Option[Any],
+                  lowerStrict : Boolean,
+                  upperValue : Option[Any],
+                  upperStrict : Boolean,
+                  value : Any,
+                  sparkDT : DataType
+                 ) : FilterSpec = {
+
+    val alphaNumeric = isNumericType(sparkDT)
+    var f = new BoundFilterSpec(dC.name, None, None, None, None, alphaNumeric)
+    if (lowerValue.isDefined) {
+      f = f.copy(lower = Some(lowerValue.get.toString), lowerStrict = Some(lowerStrict))
+    }
+    if (upperValue.isDefined) {
+      f = f.copy(upper = Some(upperValue.get.toString), upperStrict = Some(upperStrict))
+    }
+    f
+  }
+
+  private def compOp(dDS : DruidDataSource,
+             dC : DruidColumn,
+             value : Any,
+             sparkDT : DataType,
+             compOp : String) : FilterSpec = {
+    if (dDS.supportsBoundFilter) {
+      compOp match {
+        case "<" => boundFilter(dC, None, false, Some(value), true, value, sparkDT)
+        case "<=" => boundFilter(dC, None, false, Some(value), false, value, sparkDT)
+        case ">" => boundFilter(dC, Some(value), true, None, false, value, sparkDT)
+        case ">=" => boundFilter(dC, Some(value), false, None, true, value, sparkDT)
+        case _ => ???
+      }
+    } else {
+      javascriptFilter(dC, compOp, value)
+    }
+  }
+
   def dimFilterExpression(dqb: DruidQueryBuilder, fe: Expression):
   Option[FilterSpec] = {
 
@@ -137,11 +182,11 @@ trait ProjectFilterTransfom {
       }
       case LessThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, "<", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
       }
       case LessThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, ">", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
       }
       case LessThan(timeRefExtractor(dtGrp), Literal(value, LongType))
         if dtGrp.druidColumn.name != DruidDataSource.TIME_COLUMN_NAME &&
@@ -150,28 +195,28 @@ trait ProjectFilterTransfom {
         // TODO handle all other comparision fns (lte, gt, gte, eq)
       case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, "<=", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
       }
       case LessThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, ">=", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
       }
 
       case GreaterThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, ">", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
       }
       case GreaterThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, "<", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
       }
       case GreaterThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, ">=", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
       }
       case GreaterThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
-          yield JavascriptFilterSpec.create(dD.name, "<=", value.toString)
+          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
       }
       case dtTimeCond((dCol, op, value)) =>
         Some(JavascriptFilterSpec.create(dCol, op, value))

@@ -202,6 +202,23 @@ object JavascriptFilterSpec {
 
 }
 
+case class BoundFilterSpec(`type`: String,
+                           dimension: String,
+                           lower: Option[String],
+                           lowerStrict : Option[Boolean],
+                           upper: Option[String],
+                           upperStrict : Option[Boolean],
+                           alphaNumeric: Boolean) extends FilterSpec {
+
+  def this(dimension: String,
+           lower: Option[String],
+           lowerStrict : Option[Boolean],
+           upper: Option[String],
+           upperStrict : Option[Boolean],
+           alphaNumeric: Boolean) =
+    this("bound", dimension, lower, lowerStrict, upper, upperStrict, alphaNumeric)
+}
+
 sealed trait AggregationSpec {
   val `type`: String
   val name : String
@@ -458,6 +475,10 @@ sealed trait QuerySpec {
   def dimensions : List[DimensionSpec] = Nil
   def aggregations : List[AggregationSpec] = Nil
   def postAggregations : Option[List[PostAggregationSpec]] = None
+
+  def filter : Option[FilterSpec]
+
+  def setFilter(fSpec : FilterSpec) : QuerySpec
 }
 
 case class GroupByQuerySpec(
@@ -500,6 +521,8 @@ case class GroupByQuerySpec(
       postAggregations,
       null
     ).setSegIntervals(segIns)
+
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
 }
 
 case class GroupByQuerySpecWithSegIntervals(
@@ -522,6 +545,7 @@ case class GroupByQuerySpecWithSegIntervals(
   }
 
   override def setIntervals(ins: List[Interval]): QuerySpec = ???
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
 }
 
 case class TimeSeriesQuerySpec(
@@ -529,7 +553,7 @@ case class TimeSeriesQuerySpec(
                                 val dataSource: String,
                                 val intervals: List[String],
                                 val granularity: Either[String,GranularitySpec],
-                                val filters: Option[FilterSpec],
+                                val filter: Option[FilterSpec],
                                 override val aggregations: List[AggregationSpec],
                                 override val postAggregations: Option[List[PostAggregationSpec]]
                                 ) extends QuerySpec {
@@ -549,11 +573,13 @@ case class TimeSeriesQuerySpec(
       queryType,
       dataSource,
       granularity,
-      filters,
+      filter,
       aggregations,
       postAggregations,
       null
     ).setSegIntervals(segIns)
+
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
 }
 
 case class TimeSeriesQuerySpecWithSegIntervals(
@@ -574,6 +600,7 @@ case class TimeSeriesQuerySpecWithSegIntervals(
   }
 
   override def setIntervals(ins: List[Interval]): QuerySpec = ???
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
 }
 
 case class TopNQuerySpec(
@@ -604,4 +631,5 @@ case class TopNQuerySpec(
   def intervalList: List[String] = intervals
 
   def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec = ???
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
 }

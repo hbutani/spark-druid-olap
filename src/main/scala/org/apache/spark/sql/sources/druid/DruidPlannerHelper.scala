@@ -19,7 +19,7 @@ package org.apache.spark.sql.sources.druid
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
-import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.types.{DecimalType, _}
 import org.sparklinedata.druid.DruidOperatorAttribute
 
 trait DruidPlannerHelper {
@@ -77,5 +77,7 @@ trait DruidPlannerHelper {
                           expandOpProjection : Seq[Expression],
                           aEExprIdToPos : Map[ExprId, Int],
                           aEToLiteralExpr: Map[Expression, Expression] = Map())
+
+  def isNumericType(dt : DataType) : Boolean = NumericType.acceptsType(dt)
 
 }

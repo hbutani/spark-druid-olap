@@ -57,6 +57,76 @@ class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
     true
   )
 
+  test("compTestGTE",
+    "select s_nation, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where s_nation >= 'FRANCE' " +
+      "group by s_nation order by s_nation limit 2",
+    1,
+    true,
+    true
+  )
+
+  test("compTestGT",
+    "select s_nation, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where s_nation > 'FRANCE' " +
+      "group by s_nation order by s_nation limit 2",
+    1,
+    true,
+    true
+  )
+
+  test("compTestLTE",
+    "select s_nation, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where s_nation <= 'FRANCE' " +
+      "group by s_nation order by s_nation desc limit 2",
+    1,
+    true,
+    true
+  )
+
+  test("compTestLT",
+    "select s_nation, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where s_nation < 'FRANCE' " +
+      "group by s_nation order by s_nation desc limit 2",
+    1,
+    true,
+    true
+  )
+
+  test("compTestLTNumeric",
+    "select p_size, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where p_size < 50 " +
+      "group by p_size order by p_size desc limit 10",
+    1,
+    true,
+    true
+  )
+
+  test("compTestGTENumeric",
+    "select p_size, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where p_size >= 40 " +
+      "group by p_size order by p_size limit 10",
+    1,
+    true,
+    true
+  )
+
+  test("compTestBetween",
+    "select p_size, sum(c_acctbal) as bal " +
+      "from orderLineItemPartSupplier " +
+      "where p_size between 40 and 50 " +
+      "group by p_size order by p_size limit 10",
+    1,
+    true,
+    true
+  )
+
   test("isNotNullTest1",
     "select s_region from orderLineItemPartSupplier" +
       " where l_shipdate is not null and l_discount is not null and p_name is not null" +

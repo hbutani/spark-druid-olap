@@ -77,10 +77,16 @@ case class DruidTimeDimension(name : String,
   def isDimension(excludeTime : Boolean = false) = !excludeTime
 }
 
+trait DruidDataSourceCapability {
+  def druidVersion : String
+  def supportsBoundFilter : Boolean = druidVersion.compareTo("0.9.0") >= 0
+}
+
 case class DruidDataSource(name : String,
                          intervals : List[Interval],
                          columns : Map[String, DruidColumn],
-                         size : Long) {
+                         size : Long,
+                           druidVersion : String = null) extends DruidDataSourceCapability {
 
   import DruidDataSource._
 

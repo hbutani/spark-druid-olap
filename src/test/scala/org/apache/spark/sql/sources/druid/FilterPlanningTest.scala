@@ -68,11 +68,7 @@ class FilterPlanningTest extends PlanningTest {
     validateFilter("o_orderdate >= '1995-12-30'",
       true,
       Some(
-        JavascriptFilterSpec(
-          "javascript",
-          "o_orderdate",
-          "function(x) { return(x >= '1995-12-30') }"
-        )
+        BoundFilterSpec("bound","o_orderdate",Some("1995-12-30"),Some(false),None,None,false)
       )
     )
   }

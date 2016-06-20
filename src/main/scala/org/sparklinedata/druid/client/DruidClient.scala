@@ -225,6 +225,12 @@ abstract class DruidClient(val host : String,
     DruidDataSource(dataSource, l.head, List(in))
   }
 
+  def serverStatus : ServerStatus = {
+    val url = s"http://$host:$port/status"
+    val jV = get(url)
+    jV.extract[ServerStatus]
+  }
+
 }
 
 object DruidClient {
