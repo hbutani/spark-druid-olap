@@ -35,7 +35,8 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
 
   private[this] def getAgg(arg: String): Option[String] = agg match {
     case Sum(e) => Some(s"""current + $arg""".stripMargin)
-    case Min(e) => Some(s"""(($arg) ? Math.min(current, $arg) : current)""".stripMargin)
+//    case Min(e) => Some(s"""(($arg) ? Math.min(current, $arg) : current)""".stripMargin)
+    case Min(e) => Some(s"""Math.min(current, $arg)""".stripMargin)
     case Max(e) => Some(s"""Math.max(current, $arg)""".stripMargin)
     case Count(e) => Some(s"""(($arg) ? (current + 1) : current)""".stripMargin)
     case _ => None
