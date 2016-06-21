@@ -252,6 +252,12 @@ trait ProjectFilterTransfom {
         for (c <- dqb.druidColumn(nm) if c.isInstanceOf[DruidDimension]) yield
              NotFilterSpec("not", new SelectorFilterSpec(nm, ""))
       }
+        // TODO: turn isnull(TimeDim/Metric) to NULL SCAN
+      case IsNull(AttributeReference(nm,_,_,_)) => {
+        for (c <- dqb.druidColumn(nm)
+             if c.isInstanceOf[DruidDimension] || c.isInstanceOf[DruidTimeDimension]) yield
+          new SelectorFilterSpec(c.name, "")
+      }
       case _ => {
         val codeGen = JSCodeGenerator(dqb, fe, false, false,
           sqlContext.getConf(DruidPlanner.TZ_ID).toString,

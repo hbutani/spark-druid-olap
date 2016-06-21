@@ -163,4 +163,12 @@ class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
       " order by s_region",
     1,
     true, true)
+
+  test("isNullTest1",
+    "select s_region from orderLineItemPartSupplier" +
+      " where (l_shipdate is null) and (p_name is null)" +
+      " group by s_region " +
+      " order by s_region",
+    1,
+    true, true)
 }
