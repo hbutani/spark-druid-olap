@@ -45,9 +45,10 @@ trait LimitTransfom {
           new DruidOperatorSchema(dqb).pushedDownExprToDruidAttr
 
         val dqb1: ODB = orderExprs.foldLeft(Some(dqb).asInstanceOf[ODB]) { (dqb, e) =>
-          for (ue <- unalias(e.child, child);
+          for (dqb2 <- dqb;
+               ue <- unalias(e.child, child);
                doA <- exprToDruidOutput.get(ue))
-            yield dqb.get.orderBy(doA.name, e.direction == Ascending)
+            yield dqb2.orderBy(doA.name, e.direction == Ascending)
         }
         dqb1
       }

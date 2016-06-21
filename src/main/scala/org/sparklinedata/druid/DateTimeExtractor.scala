@@ -231,12 +231,16 @@ class SparkNativeTimeElementExtractor(val dqb : DruidQueryBuilder) {
 
 
   def unapply(e : Expression) : Option[DateTimeGroupingElem] = e match {
+    case dcExtractor(dc) if e.dataType == DateType =>
+      Some(DateTimeGroupingElem(dqb.nextAlias, dc, DATE_FORMAT, Some(Utils.defaultTZ), e))
     case Cast(c@dcExtractor(dc), DateType) =>
       Some(DateTimeGroupingElem(dqb.nextAlias, dc, DATE_FORMAT, Some(Utils.defaultTZ), c))
     case Cast(timeExtractor(dtGrp), DateType) =>
       Some(DateTimeGroupingElem(dtGrp.outputName,
         dtGrp.druidColumn, DATE_FORMAT,
         dtGrp.tzForFormat, dtGrp.pushedExpression))
+    case dcExtractor(dc) if e.dataType == TimestampType =>
+      Some(DateTimeGroupingElem(dqb.nextAlias, dc, TIMESTAMP_FORMAT, Some(Utils.defaultTZ), e))
     case Cast(c@dcExtractor(dc), TimestampType) =>
       // TODO: handle a tsFmt coming from below, see test fromUnixTimestamp
       Some(DateTimeGroupingElem(dqb.nextAlias, dc, TIMESTAMP_FORMAT, Some(Utils.defaultTZ), c))
