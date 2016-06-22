@@ -187,6 +187,25 @@ object SearchQuerySpecTransform extends Transform {
         List(dName),
         new InsensitiveContainsSearchQuerySpec()
       )
+    case GroupByQuerySpec(_, ds,
+    List(DefaultDimensionSpec(_, dName, oName)),
+    Some(LimitSpec(_, Integer.MAX_VALUE, List(OrderByColumnSpec(ordName, "ascending")))),
+    None,
+    granularity,
+    filter,
+    List(),
+    None,
+    intervals
+    ) if dName == oName && dName == ordName =>
+      new SearchQuerySpec(
+        ds,
+        intervals,
+        granularity,
+        filter,
+        List(dName),
+        new InsensitiveContainsSearchQuerySpec(),
+        Some(SortSearchQuerySpec("lexicographic"))
+      )
     case _ => qSpec
   }
 }

@@ -294,6 +294,15 @@ class DruidRewritesTest extends BaseTest {
     true, true
   )
 
+  test("noMetricsCNameSort", {
+    """select c_name
+      from orderLineItemPartSupplier group by c_name
+    order by c_name"""
+  },
+    1,
+    true, true
+  )
+
   test("noMetricsPSize", {
     """select p_size
       from orderLineItemPartSupplier group by p_size"""
