@@ -78,8 +78,8 @@ trait AggregateTransform {
           dqb.dimension(new ExtractionDimensionSpec(dtGrpElem.druidColumn.name,
             dtGrpElem.outputName, timeFmtExtractFunc)
           ).
-            outputAttribute(dtGrpElem.outputName, dtGrpElem.pushedExpression,
-              dtGrpElem.pushedExpression.dataType, StringType)
+            outputAttribute(dtGrpElem.outputName, ge,
+              ge.dataType, StringType)
         )
       }
       case _ => {

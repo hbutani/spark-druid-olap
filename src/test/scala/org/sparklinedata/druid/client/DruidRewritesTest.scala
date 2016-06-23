@@ -41,6 +41,19 @@ class DruidRewritesTest extends BaseTest {
     true
   )
 
+  test("view",
+
+    """
+        |SELECT COUNT(DISTINCT CAST(`orderLineItemPartSupplier`.`l_shipdate` AS TIMESTAMP))
+        | AS `ctd_date_string_ok`
+        |FROM `orderLineItemPartSupplier`
+        | HAVING (COUNT(1) > 0)
+      """.stripMargin,
+    2,
+    true,
+    true
+  )
+
   test("noAggs",
       "select l_returnflag, l_linestatus " +
         "from orderLineItemPartSupplier " +
