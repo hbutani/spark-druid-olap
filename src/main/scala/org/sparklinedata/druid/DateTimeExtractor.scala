@@ -19,7 +19,8 @@ package org.sparklinedata.druid
 
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.types.{LongType, TimestampType, DateType, StringType}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.util.ExprUtil
 import org.joda.time.DateTime
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataSource}
 import org.sparklinedata.spark.dateTime.Functions._
@@ -239,6 +240,8 @@ class SparkNativeTimeElementExtractor(val dqb : DruidQueryBuilder) {
       Some(DateTimeGroupingElem(dtGrp.outputName,
         dtGrp.druidColumn, DATE_FORMAT,
         dtGrp.tzForFormat, dtGrp.pushedExpression))
+    case dcExtractor(dc) if e.dataType == StringType =>
+      Some(DateTimeGroupingElem(dqb.nextAlias, dc, TIMESTAMP_FORMAT, Some(Utils.defaultTZ), e))
     case dcExtractor(dc) if e.dataType == TimestampType =>
       Some(DateTimeGroupingElem(dqb.nextAlias, dc, TIMESTAMP_FORMAT, Some(Utils.defaultTZ), e))
     case Cast(c@dcExtractor(dc), TimestampType) =>
@@ -373,50 +376,60 @@ class SparkIntervalConditionExtractor(val dqb : DruidQueryBuilder) {
 
   val timeRefExtractor = new SparkNativeTimeElementExtractor(dqb)
 
-  private def millisSinceEpoch(value : Any) : DateTime =
-    new DateTime(value.toString.toLong / 1000)
+  private def literalToDateTime(value : Any, dT : DataType) : DateTime = dT match {
+    case TimestampType => new DateTime(value.toString.toLong / 1000)
+    case DateType => ExprUtil.toDateTime(value.toString.toInt)
+    case StringType => new DateTime(value.toString)
+  }
+
+  private object DateTimeLiteralType {
+    def unapply(dt: DataType) : Option[DataType] = dt match {
+      case StringType | DateType | TimestampType => Some(dt)
+      case _ => None
+    }
+  }
 
   def unapply(e : Expression) : Option[IntervalCondition] = e match {
-    case LessThan(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+    case LessThan(timeRefExtractor(dtGrp), Literal(value, DateTimeLiteralType(dT)))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.LT, millisSinceEpoch(value)))
-    case LessThan(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      Some(IntervalCondition(IntervalConditionType.LT, literalToDateTime(value, dT)))
+    case LessThan(Literal(value, DateTimeLiteralType(dT)), timeRefExtractor(dtGrp))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.GT, millisSinceEpoch(value)))
-    case LessThanOrEqual(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+      Some(IntervalCondition(IntervalConditionType.GT, literalToDateTime(value, dT)))
+    case LessThanOrEqual(timeRefExtractor(dtGrp), Literal(value, DateTimeLiteralType(dT)))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.LTE, millisSinceEpoch(value)))
-    case LessThanOrEqual(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      Some(IntervalCondition(IntervalConditionType.LTE, literalToDateTime(value, dT)))
+    case LessThanOrEqual(Literal(value, DateTimeLiteralType(dT)), timeRefExtractor(dtGrp))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.GTE, millisSinceEpoch(value)))
-    case GreaterThan(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+      Some(IntervalCondition(IntervalConditionType.GTE, literalToDateTime(value, dT)))
+    case GreaterThan(timeRefExtractor(dtGrp), Literal(value, DateTimeLiteralType(dT)))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.GT, millisSinceEpoch(value)))
-    case GreaterThan(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      Some(IntervalCondition(IntervalConditionType.GT, literalToDateTime(value, dT)))
+    case GreaterThan(Literal(value, DateTimeLiteralType(dT)), timeRefExtractor(dtGrp))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.LT, millisSinceEpoch(value)))
-    case GreaterThanOrEqual(timeRefExtractor(dtGrp), Literal(value, TimestampType))
+      Some(IntervalCondition(IntervalConditionType.LT, literalToDateTime(value, dT)))
+    case GreaterThanOrEqual(timeRefExtractor(dtGrp), Literal(value, DateTimeLiteralType(dT)))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.GTE, millisSinceEpoch(value)))
-    case GreaterThanOrEqual(Literal(value, TimestampType), timeRefExtractor(dtGrp))
+      Some(IntervalCondition(IntervalConditionType.GTE, literalToDateTime(value, dT)))
+    case GreaterThanOrEqual(Literal(value, DateTimeLiteralType(dT)), timeRefExtractor(dtGrp))
       if dtGrp.druidColumn.name == DruidDataSource.TIME_COLUMN_NAME &&
         (dtGrp.formatToApply == TIMESTAMP_FORMAT ||
           dtGrp.formatToApply == TIMESTAMP_DATEZERO_FORMAT) =>
-      Some(IntervalCondition(IntervalConditionType.LTE, millisSinceEpoch(value)))
+      Some(IntervalCondition(IntervalConditionType.LTE, literalToDateTime(value, dT)))
     case _ => None
   }
 }

@@ -18,6 +18,9 @@
 package org.apache.spark.sql.util
 
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.types.{DataType, NumericType}
+import org.joda.time.DateTime
 
 
 object ExprUtil {
@@ -49,4 +52,13 @@ object ExprUtil {
       }
     }
   }
+
+  def escapeLikeRegex(v: String): String =
+    org.apache.spark.sql.catalyst.util.StringUtils.escapeLikeRegex(v)
+
+  def toDateTime(sparkDateLiteral : Int) : DateTime = {
+    new DateTime(DateTimeUtils.toJavaDate(sparkDateLiteral))
+  }
+
+  def isNumeric(dt : DataType) = NumericType.acceptsType(dt)
 }
