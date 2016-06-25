@@ -17,9 +17,13 @@
 
 package org.sparklinedata.druid.jscodegen
 
+import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.util.StringUtils
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.util.ExprUtil
+import org.apache.spark.unsafe.types.UTF8String
 import org.sparklinedata.druid.DruidQueryBuilder
 import org.sparklinedata.druid.jscodegen.JSDateTimeCtx._
 import org.sparklinedata.druid.metadata._
@@ -334,6 +338,49 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           UnaryMinus(ve) => genUnaryExprCode(ve, "-")
         case UnaryPositive(ve) =>
           genUnaryExprCode(ve, "+")
+        case JSStringPredicate(l, r, strFn) => {
+          for(lex <- genExprCode(l);
+              rVal <- Some(r.eval()) if rVal != null
+          ) yield {
+            var s = rVal.asInstanceOf[UTF8String].toString()
+            JSExpr(None,
+              lex.linesSoFar,
+              s"""java.lang.String(${lex.getRef}).${strFn}("${s}")""",
+              e.dataType)
+          }
+        }
+        case JSLike(l, r, likeMatch) => {
+          for(lex <- genExprCode(l);
+            rVal <- Some(r.eval()) if rVal != null
+          ) yield {
+            var regexStr = rVal.asInstanceOf[UTF8String].toString()
+            val v = makeUniqueVarName
+            val reV = makeUniqueVarName
+            var js : String = null
+            if (likeMatch) {
+              regexStr =
+                StringEscapeUtils.escapeJava(
+                  ExprUtil.escapeLikeRegex(regexStr))
+              js =
+                s"""
+                   |var ${reV} = java.util.regex.Pattern.compile("${regexStr}");
+                   |var ${v} = ${reV}.matcher(${lex.getRef}).matches();
+                   |
+              """.stripMargin
+            } else {
+              js =
+                s"""
+                  |var ${reV} = java.util.regex.Pattern.compile("${regexStr}");
+                  |var ${v} = ${reV}.matcher(${lex.getRef}).find(0)
+                """.stripMargin
+            }
+            JSExpr(Some(v),
+              lex.linesSoFar + js,
+              "",
+              e.dataType
+            )
+          }
+        }
         case _ => None.flatten
       }
     } else {
@@ -410,5 +457,22 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
       idt.isInstanceOf[FloatType] || idt.isInstanceOf[DecimalType]) =>
       Cast(ie, edt)
     case _ => e
+  }
+
+  object JSLike {
+    def unapply(e : Expression) : Option[(Expression, Expression, Boolean)] = e match {
+      case Like(l, r) if r.foldable => Some((l,r, true))
+      case RLike(l, r) if r.foldable => Some((l,r, false))
+      case _ => None
+    }
+  }
+
+  object JSStringPredicate {
+    def unapply(e : Expression) : Option[(Expression, Expression, String)] = e match {
+      case StartsWith(l, r) if r.foldable => Some((l,r, "startsWith"))
+      case EndsWith(l, r) if r.foldable => Some((l,r, "endsWith"))
+      case Contains(l, r) if r.foldable => Some((l,r, "contains"))
+      case _ => None
+    }
   }
 }
