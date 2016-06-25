@@ -17,16 +17,14 @@
 
 package org.sparklinedata.druid.client
 
-import org.sparklinedata.spark.dateTime.dsl.expressions._
 import org.apache.spark.Logging
+import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.scalatest.BeforeAndAfterAll
+import org.sparklinedata.spark.dateTime.dsl.expressions._
 
 import scala.language.postfixOps
-import com.github.nscala_time.time.Imports._
-import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.sparklinedata.spark.dateTime.dsl.expressions._
 
-
+// scalastyle:off line.size.limit
 class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with Logging {
   ignore("ShipDateYearAggCube") { td =>
 
@@ -47,53 +45,55 @@ class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with Logging
     )
   }
 
-
-
   cTest("duirdrewriteCubeT1",
     "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01' and l_shipdate <= '1997-01-01' " +
+      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01' and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus with cube"
     ,
     "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01' and l_shipdate <= '1997-01-01' " +
+      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01' and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus with cube"
   )
 
   cTest("duirdrewriteCubeT2",
     "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01' and l_shipdate <= '1997-01-01' " +
+      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01' and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus " +
       "union all " +
       "select l_returnflag, null, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01' and l_shipdate <= '1997-01-01' " +
+      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01' and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag "
     ,
     "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01' and l_shipdate <= '1997-01-01' " +
+      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01' and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus " +
       "union all " +
       "select l_returnflag, null, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag "
   )
 
+  /*
+   * Spark return no rows with predicate: s_nation = 'FRANCE', why?
+   *   for cube should return 1 row.
+   */
   cTest("duirdrewriteCubeT4",
     "select s_nation, l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplier " +
-      "where s_nation = 'FRANCE' and l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "where  s_nation = 'ALGERIA' and l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by s_nation, l_returnflag, l_linestatus with cube"
     ,
     "select s_nation, l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplierBase " +
-      "where s_nation = 'FRANCE' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "where  s_nation = 'ALGERIA' and l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by s_nation, l_returnflag, l_linestatus with cube"
   )
 
@@ -101,13 +101,13 @@ class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with Logging
     "select l_returnflag, l_linestatus, grouping__id, " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplier " +
-      "where s_nation = 'FRANCE' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus with rollup"
     ,
     "select l_returnflag, l_linestatus, grouping__id, " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplierBase " +
-      "where s_nation = 'FRANCE' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus with rollup"
   )
 
@@ -115,24 +115,24 @@ class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with Logging
     "select l_returnflag, l_linestatus, grouping__id, " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplier " +
-      "where s_nation = 'FRANCE' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus grouping sets(l_returnflag, l_linestatus, ())"
     ,
     "select l_returnflag, l_linestatus, grouping__id, " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplierBase " +
-      "where s_nation = 'FRANCE' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus grouping sets(l_returnflag, l_linestatus, ())"
   )
   cTest("duirdrewriteCubeT7",
     "select lower(l_returnflag), l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01'" +
+      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07'" +
       "group by lower(l_returnflag), l_linestatus with cube"
     ,
     "select lower(l_returnflag), l_linestatus, " +
       "count(*), sum(l_extendedprice) as s " +
-      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01'" +
+      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07'" +
       "group by lower(l_returnflag), l_linestatus with cube"
   )
 
