@@ -173,19 +173,19 @@ trait ProjectFilterTransfom {
 
     fe match {
       case EqualTo(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield new SelectorFilterSpec(dD.name, value.toString)
       }
       case EqualTo(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield new SelectorFilterSpec(dD.name, value.toString)
       }
       case LessThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
       }
       case LessThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
       }
       case LessThan(timeRefExtractor(dtGrp), Literal(value, LongType))
@@ -194,28 +194,28 @@ trait ProjectFilterTransfom {
         None // TODO convert this to a JavascriptFilter ?
         // TODO handle all other comparision fns (lte, gt, gte, eq)
       case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
       }
       case LessThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
       }
 
       case GreaterThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
       }
       case GreaterThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
       }
       case GreaterThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
       }
       case GreaterThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
       }
       case dtTimeCond((dCol, op, value)) =>
@@ -233,14 +233,14 @@ trait ProjectFilterTransfom {
         }
       }
       case In(AttributeReference(nm, dT, _, _), vl: Seq[Expression]) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] &&
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension() &&
           (vl.forall(e => e.isInstanceOf[Literal])))
           yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
       }
       case InSet(AttributeReference(nm, dT, _, _), vl: Set[Any]) => {
         val primitieVals = vl.foldLeft(true)((x,y) =>
           x & ( y.isInstanceOf[Literal] || !y.isInstanceOf[Expression]))
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension] && primitieVals)
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension() && primitieVals)
           yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
       }
       case Not(e) => {
@@ -249,13 +249,13 @@ trait ProjectFilterTransfom {
           yield NotFilterSpec("not", f)
       }
       case IsNotNull(AttributeReference(nm,_,_,_)) => {
-        for (c <- dqb.druidColumn(nm) if c.isInstanceOf[DruidDimension]) yield
+        for (c <- dqb.druidColumn(nm) if c.isDimension()) yield
              NotFilterSpec("not", new SelectorFilterSpec(nm, ""))
       }
         // TODO: turn isnull(TimeDim/Metric) to NULL SCAN
       case IsNull(AttributeReference(nm,_,_,_)) => {
         for (c <- dqb.druidColumn(nm)
-             if c.isInstanceOf[DruidDimension] || c.isInstanceOf[DruidTimeDimension]) yield
+             if c.isDimension()) yield
           new SelectorFilterSpec(c.name, "")
       }
       case _ => {
