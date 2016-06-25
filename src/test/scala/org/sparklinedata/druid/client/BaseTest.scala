@@ -25,9 +25,13 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.util.ExprUtil
+import org.joda.time.DateTimeZone
 import org.scalatest.{BeforeAndAfterAll, fixture}
 import org.sparklinedata.druid.Utils
 import org.sparklinedata.spark.dateTime.Functions._
+import sun.text.normalizer.UCharacter.NumericType
 
 abstract class BaseTest extends fixture.FunSuite with
   fixture.TestDataFixture with BeforeAndAfterAll with Logging {
@@ -149,6 +153,8 @@ abstract class BaseTest extends fixture.FunSuite with
 
     System.setProperty("user.timezone", "UTC")
     TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    DateTimeZone.setDefault(DateTimeZone.forID("UTC"))
+    TestHive.setConf(DruidPlanner.TZ_ID.key, "UTC")
 
     TestHive.sparkContext.setLogLevel("INFO")
 
@@ -282,94 +288,60 @@ abstract class BaseTest extends fixture.FunSuite with
     TestHive.setConf(DruidPlanner.DEBUG_TRANSFORMATIONS.key, "false")
   }
 
+  def roundValue(chooseRounding : Boolean, v : Any, dt: DataType) : Any = {
+    if ( chooseRounding && v != null && ExprUtil.isNumeric(dt)) {
+      BigDecimal(v.toString).setScale(1, BigDecimal.RoundingMode.HALF_UP).toDouble
+    } else {
+      v
+    }
+  }
 
   def isTwoDataFrameEqual(df1 : DataFrame,
                        df2 : DataFrame,
                        Sorted : Boolean = false,
                        chooseRounding : Boolean = true): Boolean = {
-    val df1_count = df1.count()
-    val df2_count = df2.count()
+
+
+    if (df1.schema != df2.schema){
+      println(
+        s"""
+           |different schemas issue:
+           | df1 schema = ${df1.schema}
+           | df2.schema = ${df2.schema}
+         """.stripMargin)
+      // return false
+    }
+
+    import collection.JavaConversions._
+
+    var df11 = df1
+    var df22 = df2
+
+    if (!Sorted) {
+      df11 = df11.sort(df1.columns(0), df1.columns.toSeq.slice(1, df1.columns.size):_*)
+      df22 = df22.sort(df2.columns(0), df2.columns.toSeq.slice(1, df2.columns.size):_*)
+    }
+
+    var df1_list = df11.collectAsList()
+    var df2_list = df22.collectAsList()
+
+    val df1_count = df1_list.size()
+    val df2_count = df2_list.size()
     if(df1_count != df2_count){
       println(df1_count + "\t" + df2_count)
       println("The row count is not equal")
+      println(s"""df1=\n${df1_list.mkString("\n")}\ndf2=\n ${df2_list.mkString("\n")}""")
       return false
     }
 
-    val df1_column = df1.columns
-    val df2_column = df2.columns
-    val column1_length = df1_column.length
-    val column2_length = df2_column.length
-    if (column1_length != column2_length){
-      println(column1_length + "\t" + column2_length)
-      println("The column length is not equal")
-      return false
-    }
-
-    var df1_list = df1.collectAsList()
-    var df2_list = df2.collectAsList()
-    if (!Sorted) {
-      var df11 = df1.sort(df1_column(0))
-      var df22 = df2.sort(df2_column(0))
-      for (i <- 1 to column1_length - 1) {
-        df11 = df11.sort(df1_column(i))
-        df22 = df22.sort(df2_column(i))
-      }
-      df1_list = df11.collectAsList()
-      df2_list = df22.collectAsList()
-    }
-    if(!chooseRounding) {
-      for (i <- 0 to df1_count.toInt - 1){
-        for (j <- 0 to column1_length - 1){
-          if(df1_list.get(i).get(j) !=
-            df2_list.get(i).get(j)){
-            println(df1_list.get(i).get(j) + "\t" + df2_list.get(i).get(j))
-            println("The row content is not equal")
-            return false
-          }
-        }
-      }
-    }else{
-      for (i <- 0 to df1_count.toInt - 1){
-        for (j <- 0 to column1_length - 1){
-          if (df1_list.get(i).get(j) == null ||
-            df2_list.get(i).get(j) == null){
-            if (df1_list.get(i).get(j) !=
-              df2_list.get(i).get(j)){
-              println(df1_list.get(i).get(j) + "\t" + df2_list.get(i).get(j))
-              println("The row content is not equal null")
-              return false
-            }
-          }else{
-            var raw1 = (df1_list.get(i).get(j)).toString
-            var raw2 = (df2_list.get(i).get(j)).toString
-            if (raw1.endsWith("f") || raw1.endsWith("F")){
-              raw1 = raw1.substring(0, raw1.length - 1)
-            }
-            if (raw2.endsWith("f") || raw2.endsWith("F")){
-              raw2 = raw2.substring(0, raw2.length - 1)
-            }
-            try {
-              val res1 = BigDecimal(raw1)
-                .setScale(2, BigDecimal.RoundingMode.HALF_UP)
-                .toDouble
-              val res2 = BigDecimal(raw2)
-                .setScale(2, BigDecimal.RoundingMode.HALF_UP)
-                .toDouble
-              if(res1 != res2){
-                println(res1 + "\t" + res2)
-                println("The rouding row content is not equal null")
-                return false
-              }
-            }catch{
-              case ex: Exception => {
-                if(raw1 != raw2){
-                  println(raw1 + "\t" + raw2)
-                  println("The rouding exce row content is not equal null")
-                  return false
-                }
-              }
-            }
-          }
+    for (i <- 0 to df1_count.toInt - 1){
+      for (j <- 0 to df11.columns.size - 1){
+        val res1 = roundValue(chooseRounding, df1_list.get(i).get(j), df1.schema(j).dataType)
+        val res2 = roundValue(chooseRounding, df2_list.get(i).get(j), df1.schema(j).dataType)
+        if(res1 != res2){
+          println(s"values in row $i, column $j don't match: ${res1} != ${res2}")
+          println(s"""df1=\n${df1_list.mkString("\n")}\ndf2=\n ${df2_list.mkString("\n")}""")
+          return false
         }
       }
     }
