@@ -17,23 +17,10 @@
 
 package org.sparklinedata.druid.client
 
-import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
-import org.apache.spark.Logging
-import org.scalatest.BeforeAndAfterAll
-import com.github.nscala_time.time.Imports._
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.apache.spark.sql.sources.druid.DruidPlanner
-import org.sparklinedata.spark.dateTime.dsl.expressions._
-
-import scala.language.postfixOps
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.Logging
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
-import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.scalatest.BeforeAndAfterAll
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 
@@ -226,70 +213,24 @@ class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll wi
       "count(*), " +
       "round(sum(l_extendedprice),2) as s " +
       "from orderLineItemPartSupplier" +
-      " where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      " where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus with cube",
     "select l_returnflag, l_linestatus, " +
       "count(*), " +
       "round(sum(l_extendedprice),2) as s " +
       "from orderLineItemPartSupplierBase " +
-      "where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
+      "where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus with cube"
   )
-
-
-
-  //the lineitem base table//Caused by: org.apache.hadoop.mapred.InvalidInputException:
-  // Input path does not exist: file:/Users/wangziming/tpch/datascale1/customer
-  cTest("hscT3",
-    {
-      val q10DtP1 = dateTime('o_orderdate) >= dateTime("1993-10-01")
-      val q10DtP2 = dateTime('o_orderdate) < (dateTime("1993-10-01") + 3.month)
-      date"""
-    select c_name, cn_name, c_address, c_phone, c_comment,
-           round(sum(l_extendedprice),2) as price
-    from customer,
-    orders, lineitem, custnation
-    where c_custkey = o_custkey
-                           |and l_shipdate  >= '1994-01-01'
-                           |and l_shipdate <= '1997-01-01'
-                           |and l_orderkey = o_orderkey
-                           |and c_nationkey = cn_nationkey and
-      $q10DtP1 and
-      $q10DtP2 and
-      l_returnflag = 'R'
-    group by c_name, cn_name, c_address, c_phone, c_comment
-    """.stripMargin
-    },
-  {
-    val q10DtP1 = dateTime('o_orderdate) >= dateTime("1993-10-01")
-  val q10DtP2 = dateTime('o_orderdate) < (dateTime("1993-10-01") + 3.month)
-  date"""
-    select c_name, cn_name, c_address, c_phone, c_comment,
-           round(sum(l_extendedprice),2) as price
-    from customer,
-    orders,lineitembase, custnation
-    where c_custkey = o_custkey
-                       |and l_shipdate  >= '1994-01-01'
-                       |and l_shipdate <= '1997-01-01'
-                       |and l_orderkey = o_orderkey
-                       |and c_nationkey = cn_nationkey and
-      $q10DtP1 and
-      $q10DtP2 and
-      l_returnflag = 'R'
-    group by c_name, cn_name, c_address, c_phone, c_comment
-    """.stripMargin
-  }
-  )
-
 
   // javascript test
   cTest("hscT4",
     "select sum(c_acctbal) as bal from orderLineItemPartSupplier " +
-      "where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' group by " +
+      "where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' group by " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000')" +
       " AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by bal",
     "select sum(c_acctbal) as bal from orderLineItemPartSupplierBase " +
-      "where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' group by " +
+      "where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' group by " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000')" +
       " AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by bal"
   )

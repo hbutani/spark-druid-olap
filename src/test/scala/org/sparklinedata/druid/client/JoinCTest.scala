@@ -1,8 +1,30 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.sparklinedata.druid.client
 
-import org.apache.spark.sql.hive.test.sparklinedata.TestHive
-
+// scalastyle:off line.size.limit
 class JoinCTest extends StarSchemaBaseTest{
+  /*
+  * tests jcT1-4 commented out because data in quickstart/tpch/datascale1.sample
+  * doesn't match druid index
+  */
+
+  /*
   cTest("jcT1",
     "select  l_linestatus, sum(ps_availqty) " +
       "from lineitem li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
@@ -48,6 +70,7 @@ class JoinCTest extends StarSchemaBaseTest{
       "where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' " +
       "group by s_name, l_linestatus"
   )
+  */
 
   cTest("jcT5",
     """SELECT customer.c_mktsegment AS c_mktsegment
