@@ -52,17 +52,10 @@ trait AggregateTransform {
                          expandOpExp : Expression):
   Option[DruidQueryBuilder] = {
     expandOpExp match {
-      case AttributeReference(nm, dT, _, _) => {
+      case AttributeReference(nm, dT, _, _) if dqb.isDruidNonTimeDimension(nm) => {
         for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
           yield dqb.dimension(new DefaultDimensionSpec(dD.name, nm)).
             outputAttribute(nm, ge, ge.dataType, DruidDataType.sparkDataType(dD.dataType))
-      }
-      case timeElemExtractor(nm, dC, tzId, fmt) => {
-        Some(
-          dqb.dimension(new ExtractionDimensionSpec(dC.name, nm,
-            new TimeFormatExtractionFunctionSpec(fmt, tzId))).
-            outputAttribute(nm, ge, ge.dataType, StringType)
-        )
       }
       case timeElemExtractor2(dtGrpElem) => {
         val timeFmtExtractFunc : ExtractionFunctionSpec = {
@@ -80,6 +73,13 @@ trait AggregateTransform {
           ).
             outputAttribute(dtGrpElem.outputName, ge,
               ge.dataType, StringType)
+        )
+      }
+      case timeElemExtractor(nm, dC, tzId, fmt) => {
+        Some(
+          dqb.dimension(new ExtractionDimensionSpec(dC.name, nm,
+            new TimeFormatExtractionFunctionSpec(fmt, tzId))).
+            outputAttribute(nm, ge, ge.dataType, StringType)
         )
       }
       case _ => {

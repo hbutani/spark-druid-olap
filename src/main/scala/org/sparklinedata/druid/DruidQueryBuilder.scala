@@ -128,6 +128,10 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
     oAttrName
   }
 
+  def isDruidNonTimeDimension(name : String) : Boolean = {
+    druidColumn(name).map(_.isDimension(true)).getOrElse(false)
+  }
+
   def druidColumn(name: String): Option[DruidColumn] = {
     drInfo.sourceToDruidMapping.get(projectionAliasMap.getOrElse(name, name))
   }
