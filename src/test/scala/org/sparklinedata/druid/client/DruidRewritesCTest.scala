@@ -26,7 +26,7 @@ import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 
-
+// scalastyle:off line.size.limit
 class DruidRewritesCTest extends BaseTest with BeforeAndAfterAll with Logging{
   cTest("druidrewriteT1",
     "select count(distinct o_custkey) from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01'",
@@ -37,11 +37,11 @@ class DruidRewritesCTest extends BaseTest with BeforeAndAfterAll with Logging{
     "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
       "count(distinct o_orderkey)  " +
-      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' group by l_returnflag, l_linestatus",
+      "from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' group by l_returnflag, l_linestatus",
     "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
       "count(distinct o_orderkey)  " +
-      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' group by l_returnflag, l_linestatus"
+      "from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' group by l_returnflag, l_linestatus"
   )
 
   cTest("druidrewriteT3",
@@ -397,7 +397,7 @@ class DruidRewritesCTest extends BaseTest with BeforeAndAfterAll with Logging{
     date"""select l_returnflag, l_linestatus, $shipDtYrGroup, count(*),
       sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a,
       count(distinct o_orderkey)
-      from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' group by l_returnflag, l_linestatus, $shipDtYrGroup"""
+      from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' group by l_returnflag, l_linestatus, $shipDtYrGroup"""
   },
     {
       val shipDtYrGroup = dateTime('l_shipdate) year
@@ -405,7 +405,7 @@ class DruidRewritesCTest extends BaseTest with BeforeAndAfterAll with Logging{
       date"""select l_returnflag, l_linestatus, $shipDtYrGroup, count(*),
       sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a,
       count(distinct o_orderkey)
-      from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' group by l_returnflag, l_linestatus, $shipDtYrGroup"""
+      from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' group by l_returnflag, l_linestatus, $shipDtYrGroup"""
     }
   )
 
@@ -416,7 +416,7 @@ class DruidRewritesCTest extends BaseTest with BeforeAndAfterAll with Logging{
     date"""select l_returnflag, l_linestatus, $orderDtYrGroup, count(*),
       sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a,
       count(distinct o_orderkey)
-      from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01' group by l_returnflag, l_linestatus, $orderDtYrGroup"""
+      from orderLineItemPartSupplier where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-02' group by l_returnflag, l_linestatus, $orderDtYrGroup"""
   },
     {
       val orderDtYrGroup = dateTime('o_orderdate) year
@@ -424,7 +424,7 @@ class DruidRewritesCTest extends BaseTest with BeforeAndAfterAll with Logging{
       date"""select l_returnflag, l_linestatus, $orderDtYrGroup, count(*),
       sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a,
       count(distinct o_orderkey)
-      from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1997-01-01'  group by l_returnflag, l_linestatus, $orderDtYrGroup"""
+      from orderLineItemPartSupplierBase where l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-02'  group by l_returnflag, l_linestatus, $orderDtYrGroup"""
     }
   )
 
