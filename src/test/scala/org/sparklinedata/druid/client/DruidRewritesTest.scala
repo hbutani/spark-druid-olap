@@ -355,5 +355,22 @@ class DruidRewritesTest extends BaseTest {
     true, true
   )
 
+  // scalastyle:off line.size.limit
+  test("countDistinctAndJS",
+  """
+    |SELECT CAST((MONTH(CAST(`sp_ad_demo_qube`.`l_shipdate` AS TIMESTAMP)) - 1) / 3 + 1 AS BIGINT) AS `qr_l_shipdate_ok`,
+    |COUNT(DISTINCT `sp_ad_demo_qube`.`s_region`) AS `usr_calculation_622270835564429312_ok`,
+    |YEAR(CAST(`sp_ad_demo_qube`.`l_shipdate` AS TIMESTAMP)) AS `yr_l_shipdate_ok`
+    |FROM `default`.`orderLineItemPartSupplier` `sp_ad_demo_qube`
+    |WHERE ((CAST(`sp_ad_demo_qube`.`l_shipdate` AS TIMESTAMP) >= CAST('2016-02-29 16:00:00' AS TIMESTAMP)) AND
+    |(CAST(`sp_ad_demo_qube`.`l_shipdate` AS TIMESTAMP) <= CAST('2016-03-27 16:00:00' AS TIMESTAMP)))
+    |GROUP BY CAST((MONTH(CAST(`sp_ad_demo_qube`.`l_shipdate` AS TIMESTAMP)) - 1) / 3 + 1 AS BIGINT),
+    |YEAR(CAST(`sp_ad_demo_qube`.`l_shipdate` AS TIMESTAMP))
+  """.stripMargin,
+    1,
+    true,
+    true
+  )
+
 }
 

@@ -83,7 +83,7 @@ trait AggregateTransform {
         )
       }
       case _ => {
-        val codeGen = JSCodeGenerator(dqb, ge, false, false,
+        val codeGen = JSCodeGenerator(dqb, expandOpExp, false, false,
           sqlContext.getConf(DruidPlanner.TZ_ID).toString)
         for (fn <- codeGen.fnCode) yield {
           val outDName = dqb.nextAlias(codeGen.fnParams.last)
