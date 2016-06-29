@@ -127,7 +127,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
         Cast(
         Divide(
           Cast(AttributeReference(sDAttr.name, sDAttr.dataType)(sDAttr.exprId), DoubleType),
-          Cast(AttributeReference(cDAttr.name, sDAttr.dataType)(cDAttr.exprId), DoubleType)
+          Cast(AttributeReference(cDAttr.name, cDAttr.dataType)(cDAttr.exprId), DoubleType)
         ),
           e.dataType)
       }
