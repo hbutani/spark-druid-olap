@@ -29,7 +29,7 @@ import org.apache.spark.sql.types.DataType
 import org.apache.spark.sql.util.ExprUtil
 import org.joda.time.DateTimeZone
 import org.scalatest.{BeforeAndAfterAll, fixture}
-import org.sparklinedata.druid.Utils
+import org.sparklinedata.druid.{DruidQuery, DruidQueryBuilder, Utils}
 import org.sparklinedata.spark.dateTime.Functions._
 import sun.text.normalizer.UCharacter.NumericType
 
@@ -224,21 +224,23 @@ abstract class BaseTest extends fixture.FunSuite with
            numDruidQueries : Int = 1,
            showPlan : Boolean = false,
            showResults : Boolean = false,
-           debugTransforms : Boolean = false) : Unit = {
-    test(nm) {td =>
+           debugTransforms : Boolean = false,
+           dqValidators: Seq[DruidQuery => Boolean] = Seq()) : Unit = {
+    test(nm) { td =>
       try {
         if (debugTransforms) turnOnTransformDebugging
         val df = sqlAndLog(nm, sql)
-        assertDruidQueries(td.name, df, numDruidQueries)
-        if (showPlan ) logPlan(nm, df)
+        assertDruidQueries(td.name, df, numDruidQueries, dqValidators)
+        if (showPlan) logPlan(nm, df)
         logDruidQueries(td.name, df)
-        if (showResults ) { df.show() }
+        if (showResults) {
+          df.show()
+        }
       } finally {
         turnOffTransformDebugging
       }
     }
   }
-
 
   def cTest(nm : String,
             dsql: String,
@@ -276,8 +278,17 @@ abstract class BaseTest extends fixture.FunSuite with
     }
   }
 
-  def assertDruidQueries(nm : String, df : DataFrame, numQueries : Int) : Unit = {
-    assert(DruidPlanner.getDruidQuerySpecs(df.queryExecution.sparkPlan).length == numQueries)
+  def assertDruidQueries(nm : String,
+                         df : DataFrame,
+                         numQueries : Int,
+                         dqValidators : Seq[DruidQuery => Boolean] = Seq()) : Unit = {
+    val dqbs = DruidPlanner.getDruidQuerySpecs(df.queryExecution.sparkPlan)
+    assert(dqbs.length == numQueries)
+    dqbs.zip(dqValidators).foreach { t =>
+      val dqb = t._1
+      val v = t._2
+      assert(v(dqb))
+    }
   }
 
   def turnOnTransformDebugging : Unit = {

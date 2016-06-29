@@ -18,6 +18,7 @@
 package org.sparklinedata.druid.client
 
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
+import org.sparklinedata.druid.{DruidQuery, GroupByQuerySpec, JavascriptFilterSpec, SearchQuerySpec}
 
 class DataTypesTest extends BaseTest {
 
@@ -127,5 +128,53 @@ class DataTypesTest extends BaseTest {
       order by c_name, bal""".stripMargin,
     1,
     true, true)
+
+  test("notPushOrderBy",
+    s"""
+       | select l_partkey, count(*)
+       | from orderLineItemPartSupplier
+       | group by l_partkey
+       | order by l_partkey
+     """.stripMargin,
+    1,
+    true,
+    true,
+    false,
+    Seq({ dq : DruidQuery =>
+      val gQ = dq.q.asInstanceOf[GroupByQuerySpec]
+      !gQ.limitSpec.isDefined
+    }))
+
+  test("notPushOrderBy2",
+    s"""
+       | select l_partkey
+       | from orderLineItemPartSupplier
+       | group by l_partkey
+       | order by l_partkey
+     """.stripMargin,
+    1,
+    true,
+    true,
+    false,
+    Seq({ dq : DruidQuery =>
+      val sQ = dq.q.asInstanceOf[SearchQuerySpec]
+      !sQ.sort.isDefined
+    }))
+
+  test("pushFilterAsJS",
+    s"""
+       | select l_partkey
+       | from orderLineItemPartSupplier
+       | where l_partkey > 10000
+       | group by l_partkey
+     """.stripMargin,
+    1,
+    true,
+    true,
+    false,
+    Seq({ dq : DruidQuery =>
+      val sQ = dq.q.asInstanceOf[SearchQuerySpec]
+      sQ.filter.get.isInstanceOf[JavascriptFilterSpec]
+    }))
 
 }

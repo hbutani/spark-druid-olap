@@ -164,106 +164,131 @@ trait ProjectFilterTransfom {
     }
   }
 
+  object ValidDruidNativeComparison {
+
+    def unapply(t : (DruidQueryBuilder, Expression)) : Option[FilterSpec] =  {
+      val dqb = t._1
+      val e = t._2
+      import SparkNativeTimeElementExtractor._
+      val timeRefExtractor = new SparkNativeTimeElementExtractor(dqb)
+      e match {
+        case EqualTo(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield new SelectorFilterSpec(dD.name, value.toString)
+        }
+        case EqualTo(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield new SelectorFilterSpec(dD.name, value.toString)
+        }
+        case LessThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
+        }
+        case LessThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
+        }
+        case LessThan(timeRefExtractor(dtGrp), Literal(value, LongType))
+          if dtGrp.druidColumn.name != DruidDataSource.TIME_COLUMN_NAME &&
+            dtGrp.formatToApply == TIMESTAMP_FORMAT =>
+          None // TODO convert this to a JavascriptFilter ?
+        // TODO handle all other comparision fns (lte, gt, gte, eq)
+        case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
+        }
+        case LessThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
+        }
+
+        case GreaterThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
+        }
+        case GreaterThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
+        }
+        case GreaterThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
+        }
+        case GreaterThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.isDimension() && DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
+        }
+        case _ => None
+      }
+    }
+  }
+
   def dimFilterExpression(dqb: DruidQueryBuilder, fe: Expression):
   Option[FilterSpec] = {
 
-    import SparkNativeTimeElementExtractor._
     val dtTimeCond = new DateTimeConditionExtractor(dqb)
     val timeRefExtractor = new SparkNativeTimeElementExtractor(dqb)
 
-    fe match {
-      case EqualTo(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield new SelectorFilterSpec(dD.name, value.toString)
-      }
-      case EqualTo(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield new SelectorFilterSpec(dD.name, value.toString)
-      }
-      case LessThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
-      }
-      case LessThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
-      }
-      case LessThan(timeRefExtractor(dtGrp), Literal(value, LongType))
-        if dtGrp.druidColumn.name != DruidDataSource.TIME_COLUMN_NAME &&
-          dtGrp.formatToApply == TIMESTAMP_FORMAT =>
-        None // TODO convert this to a JavascriptFilter ?
-        // TODO handle all other comparision fns (lte, gt, gte, eq)
-      case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
-      }
-      case LessThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
-      }
-
-      case GreaterThan(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">")
-      }
-      case GreaterThan(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<")
-      }
-      case GreaterThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  ">=")
-      }
-      case GreaterThanOrEqual(Literal(value, _), AttributeReference(nm, dT, _, _)) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
-          yield compOp(dqb.drInfo.druidDS, dD, value, dT,  "<=")
-      }
-      case dtTimeCond((dCol, op, value)) =>
-        Some(JavascriptFilterSpec.create(dCol, op, value))
-      case Or(e1, e2) => {
-        Utils.sequence(
-          List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
-          LogicalFilterSpec("or", args.toList)
+    (dqb, fe) match {
+      case ValidDruidNativeComparison(filSpec) => Some(filSpec)
+      case (dqb, fe) => fe match {
+        case dtTimeCond((dCol, op, value)) =>
+          Some(JavascriptFilterSpec.create(dCol, op, value))
+        case Or(e1, e2) => {
+          Utils.sequence(
+            List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
+            LogicalFilterSpec("or", args.toList)
+          }
         }
-      }
-      case And(e1, e2) => {
-        Utils.sequence(
-          List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
-          LogicalFilterSpec("and", args.toList)
+        case And(e1, e2) => {
+          Utils.sequence(
+            List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
+            LogicalFilterSpec("and", args.toList)
+          }
         }
-      }
-      case In(AttributeReference(nm, dT, _, _), vl: Seq[Expression]) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension() &&
-          (vl.forall(e => e.isInstanceOf[Literal])))
-          yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
-      }
-      case InSet(AttributeReference(nm, dT, _, _), vl: Set[Any]) => {
-        val primitieVals = vl.foldLeft(true)((x,y) =>
-          x & ( y.isInstanceOf[Literal] || !y.isInstanceOf[Expression]))
-        for (dD <- dqb.druidColumn(nm) if dD.isDimension() && primitieVals)
-          yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
-      }
-      case Not(e) => {
-        val fil = dimFilterExpression(dqb, e)
-        for (f <- fil)
-          yield NotFilterSpec("not", f)
-      }
-      case IsNotNull(AttributeReference(nm,_,_,_)) => {
-        for (c <- dqb.druidColumn(nm) if c.isDimension()) yield
-             NotFilterSpec("not", new SelectorFilterSpec(nm, ""))
-      }
+        case In(AttributeReference(nm, dT, _, _), vl: Seq[Expression]) => {
+          for (dD <- dqb.druidColumn(nm) if dD.isDimension() &&
+            (vl.forall(e => e.isInstanceOf[Literal])))
+            yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
+        }
+        case InSet(AttributeReference(nm, dT, _, _), vl: Set[Any]) => {
+          val primitieVals = vl.foldLeft(true)((x, y) =>
+            x & (y.isInstanceOf[Literal] || !y.isInstanceOf[Expression]))
+          for (dD <- dqb.druidColumn(nm) if dD.isDimension() && primitieVals)
+            yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
+        }
+        case Not(e) => {
+          val fil = dimFilterExpression(dqb, e)
+          for (f <- fil)
+            yield NotFilterSpec("not", f)
+        }
+        case IsNotNull(AttributeReference(nm, _, _, _)) => {
+          for (c <- dqb.druidColumn(nm) if c.isDimension()) yield
+            NotFilterSpec("not", new SelectorFilterSpec(nm, ""))
+        }
         // TODO: turn isnull(TimeDim/Metric) to NULL SCAN
-      case IsNull(AttributeReference(nm,_,_,_)) => {
-        for (c <- dqb.druidColumn(nm)
-             if c.isDimension()) yield
-          new SelectorFilterSpec(c.name, "")
-      }
-      case _ => {
-        val codeGen = JSCodeGenerator(dqb, fe, false, false,
-          sqlContext.getConf(DruidPlanner.TZ_ID).toString,
-          BooleanType)
-        for (fn <- codeGen.fnCode) yield {
-          new JavascriptFilterSpec(codeGen.fnParams.last, fn)
+        case IsNull(AttributeReference(nm, _, _, _)) => {
+          for (c <- dqb.druidColumn(nm)
+               if c.isDimension()) yield
+            new SelectorFilterSpec(c.name, "")
+        }
+        case _ => {
+          val codeGen = JSCodeGenerator(dqb, fe, false, false,
+            sqlContext.getConf(DruidPlanner.TZ_ID).toString,
+            BooleanType)
+          for (fn <- codeGen.fnCode) yield {
+            new JavascriptFilterSpec(codeGen.fnParams.last, fn)
+          }
         }
       }
     }

@@ -47,7 +47,7 @@ trait LimitTransfom {
         val dqb1: ODB = orderExprs.foldLeft(Some(dqb).asInstanceOf[ODB]) { (dqb, e) =>
           for (dqb2 <- dqb;
                ue <- unalias(e.child, child);
-               doA <- exprToDruidOutput.get(ue))
+               doA <- exprToDruidOutput.get(ue) if doA.dataType == ue.dataType)
             yield dqb2.orderBy(doA.name, e.direction == Ascending)
         }
         dqb1
