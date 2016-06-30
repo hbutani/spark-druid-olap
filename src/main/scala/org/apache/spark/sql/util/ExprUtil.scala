@@ -18,6 +18,7 @@
 package org.apache.spark.sql.util
 
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.trees.CurrentOrigin
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types.{DataType, NumericType}
 import org.joda.time.DateTime
@@ -61,4 +62,25 @@ object ExprUtil {
   }
 
   def isNumeric(dt : DataType) = NumericType.acceptsType(dt)
+
+  /**
+    * This is different from transformDown because if rule transforms an Expression,
+    * we don't try to apply any more transformation.
+    * @param e
+    * @param rule
+    * @return
+    */
+  def transformReplace(e : Expression,
+                    rule: PartialFunction[Expression, Expression]): Expression = {
+    val afterRule = CurrentOrigin.withOrigin(e.origin) {
+      rule.applyOrElse(e, identity[Expression])
+    }
+
+    // Check if unchanged and then possibly return old copy to avoid gc churn.
+    if (e fastEquals afterRule) {
+      e.transformDown(rule)
+    } else {
+      afterRule
+    }
+  }
 }

@@ -372,5 +372,19 @@ class DruidRewritesTest extends BaseTest {
     true
   )
 
+  test("aggExprIncludesGByExpr",
+  """
+    |SELECT SUM(`sparkline_paysafe`.`l_extendedprice`) AS `temp_tc___1602391293__0_`,
+    |SUM(`sparkline_paysafe`.`l_extendedprice`) AS `temp_temp_tc___4123911036__0___3760310399__0_`,
+    |MIN(CAST(CAST(CAST(`sparkline_paysafe`.`l_shipdate` AS TIMESTAMP) AS TIMESTAMP) AS TIMESTAMP))
+    |  AS `temp_temp_tc___4123911036__0___4190136418__0_`,
+    |  CAST(`sparkline_paysafe`.`l_shipdate` AS TIMESTAMP) AS `l_shipdate`
+    |  FROM `default`.`orderLineItemPartSupplier` `sparkline_paysafe`
+    |  GROUP BY CAST(`sparkline_paysafe`.`l_shipdate` AS TIMESTAMP)
+  """.stripMargin,
+    1,
+    true,
+    true)
+
 }
 

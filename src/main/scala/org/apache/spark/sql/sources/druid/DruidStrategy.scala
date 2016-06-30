@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan}
 import org.apache.spark.sql.execution.{PhysicalRDD, Project, SparkPlan, Union}
 import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.query.QuerySpecTransforms
 
@@ -120,7 +121,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
     val druidPushDownExprMap = druidOpSchema.pushedDownExprToDruidAttr
     val avgExpressions = druidOpSchema.avgExpressions
 
-    aEs.map(_.transformUp {
+    aEs.map(aE => ExprUtil.transformReplace( aE, {
       case e: Expression if avgExpressions.contains(e) => {
         val (s,c) = avgExpressions(e)
         val (sDAttr, cDAttr) = (druidOpSchema.druidAttrMap(s), druidOpSchema.druidAttrMap(c))
@@ -156,9 +157,8 @@ with PredicateHelper with DruidPlannerHelper with Logging {
         val dA = druidPushDownExprMap(e)
         AttributeReference(dA.name, dA.dataType)(dA.exprId)
       }
-
       case e => e
-    }).asInstanceOf[Seq[NamedExpression]]
+    })).asInstanceOf[Seq[NamedExpression]]
 
   }
 }
