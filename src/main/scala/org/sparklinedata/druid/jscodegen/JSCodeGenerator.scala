@@ -83,11 +83,14 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                  (metricAllowed && dD.isInstanceOf[DruidMetric]) ||
                  dD.isInstanceOf[DruidDimension]) && validInParams(v))) yield {
             /*
-             * If the Spark and Druid datatypes for a column don't match then
+             * If dim is __time, treat it like a String
+             * TODO : why, should be treated like a timestamp
+             * else if the Spark and Druid datatypes for a column don't match then
              * add in a cast for the generated JavaScript.
              */
-            if (DruidDataType.sparkDataType(dD.dataType) == dT ||
-              dD.isInstanceOf[DruidTimeDimension]) {
+            if ( dD.isInstanceOf[DruidTimeDimension] ) {
+              Some(new JSExpr(v, StringType, true))
+            } else if (DruidDataType.sparkDataType(dD.dataType) == dT ) {
               Some(new JSExpr(v, e.dataType, dD.isInstanceOf[DruidTimeDimension]))
             } else {
               val jE = new JSExpr(v, DruidDataType.sparkDataType(dD.dataType),
