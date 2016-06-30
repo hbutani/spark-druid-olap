@@ -177,4 +177,16 @@ class DataTypesTest extends BaseTest {
       sQ.filter.get.isInstanceOf[JavascriptFilterSpec]
     }))
 
+
+  test("metricTypeDifferent",
+    """
+      |SELECT DAY(`sp_demo_retail`.`o_orderdate`) AS `dy_invoicedate_ok`,
+      |SUM(`sp_demo_retail`.`l_quantity`) AS `sum_quantity_ok`
+      |FROM `default`.`orderLineItemPartSupplier` `sp_demo_retail`
+      |GROUP BY DAY(`sp_demo_retail`.`o_orderdate`)
+    """.stripMargin,
+    1,
+    true,
+    true)
+
 }

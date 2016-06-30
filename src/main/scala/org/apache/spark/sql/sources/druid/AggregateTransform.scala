@@ -321,46 +321,75 @@ trait AggregateTransform {
   }
 
   def aggregateExpression(dqb: DruidQueryBuilder, aggExp: AggregateExpression)(
-    implicit expandOpProjection : Seq[Expression],
-    aEExprIdToPos : Map[ExprId, Int],
-    aEToLiteralExpr: Map[Expression, Expression]) :
-  Option[DruidQueryBuilder] = (aggExp, aggExp.aggregateFunction) match {
-    case (_, Count(Literal(1, IntegerType) :: Nil)) => {
-      val a = dqb.nextAlias
-      Some(dqb.aggregate(FunctionAggregationSpec("longSum", a, "count")).
-        outputAttribute(a, aggExp, aggExp.dataType, LongType))
-    }
-    case (_, Count(AttributeReference("1", _, _, _) :: Nil)) => {
-      val a = dqb.nextAlias
-      Some(dqb.aggregate(FunctionAggregationSpec("longSum", a, "count")).
-        outputAttribute(a, aggExp, aggExp.dataType, LongType))
-    }
+    implicit expandOpProjection: Seq[Expression],
+    aEExprIdToPos: Map[ExprId, Int],
+    aEToLiteralExpr: Map[Expression, Expression]):
+  Option[DruidQueryBuilder] = {
+    val nativeAgg =
+      new DruidNativeAggregator(dqb, aggExp, expandOpProjection, aEExprIdToPos, aEToLiteralExpr)
+    (aggExp, aggExp.aggregateFunction) match {
+      case (_, Count(Literal(1, IntegerType) :: Nil)) => {
+        val a = dqb.nextAlias
+        Some(dqb.aggregate(FunctionAggregationSpec("longSum", a, "count")).
+          outputAttribute(a, aggExp, aggExp.dataType, LongType))
+      }
+      case (_, Count(AttributeReference("1", _, _, _) :: Nil)) => {
+        val a = dqb.nextAlias
+        Some(dqb.aggregate(FunctionAggregationSpec("longSum", a, "count")).
+          outputAttribute(a, aggExp, aggExp.dataType, LongType))
+      }
 
-    // TODO:
-    // Instead of JS rewriting AVG as Sum, Cnt, Sum/Cnt
-    // the expression should be rewritten generically. Introduce
-    // a project on top with expr sum/cnt and push agg Sum, Count below.
-    // This would avoid specialized average handling in JS and non JS paths.
-    // This also neeeds to keep track of original aggregate and remove synthetic vc if
-    // query didn't get pushed down.
-    case (_, c) if JSAggGenerator.jSAvgCandidate(dqb, c) => {
-      val sumAgg = new Sum(c.children.head)
-      val countAgg = new Count(c.children)
-      for (jsSumInf <- JSAggGenerator.jsAgg(dqb, new AggregateExpression(sumAgg, Partial, false),
-        sumAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString);
-           jsCountInf <- JSAggGenerator.jsAgg(jsSumInf._1,
-             new AggregateExpression(countAgg, Partial, false),
-             countAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
-        jsCountInf._1.avgExpression(aggExp, jsSumInf._2, jsCountInf._2)
-    }
+      // TODO:
+      // Instead of JS rewriting AVG as Sum, Cnt, Sum/Cnt
+      // the expression should be rewritten generically. Introduce
+      // a project on top with expr sum/cnt and push agg Sum, Count below.
+      // This would avoid specialized average handling in JS and non JS paths.
+      // This also neeeds to keep track of original aggregate and remove synthetic vc if
+      // query didn't get pushed down.
+      case (_, c) if JSAggGenerator.jSAvgCandidate(dqb, c) => {
+        val sumAgg = new Sum(c.children.head)
+        val countAgg = new Count(c.children)
+        for (jsSumInf <- JSAggGenerator.jsAgg(dqb, new AggregateExpression(sumAgg, Partial, false),
+          sumAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString);
+             jsCountInf <- JSAggGenerator.jsAgg(jsSumInf._1,
+               new AggregateExpression(countAgg, Partial, false),
+               countAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
+          jsCountInf._1.avgExpression(aggExp, jsSumInf._2, jsCountInf._2)
+      }
+      case nativeAgg(dqbT) => Some(dqbT)
+      case (_, c) => {
+        for (jsADQB <- JSAggGenerator.jsAgg(dqb, aggExp, c,
+          sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
+          jsADQB._1
+      }
 
-    // TODO: Make this the last option
-    case (_, c) if JSAggGenerator.jSAggCandidate(dqb, c) => {
-      for (jsADQB <- JSAggGenerator.jsAgg(dqb, aggExp, c,
-        sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
-        jsADQB._1
     }
-    case (_, c) => {
+  }
+
+  private def attributeRef(arg: Expression)(
+    implicit expandOpProjection : Seq[Expression], aEExprIdToPos : Map[ExprId, Int]):
+  Option[String] = arg match {
+    case ar : AttributeReference
+      if aEExprIdToPos.contains(ar.exprId) && expandOpProjection(aEExprIdToPos(ar.exprId)) != ar =>
+      attributeRef(expandOpProjection(aEExprIdToPos(ar.exprId)))
+    case Cast(ar@AttributeReference(_, _, _, _), _)
+      if aEExprIdToPos.contains(ar.exprId) && expandOpProjection(aEExprIdToPos(ar.exprId)) != ar =>
+      attributeRef(expandOpProjection(aEExprIdToPos(ar.exprId)))
+    case AttributeReference(name, _, _, _) => Some(name)
+    case Cast(AttributeReference(name, _, _, _), _) => Some(name)
+    case _ => None
+  }
+
+  private class DruidNativeAggregator(dqb: DruidQueryBuilder,
+                                      aggExp: AggregateExpression,
+                                      expandOpProjection: Seq[Expression],
+                                      aEExprIdToPos: Map[ExprId, Int],
+                                      aEToLiteralExpr: Map[Expression, Expression]
+
+                                     ) {
+
+    def unapply(t : (AggregateExpression, AggregateFunction)) : Option[DruidQueryBuilder] = {
+      val c = t._2
       val a = dqb.nextAlias
       (dqb, c, expandOpProjection, aEExprIdToPos) match {
         case CountDistinctAggregate(dN) =>
@@ -395,20 +424,6 @@ trait AggregateTransform {
         case _ => None
       }
     }
-  }
-
-  private def attributeRef(arg: Expression)(
-    implicit expandOpProjection : Seq[Expression], aEExprIdToPos : Map[ExprId, Int]):
-  Option[String] = arg match {
-    case ar : AttributeReference
-      if aEExprIdToPos.contains(ar.exprId) && expandOpProjection(aEExprIdToPos(ar.exprId)) != ar =>
-      attributeRef(expandOpProjection(aEExprIdToPos(ar.exprId)))
-    case Cast(ar@AttributeReference(_, _, _, _), _)
-      if aEExprIdToPos.contains(ar.exprId) && expandOpProjection(aEExprIdToPos(ar.exprId)) != ar =>
-      attributeRef(expandOpProjection(aEExprIdToPos(ar.exprId)))
-    case AttributeReference(name, _, _, _) => Some(name)
-    case Cast(AttributeReference(name, _, _, _), _) => Some(name)
-    case _ => None
   }
 
   private object CountDistinctAggregate {
