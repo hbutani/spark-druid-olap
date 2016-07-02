@@ -334,4 +334,13 @@ class HistoricalServerTest extends StarSchemaBaseTest with BeforeAndAfterAll wit
     true, true
   )
 
+  testCompare("avgHistorical",
+    "orderLineItemPartSupplier",
+    s"""select avg((CASE WHEN 1000 = 0 THEN NULL ELSE CAST(l_suppkey AS DOUBLE) / 1000 END)) as x1
+        |from %s
+        |group by s_region
+        |order by x1""".stripMargin,
+    1,
+    true, true)
+
 }

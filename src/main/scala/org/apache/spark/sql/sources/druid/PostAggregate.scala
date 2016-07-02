@@ -53,6 +53,8 @@ class PostAggregate(val druidOpSchema : DruidOperatorSchema) {
         Some(Max(attrRef(dOpAttr)))
       case JavascriptAggregationSpec(_, aggnm, _, _, _, _) if aggnm.startsWith("SUM") =>
         Some(Sum(attrRef(dOpAttr)))
+      case JavascriptAggregationSpec(_, aggnm, _, _, _, _) if aggnm.startsWith("COUNT") =>
+        Some(Count(attrRef(dOpAttr)))
       case _ => None
     }
   }
