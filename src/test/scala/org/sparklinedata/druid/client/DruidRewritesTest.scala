@@ -19,6 +19,7 @@ package org.sparklinedata.druid.client
 
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.catalyst.dsl.expressions._
+import org.sparklinedata.druid.{DruidQuery, GroupByQuerySpec, SearchQuerySpec}
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 
 import scala.language.postfixOps
@@ -313,7 +314,13 @@ class DruidRewritesTest extends BaseTest {
     order by c_name"""
   },
     1,
-    true, true
+    true, true,
+    false,
+    Seq(
+      { dq : DruidQuery =>
+        dq.q.isInstanceOf[SearchQuerySpec]
+      }
+    )
   )
 
   test("noMetricsPSize", {
@@ -321,7 +328,11 @@ class DruidRewritesTest extends BaseTest {
       from orderLineItemPartSupplier group by p_size"""
   },
     1,
-    true, true
+    true, true,
+    false,
+    Seq(
+      { dq : DruidQuery => dq.q.isInstanceOf[SearchQuerySpec]}
+    )
   )
 
   test("noMetricsPRetailPrice", {
@@ -329,7 +340,12 @@ class DruidRewritesTest extends BaseTest {
       from orderLineItemPartSupplier group by p_retailprice"""
   },
     1,
-    true, true
+    true,
+    true,
+    false,
+    Seq(
+      { dq : DruidQuery => dq.q.isInstanceOf[SearchQuerySpec]}
+    )
   )
 
   test("noMetricsYearExpr", {
@@ -353,6 +369,23 @@ class DruidRewritesTest extends BaseTest {
   },
     1,
     true, true
+  )
+
+  test("noMetricsCNameSortWithIntervalFilter", {
+    """select c_name
+      from orderLineItemPartSupplier
+      where l_shipdate > '1994'
+      group by c_name
+    order by c_name"""
+  },
+    1,
+    true, true,
+    false,
+    Seq(
+      { dq : DruidQuery =>
+        dq.q.isInstanceOf[GroupByQuerySpec]
+      }
+    )
   )
 
   // scalastyle:off line.size.limit

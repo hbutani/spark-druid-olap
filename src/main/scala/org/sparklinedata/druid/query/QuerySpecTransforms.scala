@@ -178,7 +178,7 @@ object SearchQuerySpecTransform extends Transform {
     List(),
     None,
     intervals
-    ) if dName == oName =>
+    ) if dName == oName && QueryIntervals.queryForEntireDataSourceInterval(drInfo, qSpec) =>
       new SearchQuerySpec(
         ds,
         intervals,
@@ -196,7 +196,8 @@ object SearchQuerySpecTransform extends Transform {
     List(),
     None,
     intervals
-    ) if dName == oName && dName == ordName =>
+    ) if dName == oName && dName == ordName &&
+      QueryIntervals.queryForEntireDataSourceInterval(drInfo, qSpec) =>
       new SearchQuerySpec(
         ds,
         intervals,
