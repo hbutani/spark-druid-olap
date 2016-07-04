@@ -750,4 +750,16 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
        |order by x1""".stripMargin,
     1,
     true, true)
+
+  test("aggTestDim",
+    """
+      |SELECT MIN(CAST(CAST(o_orderdate AS TIMESTAMP) AS TIMESTAMP)) AS x,
+      |       MAX(CAST(CAST(o_orderdate AS TIMESTAMP) AS TIMESTAMP)) AS y,
+      |	  COUNT(1) AS c
+      |   FROM ( select * from orderLineItemPartSupplier ) custom_sql_query
+      |   HAVING (COUNT(1) > 0)
+    """.stripMargin,
+    1, true, true
+  )
 }
+

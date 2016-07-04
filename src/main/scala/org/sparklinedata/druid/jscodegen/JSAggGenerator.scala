@@ -135,9 +135,10 @@ object JSAggGenerator {
   def simplifyExpr(dqb: DruidQueryBuilder, e: Expression, tz_id: String):
   Option[(Expression, String)] = {
     e match {
-      case Cast(a@AttributeReference(nm, _, _, _), TimestampType) =>
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidTimeDimension]) yield
-          (Cast(a, LongType), "toTSWithTZAdj")
+      case Cast(a@AttributeReference(nm, _, _, _), TimestampType)
+        if dqb.druidColumn(nm).nonEmpty &&
+          dqb.druidColumn(nm).get.isInstanceOf[DruidTimeDimension] =>
+          Some((Cast(a, LongType), "toTSWithTZAdj"))
       case _ => Some(e, null)
     }
   }
