@@ -481,6 +481,17 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     1,
     true, true)
 
+  test("aggTest7",
+    """
+      |SELECT MIN(CAST(CAST(o_orderdate AS TIMESTAMP) AS TIMESTAMP)) AS x,
+      |       MAX(CAST(CAST(o_orderdate AS TIMESTAMP) AS TIMESTAMP)) AS y,
+      |	  COUNT(1) AS c
+      |   FROM ( select * from orderLineItemPartSupplier ) custom_sql_query
+      |   HAVING (COUNT(1) > 0)
+    """.stripMargin,
+    1, true, true
+  )
+
   test("pmod1",
     """
       |SELECT max(pmod(o_totalprice, -5)) as s
@@ -751,15 +762,5 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     1,
     true, true)
 
-  test("aggTestDim",
-    """
-      |SELECT MIN(CAST(CAST(o_orderdate AS TIMESTAMP) AS TIMESTAMP)) AS x,
-      |       MAX(CAST(CAST(o_orderdate AS TIMESTAMP) AS TIMESTAMP)) AS y,
-      |	  COUNT(1) AS c
-      |   FROM ( select * from orderLineItemPartSupplier ) custom_sql_query
-      |   HAVING (COUNT(1) > 0)
-    """.stripMargin,
-    1, true, true
-  )
 }
 
