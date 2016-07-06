@@ -47,13 +47,15 @@ abstract class DruidPartition extends Partition {
   }
 }
 
-class HistoricalPartition(idx: Int, val hs : HistoricalServerAssignment) extends DruidPartition {
-  override def index: Int = idx
-  def queryClient : DruidQueryServerClient = new DruidQueryServerClient(hs.server.host)
+class HistoricalPartition(idx: Int, hs : HistoricalServerAssignment) extends DruidPartition {
+  val index: Int = idx
+  val hsName = hs.server.host
 
-  def intervals : List[Interval] = hs.segmentIntervals.map(_._2)
+  def queryClient : DruidQueryServerClient = new DruidQueryServerClient(hsName)
 
-  def segIntervals : List[(DruidSegmentInfo, Interval)] = hs.segmentIntervals
+  val intervals : List[Interval] = hs.segmentIntervals.map(_._2)
+
+  val segIntervals : List[(DruidSegmentInfo, Interval)] = hs.segmentIntervals
 }
 
 class BrokerPartition(idx: Int,
@@ -68,11 +70,14 @@ class BrokerPartition(idx: Int,
 
 
 class DruidRDD(sqlContext: SQLContext,
-              val drInfo : DruidRelationInfo,
+               drInfo : DruidRelationInfo,
                 val dQuery : DruidQuery)  extends  RDD[InternalRow](sqlContext.sparkContext, Nil) {
 
   val druidQueryAcc : DruidQueryExecutionMetric = new DruidQueryExecutionMetric()
   val numSegmentsPerQuery = drInfo.options.numSegmentsPerHistoricalQuery(sqlContext)
+  val schema = dQuery.schema(drInfo)
+  val drOptions = drInfo.options
+  val drFullName = drInfo.fullName
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
@@ -112,7 +117,6 @@ class DruidRDD(sqlContext: SQLContext,
     }
 
     val r = new InterruptibleIterator[QueryResultRow](context, dr)
-    val schema = dQuery.schema(drInfo)
     val nameToTF = dQuery.getValTFMap
     r.map { r =>
       numRows += 1
@@ -125,8 +129,8 @@ class DruidRDD(sqlContext: SQLContext,
   override protected def getPartitions: Array[Partition] = {
     if (dQuery.queryHistoricalServer) {
     val hAssigns = DruidMetadataCache.assignHistoricalServers(
-      drInfo.fullName,
-      drInfo.options,
+      drFullName,
+      drOptions,
       dQuery.intervalSplits
     )
       var idx = -1
@@ -144,9 +148,9 @@ class DruidRDD(sqlContext: SQLContext,
       l1
   } else {
       // ensure DataSource is in the Metadata Cache.
-      DruidMetadataCache.getDataSourceInfo(drInfo.fullName, drInfo.options)
-      val broker = DruidMetadataCache.getDruidClusterInfo(drInfo.fullName,
-        drInfo.options).curatorConnection.getBroker
+      DruidMetadataCache.getDataSourceInfo(drFullName, drOptions)
+      val broker = DruidMetadataCache.getDruidClusterInfo(drFullName,
+        drOptions).curatorConnection.getBroker
       dQuery.intervalSplits.zipWithIndex.map(t => new BrokerPartition(t._2, broker, t._1)).toArray
     }
   }
