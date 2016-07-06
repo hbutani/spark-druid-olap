@@ -132,26 +132,34 @@ abstract class DruidClient(val host : String,
                            reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
     var resp: CloseableHttpResponse = null
 
-    try {
-      val req: CloseableHttpClient = httpClient
-      val request: HttpRequestBase = reqType(url)
-      if (payload != null && request.isInstanceOf[HttpEntityEnclosingRequestBase]) {
-        val input: StringEntity = new StringEntity(payload, ContentType.APPLICATION_JSON)
-        request.asInstanceOf[HttpEntityEnclosingRequestBase].setEntity(input)
+    val it : Try[CloseableIterator[QueryResultRow]] = for {
+      r <- Try {
+        val req: CloseableHttpClient = httpClient
+        val request: HttpRequestBase = reqType(url)
+        if (payload != null && request.isInstanceOf[HttpEntityEnclosingRequestBase]) {
+          val input: StringEntity = new StringEntity(payload, ContentType.APPLICATION_JSON)
+          request.asInstanceOf[HttpEntityEnclosingRequestBase].setEntity(input)
+        }
+        addHeaders(request, reqHeaders)
+        resp = req.execute(request)
+        resp
       }
-      addHeaders(request, reqHeaders)
-      resp = req.execute(request)
-      val status = resp.getStatusLine().getStatusCode();
-      if (status >= 200 && status < 300) {
-        qrySpec(resp.getEntity.getContent, {release(resp)})
-      } else {
-        throw new DruidDataSourceException(s"Unexpected response status: ${resp.getStatusLine} " +
-          s"on $url for query: \n $payload")
+      it <- Try {
+        val status = r.getStatusLine().getStatusCode()
+        if (status >= 200 && status < 300) {
+          qrySpec(r.getEntity.getContent, {release(r)})
+        } else {
+          throw new DruidDataSourceException(s"Unexpected response status: ${resp.getStatusLine} " +
+            s"on $url for query: \n $payload")
+        }
       }
-    } catch {
-      case dE: DruidDataSourceException => throw dE
-      case x : Throwable =>
-        throw new DruidDataSourceException("Failed in communication with Druid", x)
+    } yield it
+    it.getOrElse {
+      release(resp)
+      it.failed.get match {
+        case dE : DruidDataSourceException => throw dE
+        case x => throw new DruidDataSourceException("Failed in communication with Druid", x)
+      }
     }
   }
 
