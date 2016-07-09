@@ -56,7 +56,8 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 zkDruidPath : String,
                                 queryHistoricalServers : Boolean,
                                 zkQualifyDiscoveryNames : Boolean,
-                                numSegmentsPerHistoricalQuery : Int) {
+                                numSegmentsPerHistoricalQuery : Int,
+                                numProcessingThreadsPerHistorical : Option[Int] = None) {
 
   def sqlContextOption(nm : String) = s"spark.sparklinedata.druid.option.$nm"
 

@@ -98,6 +98,70 @@ object DruidPlanner {
     doc = "Max. number of Http Connections to each server in Druid Cluster"
   )
 
+
+  val DRUID_QUERY_COST_MODEL_HIST_MERGE_COST = doubleConf(
+    "spark.sparklinedata.druid.querycostmodel.histMergeCostFactor",
+    defaultValue = Some(0.2),
+    doc = "cost of performing a segment agg. merge in druid " +
+      "historicals relative to spark shuffle cost"
+  )
+
+  val DRUID_QUERY_COST_MODEL_HIST_SEGMENTS_PERQUERY_LIMIT = intConf(
+    "spark.sparklinedata.druid.querycostmodel.histSegsPerQueryLimit",
+    defaultValue = Some(3),
+    doc = "the max. number of segments processed per historical query."
+  )
+
+  val DRUID_QUERY_COST_MODEL_BROKER_SIZE_THRESHOLD = intConf(
+    "spark.sparklinedata.druid.querycostmodel.broker.threshold",
+    defaultValue = Some(500),
+    doc = "queries with an output estimate less than this value " +
+      "are issued against the broker"
+  )
+
+  val DRUID_QUERY_COST_MODEL_INTERVAL_SCALING_NDV = doubleConf(
+    "spark.sparklinedata.druid.querycostmodel.queryintervalScalingForDistinctValues",
+    defaultValue = Some(3),
+    doc = "The ndv estimate for a query interval uses this number. The ratio of" +
+      "the (query interval/index interval) is multiplied by this number. " +
+      "The ndv for a query is estimated as:" +
+      " 'log(this_value * min(10*interval_ratio,10)) * orig_ndv'. The reduction is logarithmic" +
+      "and this value applies further dampening factor on the reduction. At a default value" +
+      "of '3' any interval ratio >= 0.33 will have no reduction in ndvs. "
+  )
+
+  val DRUID_QUERY_COST_MODEL_HISTORICAL_PROCESSING_COST = doubleConf(
+    "spark.sparklinedata.druid.querycostmodel.historicalProcessingCost",
+    defaultValue = Some(0.25),
+    doc = "the cost per byte of groupBy processing in historical servers " +
+      "relative to spark shuffle cost"
+  )
+
+  val DRUID_QUERY_COST_MODEL_HISTORICAL_TIMESERIES_PROCESSING_COST = doubleConf(
+    "spark.sparklinedata.druid.querycostmodel.historicalTimeSeriesProcessingCost",
+    defaultValue = Some(0.1),
+    doc = "the cost per byte of timeseries processing in historical servers " +
+      "relative to spark shuffle cost"
+  )
+
+  val DRUID_QUERY_COST_MODEL_SPARK_SCHEDULING_COST = doubleConf(
+    "spark.sparklinedata.druid.querycostmodel.sparkSchedulingCost",
+    defaultValue = Some(1.0),
+    doc = "the cost of scheduling tasks in spark relative to the shuffle cost of 1 byte"
+  )
+
+  val DRUID_QUERY_COST_MODEL_SPARK_AGGREGATING_COST = doubleConf(
+    "spark.sparklinedata.druid.querycostmodel.sparkAggregatingCost",
+    defaultValue = Some(0.15),
+    doc = "the cost per byte to do aggregation in spark relative to the shuffle cost"
+  )
+
+  val DRUID_QUERY_COST_MODEL_OUTPUT_TRANSPORT_COST = doubleConf(
+    "spark.sparklinedata.druid.querycostmodel.druidOutputTransportCost",
+    defaultValue = Some(0.4),
+    doc = "the cost per byte to transport druid output relative to the shuffle cost"
+  )
+
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
       case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery
