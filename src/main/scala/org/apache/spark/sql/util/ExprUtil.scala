@@ -20,8 +20,10 @@ package org.apache.spark.sql.util
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.trees.CurrentOrigin
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
-import org.apache.spark.sql.types.{DataType, NumericType}
+import org.apache.spark.sql.types._
 import org.joda.time.DateTime
+import org.sparklinedata.druid.DruidQueryBuilder
+import org.sparklinedata.druid.metadata.DruidDimension
 
 
 object ExprUtil {
@@ -34,6 +36,7 @@ object ExprUtil {
     * @return
     */
   def nullPreserving(e: Expression): Boolean = e match {
+    case Literal(v, _) if v == null => false
     case _ if e.isInstanceOf[LeafExpression] => true
       // TODO: Expand the case below
     case (Cast(_, _) | BinaryArithmetic(_) | UnaryMinus(_) | UnaryPositive(_) | Abs(_))
@@ -66,12 +69,13 @@ object ExprUtil {
   /**
     * This is different from transformDown because if rule transforms an Expression,
     * we don't try to apply any more transformation.
+    *
     * @param e
     * @param rule
     * @return
     */
-  def transformReplace(e : Expression,
-                    rule: PartialFunction[Expression, Expression]): Expression = {
+  def transformReplace(e: Expression,
+                       rule: PartialFunction[Expression, Expression]): Expression = {
     val afterRule = CurrentOrigin.withOrigin(e.origin) {
       rule.applyOrElse(e, identity[Expression])
     }
@@ -81,6 +85,150 @@ object ExprUtil {
       e.transformDown(rule)
     } else {
       afterRule
+    }
+  }
+
+  /**
+    * Simplify Cast expression by removing inner most cast if reduendant
+    *
+    * @param e   Inner Expression
+    * @param edt Outer cast DataType
+    * @return
+    */
+  def simplifyCast(e: Expression, edt: DataType): Expression = e match {
+    case Cast(ie, idt) if edt.isInstanceOf[NumericType] && (idt.isInstanceOf[DoubleType] ||
+      idt.isInstanceOf[FloatType] || idt.isInstanceOf[DecimalType]) =>
+      Cast(ie, edt)
+    case _ => e
+  }
+
+  /**
+    * Simplify given predicates
+    *
+    * @param dqb  DruidQueryBuilder
+    * @param fils Predicates
+    * @return
+    */
+  def simplifyPreds(dqb: DruidQueryBuilder, fils: Seq[Expression]): Seq[Expression] =
+    fils.foldLeft[Seq[Expression]](List[Expression]()) { (l, f) =>
+      var tpl = l
+      for (tp <- simplifyPred(dqb, f))
+        tpl = l :+ tp
+      tpl
+    }
+
+  /**
+    * Simplify given Predicate. Does rewrites for cast, Conj/Disj, not null expressions.
+    *
+    * @param dqb DruidQueryBuilder
+    * @param fil Predicate
+    * @return
+    */
+  def simplifyPred(dqb: DruidQueryBuilder, fil: Expression): Option[Expression] = fil match {
+    case And(le, re) => simplifyBinaryPred(dqb, le, re, true)
+    case Or(le, re) => simplifyBinaryPred(dqb, le, re, false)
+    case SimplifyCast(e) => simplifyPred(dqb, e)
+    case e@_ => e match {
+      case SimplifyNotNullFil(se) =>
+        var nullFil: Option[Expression] = Some(se)
+        if (se.nullable) {
+          if (ExprUtil.nullPreserving(se)) {
+            val v1 = nullableAttributes(dqb, se.references)
+            if (v1._2.isEmpty) {
+              if (v1._1.nonEmpty) {
+                nullFil = Some((v1._1).foldLeft[Expression](null)((es, ar) =>
+                  if (es != null) {
+                    And(es, IsNotNull(ar.asInstanceOf[Expression]))
+                  } else {
+                    IsNotNull(ar.asInstanceOf[Expression])
+                  }))
+              } else {
+                nullFil = None
+              }
+            }
+          }
+        } else {
+          nullFil = None
+        }
+        nullFil
+      case _ => Some(e)
+    }
+  }
+
+  /**
+    * Simplify Binary Predicate
+    *
+    * @param dqb  DruidQueryBuilder
+    * @param c1   First child (Left)
+    * @param c2   Second child (Right)
+    * @param conj If true this is a conjuction else disjunction
+    * @return
+    */
+  def simplifyBinaryPred(dqb: DruidQueryBuilder, c1: Expression, c2: Expression, conj: Boolean):
+  Option[Expression] = {
+    var newFil: Option[Expression] = None
+    val newLe = simplifyPred(dqb, c1)
+    val newRe = simplifyPred(dqb, c2)
+    if (newLe.nonEmpty) {
+      newFil = newLe
+    }
+    if (newRe.nonEmpty) {
+      if (newLe.nonEmpty) {
+        if (conj) {
+          newFil = Some(And(newLe.get, newRe.get))
+        } else {
+          newFil = Some(Or(newLe.get, newRe.get))
+        }
+      } else {
+        newFil = newRe
+      }
+    }
+    newFil
+  }
+
+  /**
+    * Split the given AttributeSet to nullable and unresolvable.
+    *
+    * @param dqb   DruidQueryBuilder
+    * @param attrs AttributeSet
+    * @return
+    */
+  def nullableAttributes(dqb: DruidQueryBuilder, attrs: AttributeSet):
+  (List[AttributeReference], List[Attribute]) =
+    attrs.foldLeft((List[AttributeReference](), List[Attribute]())) { (s, a) =>
+      var s1 = s._1
+      var s2 = s._2
+      val c = dqb.druidColumn(a.name)
+      if (c.nonEmpty) {
+        c.get match {
+          case DruidDimension(_, _, _, _) if a.isInstanceOf[AttributeReference] =>
+            s1 = s1 :+ a.asInstanceOf[AttributeReference]
+          case _ => None
+        }
+      } else {
+        s2 = (s2 :+ a)
+      }
+      (s1, s2)
+    }
+
+  private[this] object SimplifyNotNullFil {
+    private[this] val trueFil = Literal(true)
+
+    def unapply(e: Expression): Option[Expression] = e match {
+      case Not(IsNull(c)) if (c.nullable) => Some(IsNotNull(c))
+      case IsNotNull(c) if (c.nullable) => Some(c)
+      case Not(IsNull(c)) if (!c.nullable) => Some(trueFil)
+      case IsNotNull(c) if (!c.nullable) => Some(trueFil)
+      case _ => None
+    }
+  }
+
+  private[this] object SimplifyCast {
+    def unapply(e: Expression): Option[Expression] = e match {
+      case Cast(ie@Cast(_, _), edt) =>
+        val nie = simplifyCast(ie, edt)
+        if (nie != ie) Some(nie) else None
+      case _ => None
     }
   }
 }

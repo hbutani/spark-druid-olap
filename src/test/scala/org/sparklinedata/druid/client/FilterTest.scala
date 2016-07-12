@@ -139,12 +139,13 @@ class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
   test("isNotNullTest2",
     "select s_region from orderLineItemPartSupplier" +
       " where (cast(l_shipdate as double) + 10) is not null and " +
-      " (l_discount % 10) is not null and p_name  is not null" +
+      " (l_discount % 10) is not null and" +
+      " cast(c_phone as int)  is not null and" +
+      " p_name is not null" +
       " group by s_region " +
       " order by s_region",
     1,
     true, true)
-
 
   test("notIsNullTest1",
     "select s_region from orderLineItemPartSupplier" +
@@ -158,7 +159,8 @@ class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
   test("notIsNullTest2",
     "select s_region from orderLineItemPartSupplier" +
       " where not((cast(l_shipdate as double) + 10) is null) and " +
-      " not((l_discount % 10) is null) and not(p_name  is null)" +
+      " not((l_discount % 10) is null) and not(cast(c_phone as int)  is null)" +
+      " and not(p_name  is null)" +
       " group by s_region " +
       " order by s_region",
     1,

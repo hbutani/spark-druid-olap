@@ -67,7 +67,7 @@ trait ProjectFilterTransfom {
       val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
       translateProjectFilter(dqb,
         projectList,
-        simplifyFil(dqb.get, filters))
+        ExprUtil.simplifyPreds(dqb.get, filters))
     }
     case _ => Seq()
   }
@@ -267,11 +267,6 @@ trait ProjectFilterTransfom {
           for (dD <- dqb.druidColumn(nm) if dD.isDimension() && primitieVals)
             yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
         }
-        case Not(e) => {
-          val fil = dimFilterExpression(dqb, e)
-          for (f <- fil)
-            yield NotFilterSpec("not", f)
-        }
         case IsNotNull(AttributeReference(nm, _, _, _)) => {
           for (c <- dqb.druidColumn(nm) if c.isDimension()) yield
             NotFilterSpec("not", new SelectorFilterSpec(nm, ""))
@@ -281,6 +276,11 @@ trait ProjectFilterTransfom {
           for (c <- dqb.druidColumn(nm)
                if c.isDimension()) yield
             new SelectorFilterSpec(c.name, "")
+        }
+        case Not(e) => {
+          val fil = dimFilterExpression(dqb, e)
+          for (f <- fil)
+            yield NotFilterSpec("not", f)
         }
         case _ => {
           val codeGen = JSCodeGenerator(dqb, fe, false, false,
@@ -293,25 +293,5 @@ trait ProjectFilterTransfom {
       }
     }
   }
-
-  private[this] def simplifyFil(dqb: DruidQueryBuilder, fil: Seq[Expression])
-  : Seq[Expression] = {
-    fil.foldLeft(List[Expression]()) { (l, e) => e match {
-      case Not(IsNull(e)) if ExprUtil.nullPreserving(e) &&
-        timeDimOrMetric(dqb, e.references) => l
-      case IsNotNull(e) if ExprUtil.nullPreserving(e) &&
-        timeDimOrMetric(dqb, e.references) => l
-      case Not(IsNull(e)) =>
-        (IsNotNull(e) :: l.asInstanceOf[List[Expression]]).asInstanceOf[List[Expression]]
-      case _ => (e :: l.asInstanceOf[List[Expression]]).asInstanceOf[List[Expression]]
-    }
-    }
-  }
-
-  private[this] def timeDimOrMetric(dqb: DruidQueryBuilder, attrs: AttributeSet): Boolean =
-    attrs.foldLeft(true) { (s, a) => val c = dqb.druidColumn(a.name).getOrElse(None)
-      val b = s && (c.isInstanceOf[DruidTimeDimension] || c.isInstanceOf[DruidMetric])
-      if (b) true else return false
-    }
 }
 

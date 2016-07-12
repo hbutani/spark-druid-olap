@@ -20,7 +20,6 @@ package org.sparklinedata.druid.jscodegen
 import org.apache.commons.lang3.StringEscapeUtils
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.util.StringUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.ExprUtil
 import org.apache.spark.unsafe.types.UTF8String
@@ -445,7 +444,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
   }
 
   private[this] def genCastExprCode(e: Expression, dt: DataType): Option[JSExpr] = {
-    for (fn <- genExprCode(simplifyCast(e, dt));
+    for (fn <- genExprCode(ExprUtil.simplifyCast(e, dt));
          cs <- JSCast(fn, dt, this).castCode) yield
       JSExpr(cs.fnVar, fn.linesSoFar + cs.linesSoFar, cs.curLine, dt)
   }
@@ -453,13 +452,6 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
   private[this] def validInParams(inParam: String): Boolean = {
     inParams += inParam
     if (!mulInParamsAllowed && (inParams.size > 1)) false else true
-  }
-
-  private[this] def simplifyCast(e: Expression, edt: DataType): Expression = e match {
-    case Cast(ie, idt) if edt.isInstanceOf[NumericType] && (idt.isInstanceOf[DoubleType] ||
-      idt.isInstanceOf[FloatType] || idt.isInstanceOf[DecimalType]) =>
-      Cast(ie, edt)
-    case _ => e
   }
 
   object JSLike {
