@@ -260,4 +260,13 @@ class SparklineSQLTest extends BaseTest {
       """.stripMargin).show()
   }
 
+  test("explainDruidRewrite") { td =>
+    sql("""explain druid rewrite
+          |SELECT COUNT(DISTINCT CAST(`orderLineItemPartSupplier`.`l_shipdate` AS TIMESTAMP))
+          | AS `ctd_date_string_ok`
+          |FROM `orderLineItemPartSupplier`
+          | HAVING (COUNT(1) > 0)
+        """.stripMargin).show(Int.MaxValue - 1, false)
+  }
+
 }

@@ -17,15 +17,19 @@
 
 package org.apache.spark.sql.sources.druid
 
+import java.text.DecimalFormat
+
 import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
 import org.joda.time.Interval
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.{DruidDimension, DruidDimensionInfo, DruidMetadataCache, DruidRelationInfo}
+import org.sparklinedata.druid.metadata.{DruidDimensionInfo, DruidMetadataCache, DruidRelationInfo}
+import org.apache.commons.lang3.StringUtils
 
-import scala.collection.mutable.{HashMap => MHashMap, Map => MMap}
+import scala.language.existentials
+import scala.collection.mutable.{ArrayBuffer, HashMap => MHashMap, Map => MMap}
 
-trait DruidQueryCost extends Ordered[DruidQueryCost] {
+sealed trait DruidQueryCost extends Ordered[DruidQueryCost] {
   def queryCost : Double
 
   override def compare(that: DruidQueryCost): Int =
@@ -34,6 +38,114 @@ trait DruidQueryCost extends Ordered[DruidQueryCost] {
     } else {
       Math.min(this.queryCost - that.queryCost, Int.MaxValue.toDouble).toInt
     }
+}
+
+case class CostDetails(
+                                        costInput : CostInput[_ <: QuerySpec],
+                                        histProcessingCostPerByte : Double,
+                                        queryOutputSizeEstimate : Long,
+                                        segmentOutputSizeEstimate : Long,
+                                        numSegmentsProcessed : Long,
+                                        numSparkCores : Long,
+                                        numHistoricalThreads : Long,
+                                        parallelismPerWave : Long,
+                                        minCost : DruidQueryCost,
+                                        allCosts : List[DruidQueryCost]
+                                      ) {
+
+
+  override def toString : String = {
+    val header = s"""Druid Query Cost Model::
+                     |         |${costInput}histProcessingCost = $histProcessingCostPerByte
+                     |         |queryOutputSizeEstimate = $queryOutputSizeEstimate
+                     |         |segmentOutputSizeEstimate = $segmentOutputSizeEstimate
+                     |         |numSegmentsProcessed = $numSegmentsProcessed
+                     |         |numSparkCores = $numSparkCores
+                     |         |numHistoricalThreads = $numHistoricalThreads
+                     |         |parallelismPerWave = $parallelismPerWave
+                     |
+                     |         |minCost : $minCost
+                     |         |
+                     |       """.stripMargin
+
+
+
+    val rows = allCosts.map(CostDetails.costRow(_)).mkString("", "\n", "")
+
+    s"""${header}Cost Details:
+       |${CostDetails.tableHeader}
+       |$rows
+     """.stripMargin
+  }
+
+}
+
+object CostDetails {
+
+  val formatter = new DecimalFormat("#######0.##E0")
+  def roundValue(v : Double) : String = formatter.format(v)
+
+  val tableHeaders = List(
+    "broker/historical",
+    "   queryCost   ",
+    "numWaves",
+    "numSegmentsPerQuery",
+    "druidMergeCostPerWave",
+    "transportCostPerWave",
+    "druidCostPerWave",
+    "   totalDruidCost    ",
+    "   sparkShuffleCost   ",
+    "   sparkAggCost   ",
+    "   sparkSchedulingCost   "
+  )
+
+  val colWidths = tableHeaders.map(_.size)
+
+  def tableHeader : String = {
+    tableHeaders.mkString("", " | ", "")
+  }
+
+  def brokerCost(c : BrokerQueryCost) : String = {
+    import c._
+    val row = List(
+      StringUtils.leftPad("broker", colWidths(0)),
+      StringUtils.leftPad(roundValue(queryCost), colWidths(1)),
+      StringUtils.leftPad("1", colWidths(2)),
+      StringUtils.leftPad("all", colWidths(3)),
+      StringUtils.leftPad(roundValue(brokerMergeCost), colWidths(4)),
+      StringUtils.leftPad(roundValue(segmentOutputTransportCost), colWidths(5)),
+      StringUtils.leftPad(roundValue(queryCost), colWidths(6)),
+      StringUtils.leftPad(roundValue(queryCost), colWidths(7)),
+      StringUtils.leftPad("0.0", colWidths(8)),
+      StringUtils.leftPad("0.0", colWidths(9)),
+      StringUtils.leftPad("0.0", colWidths(10))
+    )
+    row.mkString("", " | ", "")
+  }
+
+  def historicalCost(c : HistoricalQueryCost) : String = {
+    import c._
+    val row = List(
+      StringUtils.leftPad("historical", colWidths(0)),
+      StringUtils.leftPad(roundValue(queryCost), colWidths(1)),
+      StringUtils.leftPad(numWaves.toString, colWidths(2)),
+      StringUtils.leftPad(numSegmentsPerQuery.toString, colWidths(3)),
+      StringUtils.leftPad(roundValue(histMergeCost), colWidths(4)),
+      StringUtils.leftPad(roundValue(segmentOutputTransportCost), colWidths(5)),
+      StringUtils.leftPad(roundValue(costPerHistoricalWave), colWidths(6)),
+      StringUtils.leftPad(roundValue(druidStageCost), colWidths(7)),
+      StringUtils.leftPad(roundValue(shuffleCost), colWidths(8)),
+      StringUtils.leftPad(roundValue(sparkAggCost), colWidths(9)),
+      StringUtils.leftPad(roundValue(sparkSchedulingCost), colWidths(10))
+    )
+    row.mkString("", " | ", "")
+  }
+
+  def costRow(c : DruidQueryCost) : String = c match {
+    case br : BrokerQueryCost => brokerCost(br)
+    case hr : HistoricalQueryCost => historicalCost(hr)
+  }
+
 }
 
 case class BrokerQueryCost(
@@ -57,6 +169,7 @@ case class BrokerQueryCost(
 
 case class HistoricalQueryCost(
                          numWaves: Long,
+                         numSegmentsPerQuery : Long,
                          estimateOutputSizePerHist: Long,
                          processingCostPerHist: Double,
                          histMergeCost: Double,
@@ -69,13 +182,10 @@ case class HistoricalQueryCost(
                          queryCost: Double
                        ) extends DruidQueryCost {
 
-  def this() = this(
-    -1, -1L, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, Double.MaxValue
-  )
-
   override def toString : String = {
     s"""
        |numWaves = $numWaves,
+       |numSegmentsPerQuery = $numSegmentsPerQuery,
        |estimateOutputSizePerHist = $estimateOutputSizePerHist,
        |processingCostPerHist = $processingCostPerHist,
        |histMergeCost = $histMergeCost,
@@ -91,10 +201,20 @@ case class HistoricalQueryCost(
 }
 
 case class DruidQueryMethod(
-                              queryHistorical : Boolean,
-                              numSegmentsPerQuery : Int,
-                              cost : DruidQueryCost
-                              )
+                             queryHistorical : Boolean,
+                             numSegmentsPerQuery : Int,
+                             bestCost : DruidQueryCost,
+                             costDetails : CostDetails
+                              ) {
+  override def toString : String = {
+    s"""
+       |queryHistorical = $queryHistorical,
+       |numSegmentsPerQuery = $numSegmentsPerQuery,
+       |bestCost = ${bestCost.queryCost},
+       |$costDetails
+     """.stripMargin
+  }
+}
 
 case class CostInput[T <: QuerySpec](
                       dimsNDVEstimate : Long,
@@ -258,6 +378,7 @@ object DruidQueryCostModel extends Logging {
 
       HistoricalQueryCost(
         numWaves,
+        numSegsPerQuery,
         estimateOutputSizePerHist,
         processingCostPerHist,
         histMergeCost,
@@ -284,30 +405,38 @@ object DruidQueryCostModel extends Logging {
          |
        """.stripMargin)
 
+    val allCosts : ArrayBuffer[DruidQueryCost] = ArrayBuffer()
     var minCost : DruidQueryCost = brokerQueryCost
+    allCosts += minCost
     var minNumSegmentsPerQuery = -1
 
-    log.info(
-      s"""Druid Query Cost Model Cost for broker query =
-          |$minCost""".stripMargin)
 
     (1 to histSegsPerQueryLimit).foreach { (numSegsPerQuery : Int) =>
       val c = histQueryCost(numSegsPerQuery)
-      log.info(
-        s"""Druid Query Cost Model Cost for numSegsPerQuery = $numSegsPerQuery:
-           |$c""".stripMargin)
+      allCosts += c
       if ( c < minCost ) {
         minCost = c
         minNumSegmentsPerQuery = numSegsPerQuery
       }
     }
-    log.info(
-      s"""Druid Query Cost Model Output:
-         |numSegsPerQuery= $minNumSegmentsPerQuery
-         | cost = (
-         | $minCost
-         | )""".stripMargin)
-    DruidQueryMethod(minCost.isInstanceOf[HistoricalQueryCost], minNumSegmentsPerQuery, minCost)
+
+    val costDetails = CostDetails(
+      cI,
+      histProcessingCostPerByte,
+      queryOutputSizeEstimate,
+      segmentOutputSizeEstimate,
+      numSegmentsProcessed,
+      numSparkCores,
+      numHistoricalThreads,
+      parallelismPerWave,
+      minCost,
+      allCosts.toList
+    )
+
+    log.info(costDetails.toString)
+
+    DruidQueryMethod(minCost.isInstanceOf[HistoricalQueryCost],
+      minNumSegmentsPerQuery, minCost, costDetails)
 
   }
   
@@ -350,7 +479,7 @@ object DruidQueryCostModel extends Logging {
                    drInfo : DruidRelationInfo,
                    dimsNDVEstimate : Long,
                    queryIntervalMillis : Long,
-                   querySpecClass : Class[T]
+                   querySpecClass : Class[_ <: T]
                    ) : DruidQueryMethod = {
 
     val shuffleCostPerByte: Double = 1.0

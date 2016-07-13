@@ -19,7 +19,9 @@ package org.apache.spark.sql.sparklinedata.commands
 
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.RunnableCommand
+import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryCostModel}
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.util.PlanUtil
 import org.apache.spark.sql.{Row, SQLContext}
 import org.sparklinedata.druid.metadata.DruidMetadataCache
 
@@ -41,4 +43,28 @@ case class ClearMetadata(druidHost: Option[String]) extends RunnableCommand {
     Seq(Row(""))
   }
 }
+
+case class ExplainDruidRewrite(sql: String) extends RunnableCommand {
+
+  override val output: Seq[Attribute] = {
+    val schema = StructType(
+      StructField("", StringType, nullable = true) :: Nil)
+
+    schema.toAttributes
+  }
+
+  override def run(sqlContext: SQLContext): Seq[Row] = {
+    val qe = sqlContext.executeSql(sql)
+
+    qe.sparkPlan.toString().split("\n").map(Row(_)).toSeq ++
+    Seq(Row("")) ++
+    DruidPlanner.getDruidRDDs(qe.sparkPlan).flatMap { dR =>
+      val drInfo = PlanUtil.druidRelationInfo(dR.drFullName.sparkDataSource)(sqlContext).get
+      s"""DruidQuery(${System.identityHashCode(dR.dQuery)}) details ::
+         |${DruidQueryCostModel.computeMethod(sqlContext, drInfo, dR.dQuery.q)}
+       """.stripMargin.split("\n").map(Row(_))
+    }
+  }
+}
+
 

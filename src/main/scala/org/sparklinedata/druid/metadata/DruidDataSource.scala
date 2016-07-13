@@ -86,7 +86,7 @@ case class DruidTimeDimension(name : String,
   /**
     * assume the worst, this is only used during query costing
     */
-  val cardinality = Long.MaxValue
+  val cardinality = Int.MaxValue.toLong
 }
 
 trait DruidDataSourceCapability {

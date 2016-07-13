@@ -129,7 +129,7 @@ case class DruidRelation (val info : DruidRelationInfo,
 
   override def toString : String = {
     if (dQuery.isDefined) {
-      s"DruidQuery: ${Utils.queryToString(dQuery.get)}"
+      s"DruidQuery(${System.identityHashCode(dQuery)}): ${Utils.queryToString(dQuery.get)}"
     } else {
       info.toString
     }

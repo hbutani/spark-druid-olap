@@ -21,11 +21,12 @@ import java.util.TimeZone
 
 import org.apache.spark.sql.SQLConf.SQLConfEntry
 import org.apache.spark.sql.SQLConf.SQLConfEntry._
-import org.apache.spark.sql.execution.{SparkPlan, PhysicalRDD}
+import org.apache.spark.sql.execution.{PhysicalRDD, SparkPlan}
 import org.apache.spark.sql.{CachedTablePattern, SQLContext}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.client.ConnectionManager
+import org.sparklinedata.druid.metadata.DruidRelationInfo
 
 class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTransforms {
 
@@ -166,6 +167,12 @@ object DruidPlanner {
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
       case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery
+    }
+  }
+
+  def getDruidRDDs(plan : SparkPlan) : Seq[DruidRDD] = {
+    plan.collect {
+      case PhysicalRDD(_, r : DruidRDD, _, _, _) => r
     }
   }
 
