@@ -43,6 +43,12 @@ case class DruidRelationInfo(val fullName : DruidRelationName,
 
   def sourceDF(sqlContext : SQLContext) = sqlContext.table(sourceDFName)
 
+  override def toString : String = {
+    s"""DruidRelationInfo(fullName = $fullName, sourceDFName = $sourceDFName,
+       |timeDimensionCol = $timeDimensionCol,
+       |options = $options)""".stripMargin
+  }
+
 
 }
 
