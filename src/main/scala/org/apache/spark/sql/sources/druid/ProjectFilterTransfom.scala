@@ -282,6 +282,8 @@ trait ProjectFilterTransfom {
           for (f <- fil)
             yield NotFilterSpec("not", f)
         }
+        // TODO: Hack till we do NULL SCAN
+        case Literal(null, _) => Some(new SelectorFilterSpec("__time", ""))
         case _ => {
           val codeGen = JSCodeGenerator(dqb, fe, false, false,
             sqlContext.getConf(DruidPlanner.TZ_ID).toString,

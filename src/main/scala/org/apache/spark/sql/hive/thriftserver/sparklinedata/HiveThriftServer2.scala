@@ -28,6 +28,7 @@ import org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver
 import org.apache.spark.sql.hive.thriftserver.{SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
 import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
 import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.apache.spark.sql.planner.logical.DruidLogicalOptimizer
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 import org.sparklinedata.spark.dateTime.Functions
 
@@ -96,7 +97,7 @@ object SparklineSQLEnv extends Logging {
 
       sparkContext = new SparkContext(sparkConf)
       sparkContext.addSparkListener(new StatsReportListener())
-      hiveContext = new SparklineDataContext(sparkContext)
+      hiveContext = new SparklineDataContext(sparkContext, DruidLogicalOptimizer)
 
       hiveContext.metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
       hiveContext.metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))

@@ -17,20 +17,19 @@
 
 package org.apache.spark.sql.hive.sparklinedata
 
-import com.google.common.cache.LoadingCache
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.{ParserDialect, TableIdentifier}
 import org.apache.spark.sql.execution.CacheManager
-import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.ui.SQLListener
 import org.apache.spark.sql.hive.client.{ClientInterface, ClientWrapper}
 import org.apache.spark.sql.hive.{HiveContext, HiveMetastoreCatalog}
+import org.apache.spark.sql.planner.logical.DruidLogicalOptimizer
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.{Logging, SparkContext}
-import org.sparklinedata.druid.DruidRelation
 import org.sparklinedata.druid.metadata.{DruidMetadataViews, DruidRelationInfo}
 
 
@@ -40,7 +39,8 @@ class SparklineDataContext(
                             listener: SQLListener,
                             execHive: ClientWrapper,
                             metaHive: ClientInterface,
-                            isRootContext: Boolean)
+                            isRootContext: Boolean,
+                            logicalOptimizer: Optimizer = DruidLogicalOptimizer)
   extends HiveContext(
     sc,
     cacheManager,
@@ -51,7 +51,7 @@ class SparklineDataContext(
 
   DruidPlanner(this)
 
-  def this(sc: SparkContext) = {
+  def this(sc: SparkContext, logicalOptimizer: Optimizer = DruidLogicalOptimizer) = {
     this(sc, new CacheManager, SQLContext.createListenerAndUI(sc), null, null, true)
   }
   def this(sc: JavaSparkContext) = this(sc.sc)
@@ -72,6 +72,8 @@ class SparklineDataContext(
 
   override lazy val catalog =
     new SparklineMetastoreCatalog(metadataHive, this) with OverrideCatalog
+
+  override protected[sql] lazy val optimizer: Optimizer = logicalOptimizer
 }
 
 class SparklineMetastoreCatalog(client: ClientInterface, hive: HiveContext) extends

@@ -21,6 +21,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.trees.CurrentOrigin
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.joda.time.DateTime
 import org.sparklinedata.druid.DruidQueryBuilder
 import org.sparklinedata.druid.metadata.DruidDimension
@@ -32,46 +33,47 @@ object ExprUtil {
     * If any input col/ref is null then expression will evaluate to null
     * and if no input col/ref is null then expression won't evaluate to null
     *
-    * @param e
+    * @param e Expression that needs to be checked
     * @return
     */
   def nullPreserving(e: Expression): Boolean = e match {
     case Literal(v, _) if v == null => false
     case _ if e.isInstanceOf[LeafExpression] => true
-      // TODO: Expand the case below
+    // TODO: Expand the case below
     case (Cast(_, _) | BinaryArithmetic(_) | UnaryMinus(_) | UnaryPositive(_) | Abs(_))
     => e.children.filter(_.isInstanceOf[Expression]).foldLeft(true) {
-      (s,ce) => val cexp = nullPreserving(ce); if (s && cexp) return true else false }
+      (s, ce) => val cexp = nullPreserving(ce); if (s && cexp) return true else false
+    }
     case _ => false
   }
 
-  def conditionalExpr(e: Expression) : Boolean = {
+  def conditionalExpr(e: Expression): Boolean = {
     e match {
-      case If(_,_,_) | CaseWhen(_) | CaseKeyWhen(_,_) | Least(_) | Greatest(_)
+      case If(_, _, _) | CaseWhen(_) | CaseKeyWhen(_, _) | Least(_) | Greatest(_)
            | Coalesce(_) | NaNvl(_, _) | AtLeastNNonNulls(_, _) => true
       case _ if e.isInstanceOf[LeafExpression] => false
-      case _ => {
-        e.children.filter(_.isInstanceOf[Expression]).foldLeft(false){
-          (s,ce) => val cexp = conditionalExpr(ce); if (s ||cexp) return true else false }
-      }
+      case _ =>
+        e.children.filter(_.isInstanceOf[Expression]).foldLeft(false) {
+          (s, ce) => val cexp = conditionalExpr(ce); if (s || cexp) return true else false
+        }
     }
   }
 
   def escapeLikeRegex(v: String): String =
     org.apache.spark.sql.catalyst.util.StringUtils.escapeLikeRegex(v)
 
-  def toDateTime(sparkDateLiteral : Int) : DateTime = {
+  def toDateTime(sparkDateLiteral: Int): DateTime = {
     new DateTime(DateTimeUtils.toJavaDate(sparkDateLiteral))
   }
 
-  def isNumeric(dt : DataType) = NumericType.acceptsType(dt)
+  def isNumeric(dt: DataType) = NumericType.acceptsType(dt)
 
   /**
     * This is different from transformDown because if rule transforms an Expression,
     * we don't try to apply any more transformation.
     *
-    * @param e
-    * @param rule
+    * @param e    Expression
+    * @param rule Rule to apply
     * @return
     */
   def transformReplace(e: Expression,
@@ -229,6 +231,109 @@ object ExprUtil {
         val nie = simplifyCast(ie, edt)
         if (nie != ie) Some(nie) else None
       case _ => None
+    }
+  }
+
+  /**
+    * Given a list of exprs and two AttributeSet, split exprs into those that
+    * involves attributes only from first set, only from second set, from both and
+    * that doesn't belong to neither (i.e f(Literals)).
+    *
+    * @param el Expression List
+    * @param fa First Attribute Set
+    * @param sa Second Attribute Set
+    * @return
+    */
+  def splitExprs(el: Seq[Expression], fa: AttributeSet, sa: AttributeSet):
+  (Seq[Expression], Seq[Expression], Seq[Expression], Seq[Expression]) = {
+    val (fEL, rest1) =
+      el.partition(_.references subsetOf fa)
+    val (sEL, rest2) =
+      rest1.partition(_.references subsetOf sa)
+    val (bEL, nEL) =
+      rest2.partition(_.references subsetOf (fa ++ sa))
+    (fEL, sEL, bEL, nEL)
+  }
+
+  /**
+    * Translate Give Aggregate to the below given child project
+    *
+    * @param gbKeys  GBKeys
+    * @param aggKeys Aggregate Keys
+    * @param fil     Optional filter
+    * @param p       Child Project
+    * @return
+    */
+  def translateAggBelowProject(gbKeys: Seq[Expression],
+                               aggKeys: Seq[NamedExpression],
+                               fil: Option[Expression], p: Project):
+  Option[(Seq[Expression], Seq[NamedExpression], Option[Expression], LogicalPlan)] = {
+    p match {
+      case p@Project(_, _) if gbKeys.nonEmpty || aggKeys.nonEmpty =>
+        val tGBKeys = ExprUtil.translateExpr(gbKeys, p, false)
+        val tAggKeys = ExprUtil.translateExpr(aggKeys, p)
+        val tFil = if (fil.nonEmpty) ExprUtil.translateExpr(fil.get, p, true) else None
+        if ((gbKeys.isEmpty || tGBKeys.nonEmpty) &&
+          (aggKeys.isEmpty || tAggKeys.nonEmpty) && (fil.isEmpty || tFil.nonEmpty)) {
+          Some(tGBKeys.get, tAggKeys.get.asInstanceOf[Seq[NamedExpression]], tFil, p.child)
+        } else {
+          None
+        }
+      case _ => None
+    }
+  }
+
+  /**
+    * Translate given seq of expressions below the child.
+    *
+    * @param se Sequence of expressions to be translated
+    * @param c  Child node
+    * @param preserveAlias Should we preserve alias of expression
+    * @return
+    */
+  def translateExpr(se: Seq[Expression], c: LogicalPlan, preserveAlias: Boolean = true)
+  : Option[Seq[Expression]] = {
+    val translatedExprs = se.collect { case e: Expression =>
+      val v = ExprUtil.translateExpr(e, c, preserveAlias)
+      if (v.nonEmpty) v.get
+    }
+    if (translatedExprs.size == se.size) {
+      Some(translatedExprs.asInstanceOf[Seq[Expression]])
+    } else {
+      None
+    }
+  }
+
+
+  /**
+    * Translate given expression through its child as an expression above grand child.
+    * Currently we only translate through Project.
+    * TODO: add support for Aggregate, Window, Cube, GroupingSet
+    *
+    * @param e Expression to translate
+    * @param c Child node
+    * @param preserveAlias Should we preserve alias of expression
+    * @return
+    */
+  def translateExpr(e: Expression, c: LogicalPlan, preserveAlias: Boolean)
+  : Option[Expression] = {
+    if (c.isInstanceOf[Project]) {
+      val aliasMap = AttributeMap(c.asInstanceOf[Project].projectList.collect {
+        case a: Alias => (a.toAttribute, a.child)
+      })
+      e match {
+        case a@Alias(c, n) if preserveAlias => Some(Alias(c.transform {
+          case a: Attribute => aliasMap.getOrElse(a, a)
+        }, n)(a.exprId, a.qualifiers, a.explicitMetadata))
+        case atr@AttributeReference(n, dt, nul, m) if preserveAlias => Some(Alias(e.transform {
+          case a: Attribute => aliasMap.getOrElse(a, a)
+        }, n)(atr.exprId, atr.qualifiers, Some(atr.metadata)))
+        case _ => Some(e.transform {
+          case a: Attribute => aliasMap.getOrElse(a, a)
+        })
+      }
+    } else {
+      None
     }
   }
 }
