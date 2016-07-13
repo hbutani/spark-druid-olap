@@ -74,7 +74,7 @@ class DruidRDD(sqlContext: SQLContext,
                 val dQuery : DruidQuery)  extends  RDD[InternalRow](sqlContext.sparkContext, Nil) {
 
   val druidQueryAcc : DruidQueryExecutionMetric = new DruidQueryExecutionMetric()
-  val numSegmentsPerQuery = drInfo.options.numSegmentsPerHistoricalQuery(sqlContext)
+  val numSegmentsPerQuery = dQuery.numSegmentsPerQuery
   val schema = dQuery.schema(drInfo)
   val drOptions = drInfo.options
   val drFullName = drInfo.fullName

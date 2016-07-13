@@ -58,10 +58,17 @@ object DruidColumn {
   }
 }
 
+trait DruidDimensionInfo {
+  def name : String
+  def dataType : DruidDataType.Value
+  def size : Long
+  def cardinality : Long
+}
+
 case class DruidDimension(name : String,
                        dataType : DruidDataType.Value,
                        size : Long,
-                       cardinality : Long) extends DruidColumn {
+                       cardinality : Long) extends DruidColumn with DruidDimensionInfo {
   def isDimension(excludeTime : Boolean = false) = true
 }
 
@@ -73,8 +80,13 @@ case class DruidMetric(name : String,
 
 case class DruidTimeDimension(name : String,
                        dataType : DruidDataType.Value,
-                       size : Long) extends DruidColumn {
+                       size : Long) extends DruidColumn with DruidDimensionInfo {
   def isDimension(excludeTime : Boolean = false) = !excludeTime
+
+  /**
+    * assume the worst, this is only used during query costing
+    */
+  val cardinality = Long.MaxValue
 }
 
 trait DruidDataSourceCapability {

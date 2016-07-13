@@ -64,11 +64,28 @@ with PredicateHelper with DruidPlannerHelper with Logging {
          */
         qs = QuerySpecTransforms.transform(dqb.drInfo, qs)
 
+        val (queryHistorical : Boolean, numSegsPerQuery : Int) =
+          if ( !pAgg.canBeExecutedInHistorical ) {
+          (false, -1)
+        } else if (planner.sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED)) {
+          val dqc = DruidQueryCostModel.computeMethod(
+            planner.sqlContext,
+            dqb.drInfo,
+            qs
+          )
+          (dqc.queryHistorical, dqc.numSegmentsPerQuery)
+        } else {
+          (dqb.drInfo.options.queryHistoricalServers,
+            dqb.drInfo.options.numSegmentsPerHistoricalQuery(planner.sqlContext)
+            )
+        }
+
         /*
          * 5. Setup DruidRelation
          */
         val dq = DruidQuery(qs,
-          dqb.drInfo.options.queryHistoricalServers && pAgg.canBeExecutedInHistorical,
+          queryHistorical,
+          numSegsPerQuery,
           intervals,
           Some(druidOpSchema.operatorDruidAttributes))
 

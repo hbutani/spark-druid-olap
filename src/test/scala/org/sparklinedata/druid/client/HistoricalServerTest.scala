@@ -181,8 +181,11 @@ class HistoricalServerTest extends StarSchemaBaseTest with BeforeAndAfterAll wit
            showResults: Boolean = true,
            debugTransforms: Boolean = false): Unit = {
     import org.apache.spark.sql.DataFrameUtils._
+    val costModelEnabled =
+      TestHive.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED.key, "true")
     test(nm) { td =>
       try {
+        TestHive.setConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED.key, "false")
         if (debugTransforms) turnOnTransformDebugging
         val df1 = sqlAndLog(nm, sqlTemplate.format(tableName))
         assertDruidQueries(td.name, df1, numDruidQueries)
@@ -211,6 +214,7 @@ class HistoricalServerTest extends StarSchemaBaseTest with BeforeAndAfterAll wit
 
       } finally {
         turnOffTransformDebugging
+        TestHive.setConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED.key, costModelEnabled)
       }
     }
 

@@ -20,8 +20,10 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
 import org.joda.time.Interval
-import org.sparklinedata.druid.{QuerySpec, TimeSeriesQuerySpec}
-import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationInfo}
+import org.sparklinedata.druid._
+import org.sparklinedata.druid.metadata.{DruidDimension, DruidDimensionInfo, DruidMetadataCache, DruidRelationInfo}
+
+import scala.collection.mutable.{HashMap => MHashMap, Map => MMap}
 
 trait DruidQueryCost extends Ordered[DruidQueryCost] {
   def queryCost : Double
@@ -95,11 +97,10 @@ case class DruidQueryMethod(
                               )
 
 case class CostInput[T <: QuerySpec](
-                      dimsNDVEstimate : Int,
+                      dimsNDVEstimate : Long,
                       shuffleCostPerByte : Double,
                       histMergeCostPerByteFactor : Double,
                       histSegsPerQueryLimit : Int,
-                      brokerSizeThreshold : Int,
                       queryIntervalRatioScaleFactor : Double,
                       historicalTimeSeriesProcessingCostPerByteFactor : Double,
                       historicalGByProcessigCostPerByteFactor : Double,
@@ -123,7 +124,6 @@ case class CostInput[T <: QuerySpec](
        |shuffleCostPerByte = $shuffleCostPerByte,
        |histMergeCostPerByteFactor = $histMergeCostPerByteFactor,
        |histSegsPerQueryLimit = $histSegsPerQueryLimit,
-       |brokerSizeThreshold = $brokerSizeThreshold,
        |queryIntervalRatioScaleFactor = $queryIntervalRatioScaleFactor,
        |historicalTimeSeriesProcessingCostPerByteFactor = $historicalTimeSeriesProcessingCostPerByteFactor,
        |historicalGByProcessigCostPerByteFactor = $historicalGByProcessigCostPerByteFactor,
@@ -310,13 +310,47 @@ object DruidQueryCostModel extends Logging {
     DruidQueryMethod(minCost.isInstanceOf[HistoricalQueryCost], minNumSegmentsPerQuery, minCost)
 
   }
+  
+  /**
+    * Cardinality = product of dimension(ndv) * dimension(selectivity)
+    * where selectivity:
+    * - is only applied for equality and in predicates.
+    * - a predicate on a non-gby dimension is assumed not changed the cardinality estmate.
+    * - or and not predicates are also assumed not to reduce cardinality.
+    *
+    * @param qs
+    * @param drInfo
+    * @return
+    */
+  def estimateNDV(qs : QuerySpec,
+                  drInfo : DruidRelationInfo) : Long = {
 
-  def computeMethod[T <: QuerySpec](
+    val m : MMap[String, Long] = MHashMap()
+
+    def applyFilterSelectivity(f : FilterSpec) : Unit = f match {
+      case SelectorFilterSpec(_, dm, _) if m.contains(dm) => m(dm) = 1
+      case ExtractionFilterSpec(_, dm, _, InExtractionFnSpec(_, LookUpMap(_, lm)))
+        if m.contains(dm) => m(dm) = Math.min(m(dm), lm.size)
+      case LogicalFilterSpec("and", sfs) => sfs.foreach(applyFilterSelectivity)
+      case _ => ()
+    }
+
+    qs.dimensions.foreach { d =>
+      m(d.dimension) =
+        drInfo.druidDS.columns(d.dimension).asInstanceOf[DruidDimensionInfo].cardinality
+    }
+    if ( qs.filter.isDefined) {
+      applyFilterSelectivity(qs.filter.get)
+    }
+    m.values.product
+  }
+
+  private[druid] def computeMethod[T <: QuerySpec](
                    sqlContext : SQLContext,
                    drInfo : DruidRelationInfo,
-                   dimsNDVEstimate : Int,
+                   dimsNDVEstimate : Long,
                    queryIntervalMillis : Long,
-                   querySpecClass : T
+                   querySpecClass : Class[T]
                    ) : DruidQueryMethod = {
 
     val shuffleCostPerByte: Double = 1.0
@@ -326,9 +360,6 @@ object DruidQueryCostModel extends Logging {
 
     val histSegsPerQueryLimit =
       sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_HIST_SEGMENTS_PERQUERY_LIMIT)
-
-    val brokerSizeThreshold =
-      sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_BROKER_SIZE_THRESHOLD)
 
     val queryIntervalRatioScaleFactor =
       sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_INTERVAL_SCALING_NDV)
@@ -371,7 +402,10 @@ object DruidQueryCostModel extends Logging {
       Math.max(Math.round(queryIntervalMillis / segIntervalMillis), 1L)
 
     val sparkCoresPerExecutor =
-      sqlContext.sparkContext.getConf.get("spark.executor.cores").toLong
+      sqlContext.sparkContext.getConf.get(
+        "spark.executor.cores",
+        sqlContext.sparkContext.schedulerBackend.defaultParallelism().toString
+      ).toLong
 
     val numSparkExecutors = sqlContext.sparkContext.getExecutorMemoryStatus.size
 
@@ -390,7 +424,6 @@ object DruidQueryCostModel extends Logging {
         shuffleCostPerByte,
         histMergeFactor,
         histSegsPerQueryLimit,
-        brokerSizeThreshold,
         queryIntervalRatioScaleFactor,
         historicalTimeSeriesProcessingCostPerByte,
         historicalGByProcessigCostPerByte,
@@ -404,8 +437,24 @@ object DruidQueryCostModel extends Logging {
         numSparkExecutors,
         numProcessingThreadsPerHistorical,
         numHistoricals,
-        querySpecClass.getClass
+        querySpecClass
       )
     )
+  }
+
+  def computeMethod[T <: QuerySpec](sqlContext : SQLContext,
+                                     drInfo : DruidRelationInfo,
+                                     querySpec : T
+                                   ) : DruidQueryMethod = {
+    val queryIntervalMillis : Long = intervalsMillis(querySpec.intervalList.map(Interval.parse(_)))
+
+    computeMethod(
+      sqlContext,
+      drInfo,
+      estimateNDV(querySpec, drInfo),
+      queryIntervalMillis,
+      querySpec.getClass
+    )
+
   }
 }

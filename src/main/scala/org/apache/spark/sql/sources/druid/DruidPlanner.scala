@@ -98,6 +98,14 @@ object DruidPlanner {
     doc = "Max. number of Http Connections to each server in Druid Cluster"
   )
 
+  val DRUID_QUERY_COST_MODEL_ENABLED = booleanConf(
+    "spark.sparklinedata.druid.querycostmodel.enabled",
+    defaultValue = Some(true),
+    doc = "flag that controls if decision to execute druid query on broker or" +
+      " historicals is based on the cost model; default is true. If false " +
+      "the decision is based on the 'queryHistoricalServers' and " +
+      "'numSegmentsPerHistoricalQuery' datasource options."
+  )
 
   val DRUID_QUERY_COST_MODEL_HIST_MERGE_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.histMergeCostFactor",
@@ -110,13 +118,6 @@ object DruidPlanner {
     "spark.sparklinedata.druid.querycostmodel.histSegsPerQueryLimit",
     defaultValue = Some(3),
     doc = "the max. number of segments processed per historical query."
-  )
-
-  val DRUID_QUERY_COST_MODEL_BROKER_SIZE_THRESHOLD = intConf(
-    "spark.sparklinedata.druid.querycostmodel.broker.threshold",
-    defaultValue = Some(500),
-    doc = "queries with an output estimate less than this value " +
-      "are issued against the broker"
   )
 
   val DRUID_QUERY_COST_MODEL_INTERVAL_SCALING_NDV = doubleConf(
