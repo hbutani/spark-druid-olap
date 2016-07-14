@@ -23,7 +23,7 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
 import org.joda.time.Interval
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.{DruidDimensionInfo, DruidMetadataCache, DruidRelationInfo}
+import org.sparklinedata.druid.metadata._
 import org.apache.commons.lang3.StringUtils
 
 import scala.language.existentials
@@ -466,7 +466,7 @@ object DruidQueryCostModel extends Logging {
 
     qs.dimensions.foreach { d =>
       m(d.dimension) =
-        drInfo.druidDS.columns(d.dimension).asInstanceOf[DruidDimensionInfo].cardinality
+        drInfo.druidDS.columns(d.dimension).cardinality
     }
     if ( qs.filter.isDefined) {
       applyFilterSelectivity(qs.filter.get)
@@ -476,7 +476,9 @@ object DruidQueryCostModel extends Logging {
 
   private[druid] def computeMethod[T <: QuerySpec](
                    sqlContext : SQLContext,
-                   drInfo : DruidRelationInfo,
+                   druidDSIntervals : List[Interval],
+                   druidDSFullName : DruidRelationName,
+                   druidDSOptions : DruidRelationOptions,
                    dimsNDVEstimate : Long,
                    queryIntervalMillis : Long,
                    querySpecClass : Class[_ <: T]
@@ -508,10 +510,10 @@ object DruidQueryCostModel extends Logging {
     val druidOutputTransportCostPerRow = sqlContext.getConf(
       DruidPlanner.DRUID_QUERY_COST_MODEL_OUTPUT_TRANSPORT_COST)
 
-    val indexIntervalMillis = intervalsMillis(drInfo.druidDS.intervals)
+    val indexIntervalMillis = intervalsMillis(druidDSIntervals)
     val segIntervalMillis = {
       val segIn = DruidMetadataCache.getDataSourceInfo(
-        drInfo.fullName, drInfo.options)._1.segments.head._interval
+        druidDSFullName, druidDSOptions)._1.segments.head._interval
       intervalsMillis(List(segIn))
     }
 
@@ -539,12 +541,12 @@ object DruidQueryCostModel extends Logging {
     val numSparkExecutors = sqlContext.sparkContext.getExecutorMemoryStatus.size
 
     val numProcessingThreadsPerHistorical: Long =
-      drInfo.options.
+      druidDSOptions.
         numProcessingThreadsPerHistorical.map(_.toLong).getOrElse(sparkCoresPerExecutor)
 
     val numHistoricals = {
       DruidMetadataCache.getDruidClusterInfo(
-        drInfo.fullName, drInfo.options).histServers.size
+        druidDSFullName, druidDSOptions).histServers.size
     }
 
     compute(
@@ -579,8 +581,31 @@ object DruidQueryCostModel extends Logging {
 
     computeMethod(
       sqlContext,
-      drInfo,
+      drInfo.druidDS.intervals,
+      drInfo.fullName,
+      drInfo.options,
       estimateNDV(querySpec, drInfo),
+      queryIntervalMillis,
+      querySpec.getClass
+    )
+
+  }
+
+  def computeMethod[T <: QuerySpec](sqlContext : SQLContext,
+                                    druidDSIntervals : List[Interval],
+                                    druidDSFullName : DruidRelationName,
+                                    druidDSOptions : DruidRelationOptions,
+                                    ndvEstimate : Long,
+                                    querySpec : T
+                                   ) : DruidQueryMethod = {
+    val queryIntervalMillis : Long = intervalsMillis(querySpec.intervalList.map(Interval.parse(_)))
+
+    computeMethod(
+      sqlContext,
+      druidDSIntervals,
+      druidDSFullName,
+      druidDSOptions,
+      ndvEstimate,
       queryIntervalMillis,
       querySpec.getClass
     )

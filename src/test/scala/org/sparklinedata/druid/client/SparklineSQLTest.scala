@@ -269,4 +269,20 @@ class SparklineSQLTest extends BaseTest {
         """.stripMargin).show(Int.MaxValue - 1, false)
   }
 
+  test("explainDruidRewrite2") { td =>
+    sql("""explain druid rewrite
+          |SELECT p_name, count(*)
+          |FROM `orderLineItemPartSupplier`
+          |group by p_name
+        """.stripMargin).show(Int.MaxValue - 1, false)
+  }
+
+  test("explainDruidRewrite3") { td =>
+    sql("""explain druid rewrite
+          |SELECT l_quantity + 1, count(*)
+          |FROM `orderLineItemPartSupplier`
+          |group by l_quantity + 1
+        """.stripMargin).show(Int.MaxValue - 1, false)
+  }
+
 }

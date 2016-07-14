@@ -52,6 +52,7 @@ class DataSourceTest extends BaseTest {
       druidDatasource "tpch",
       druidHost "localhost",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema',
       druidQuery '$dq')""".stripMargin
@@ -78,6 +79,7 @@ class DataSourceTest extends BaseTest {
       druidDatasource "tpch",
       druidHost "localhost",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema',
       druidQuery '$dq')""".stripMargin

@@ -119,6 +119,9 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(NUM_SEGMENTS_PER_HISTORICAL_QUERY).
         getOrElse(DEFAULT_NUM_SEGMENTS_PER_HISTORICAL_QUERY).toInt
 
+    val numProcessingThreadsPerHistorical =
+      parameters.get(NUM_PROCESSING_THREADS_PER_HISTORICAL).map(_.toInt)
+
     val options = DruidRelationOptions(
       maxCardinality,
       cardinalityPerDruidQuery,
@@ -130,7 +133,8 @@ class DefaultSource extends RelationProvider with Logging {
       zkDruidPath,
       queryHistorical,
       zkQualifyDiscoveryNames,
-      numSegmentsPerHistoricalQuery
+      numSegmentsPerHistoricalQuery,
+      numProcessingThreadsPerHistorical
     )
 
 
@@ -242,4 +246,7 @@ object DefaultSource {
 
   val NUM_SEGMENTS_PER_HISTORICAL_QUERY = "numSegmentsPerHistoricalQuery"
   val DEFAULT_NUM_SEGMENTS_PER_HISTORICAL_QUERY = Int.MaxValue.toString
+
+  val NUM_PROCESSING_THREADS_PER_HISTORICAL = "numProcessingThreadsPerHistorical"
+
 }

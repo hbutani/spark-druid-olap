@@ -81,6 +81,7 @@ class DataTypesTest extends BaseTest {
       zkQualifyDiscoveryNames "true",
       queryHistoricalServers "false",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$starSchemaDataTypes')""".stripMargin
     )
@@ -120,6 +121,7 @@ class DataTypesTest extends BaseTest {
       zkQualifyDiscoveryNames "true",
       queryHistoricalServers "false",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$starSchemaDataTypes2')""".stripMargin
     )

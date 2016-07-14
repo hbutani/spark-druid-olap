@@ -316,6 +316,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       druidHost "localhost",
       zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$starSchema')""".stripMargin
     )

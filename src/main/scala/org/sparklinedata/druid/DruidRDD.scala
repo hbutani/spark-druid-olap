@@ -26,6 +26,7 @@ import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.sources.druid.DruidQueryCostModel
 import org.apache.spark.sql.sparklinedata.execution.metrics.DruidQueryExecutionMetric
 import org.joda.time.Interval
 import org.sparklinedata.druid.client.{DruidQueryServerClient, QueryResultRow}
@@ -78,6 +79,8 @@ class DruidRDD(sqlContext: SQLContext,
   val schema = dQuery.schema(drInfo)
   val drOptions = drInfo.options
   val drFullName = drInfo.fullName
+  val drDSIntervals = drInfo.druidDS.intervals
+  val ndvEstimate = DruidQueryCostModel.estimateNDV(dQuery.q, drInfo)
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {

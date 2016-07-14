@@ -202,6 +202,7 @@ abstract class BaseTest extends fixture.FunSuite with
       druidHost "localhost",
       zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema')""".stripMargin
 

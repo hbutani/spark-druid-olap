@@ -131,6 +131,7 @@ class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll wi
       zkQualifyDiscoveryNames "true",
       queryHistoricalServers "true",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchemaHistorical')""".stripMargin
     )
@@ -145,6 +146,7 @@ class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll wi
       zkQualifyDiscoveryNames "true",
       queryHistoricalServers "true",
       columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
       starSchema '$starSchemaHistorical')""".stripMargin
     )
