@@ -135,33 +135,33 @@ object DruidPlanner {
   val DRUID_QUERY_COST_MODEL_HISTORICAL_PROCESSING_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.historicalProcessingCost",
     defaultValue = Some(0.25),
-    doc = "the cost per byte of groupBy processing in historical servers " +
+    doc = "the cost per row of groupBy processing in historical servers " +
       "relative to spark shuffle cost"
   )
 
   val DRUID_QUERY_COST_MODEL_HISTORICAL_TIMESERIES_PROCESSING_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.historicalTimeSeriesProcessingCost",
     defaultValue = Some(0.1),
-    doc = "the cost per byte of timeseries processing in historical servers " +
+    doc = "the cost per row of timeseries processing in historical servers " +
       "relative to spark shuffle cost"
   )
 
   val DRUID_QUERY_COST_MODEL_SPARK_SCHEDULING_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.sparkSchedulingCost",
     defaultValue = Some(1.0),
-    doc = "the cost of scheduling tasks in spark relative to the shuffle cost of 1 byte"
+    doc = "the cost of scheduling tasks in spark relative to the shuffle cost of 1 row"
   )
 
   val DRUID_QUERY_COST_MODEL_SPARK_AGGREGATING_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.sparkAggregatingCost",
     defaultValue = Some(0.15),
-    doc = "the cost per byte to do aggregation in spark relative to the shuffle cost"
+    doc = "the cost per row to do aggregation in spark relative to the shuffle cost"
   )
 
   val DRUID_QUERY_COST_MODEL_OUTPUT_TRANSPORT_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.druidOutputTransportCost",
     defaultValue = Some(0.4),
-    doc = "the cost per byte to transport druid output relative to the shuffle cost"
+    doc = "the cost per row to transport druid output relative to the shuffle cost"
   )
 
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
