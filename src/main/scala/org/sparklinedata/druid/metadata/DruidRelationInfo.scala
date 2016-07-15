@@ -74,6 +74,13 @@ case class DruidRelationOptions(val maxCardinality : Long,
     ).toInt
   }
 
+  def queryHistoricalServers(sqlContext : SQLContext) : Boolean = {
+    sqlContext.getConf(
+      sqlContextOption("queryHistoricalServers"),
+      queryHistoricalServers.toString
+    ).toBoolean
+  }
+
 }
 
 private[druid] object MappingBuilder extends Logging {

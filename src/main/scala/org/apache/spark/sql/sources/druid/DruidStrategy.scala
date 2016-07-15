@@ -75,7 +75,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           )
           (dqc.queryHistorical, dqc.numSegmentsPerQuery)
         } else {
-          (dqb.drInfo.options.queryHistoricalServers,
+          (dqb.drInfo.options.queryHistoricalServers(planner.sqlContext),
             dqb.drInfo.options.numSegmentsPerHistoricalQuery(planner.sqlContext)
             )
         }
