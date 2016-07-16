@@ -302,6 +302,9 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           for (te <- genExprCode(t); cte <- JSCast(te, TimestampType, this).castCode) yield
             JSExpr(None, te.linesSoFar + cte.linesSoFar,
               dtToSecondsCode(cte.getRef), LongType)
+        case TruncDate(d, f@Literal(v, _)) if v.isInstanceOf[UTF8String] =>
+          for (de <- genExprCode(d); tr <- trunc(de.getRef, f.value.toString)) yield
+            JSExpr(None, de.linesSoFar, tr, DateType)
         case Add(l, r) => Some(genBArithmeticExprCode(l, r, e, "+")).flatten
         case Subtract(l, r) => Some(genBArithmeticExprCode(l, r, e, "-")).flatten
         case Multiply(l, r) => Some(genBArithmeticExprCode(l, r, e, "*")).flatten

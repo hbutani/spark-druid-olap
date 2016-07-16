@@ -762,5 +762,42 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     1,
     true, true)
 
+  test("trunc1",
+    """
+      |select o_orderstatus as x, trunc(cast(o_orderdate as date), 'MM') as y
+      |from orderLineItemPartSupplier
+      |group by o_orderstatus, trunc(cast(o_orderdate as date), 'MM')
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+
+
+  test("trunc1B",
+    """
+      |select o_orderstatus as x, trunc(cast(o_orderdate as date), 'MM') as y
+      |from orderLineItemPartSupplierBase
+      |group by o_orderstatus, trunc(cast(o_orderdate as date), 'MM')
+      |order by x, y
+    """.stripMargin
+    ,0,true,true)
+
+  test("trunc2",
+    """
+      |select o_orderstatus as x, trunc(cast(o_orderdate as date), 'YY') as y
+      |from orderLineItemPartSupplier
+      |group by o_orderstatus, trunc(cast(o_orderdate as date), 'YY')
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+
+
+  test("trunc2B",
+    """
+      |select o_orderstatus as x, trunc(cast(o_orderdate as date), 'YY') as y
+      |from orderLineItemPartSupplierBase
+      |group by o_orderstatus, trunc(cast(o_orderdate as date), 'YY')
+      |order by x, y
+    """.stripMargin
+    ,0,true,true)
 }
 

@@ -72,6 +72,13 @@ private[jscodegen] object JSDateTimeCtx {
   private[jscodegen] def noDaysToDateCode(ts: String) =
     s"new org.joda.time.LocalDate(${ts} * $mSecsInDay)"
 
+  private[jscodegen] def trunc(ld: String, format: String): Option[String] =
+    format.toUpperCase match {
+      case "YEAR" | "YYYY" | "YY" => Some(s"$ld.withDayOfMonth(1).withMonthOfYear(1)")
+      case "MON" | "MONTH" | "MM" => Some(s"$ld.withDayOfMonth(1)")
+      case _ => None
+    }
+
   private[jscodegen] def dtToDateCode(ts: String) = s"${ts}.toLocalDate()"
 
   private[jscodegen] def dtToStrCode(jdt: String,
