@@ -140,6 +140,10 @@ object PushGB extends Rule[LogicalPlan] with PredicateHelper {
 
             // 4. Translate GB, Agg keys below Project if
             // pushside child is Project J(GB(P)) => J(p(GB))
+
+            /*
+            // Disabled for time being. Seems like there is an issue with
+            // AggregateTransform without child project.
             if (pushSideChild.isInstanceOf[Project]) {
               val exprsBelowProj = ExprUtil.translateAggBelowProject(gbESplit._1 ++ gbESplit._4,
                 (agFSplit._1 ++ agFSplit._4).asInstanceOf[Seq[NamedExpression]],
@@ -149,7 +153,7 @@ object PushGB extends Rule[LogicalPlan] with PredicateHelper {
                   exprsBelowProj.get._2, agFSplit._2.asInstanceOf[Seq[NamedExpression]],
                   pushSideChild.asInstanceOf[Project].child, j, a))
               }
-            } else {
+            } else */{
               pi = Some(PushInfo(pc.get.asInstanceOf[PushCandiates], gbESplit._1 ++ gbESplit._4,
                 (agFSplit._1 ++ agFSplit._4).asInstanceOf[Seq[NamedExpression]],
                 agFSplit._2.asInstanceOf[Seq[NamedExpression]], pushSideChild, j, a))
