@@ -60,4 +60,53 @@ class OptimizerTest extends BaseTest with BeforeAndAfterAll with Logging {
        order by a, b, z, c, mi%2""".stripMargin,
     2,
     true, true)
+
+  test("sumRewrite1",
+    """select sum(5) s5
+       from orderLineItemPartSupplier
+       group by l_linenumber
+       having s5 > 10
+       order by  s5""".stripMargin,
+    1,
+    true, true)
+
+  test("sumRewrite1B",
+    """select sum(5) s5
+       from orderLineItemPartSupplierBase
+       group by l_linenumber
+       having s5 > 10
+       order by  s5""".stripMargin,
+    0,
+    true, true)
+
+  test("sumRewrite2",
+    """select l_linenumber a, (mi + 10) b, z, mi % 2 , sum(l_quantity) c, s5
+       from
+       (select r1.l_linenumber,  r1.l_quantity, mi, (mi + 10) as z, l_shipdate, s5
+        from orderLineItemPartSupplier r1
+       join
+       (select min(l_linenumber)mi, sum(c_acctbal) ma, sum(5) s5, count(1)
+       from orderLineItemPartSupplier
+       where not(l_shipdate is null) having count(1) > 0) r2) r3
+       where not(cast(l_shipdate as timestamp)is null) and  not (l_linenumber='NA')
+       group by l_linenumber, (mi + 10), z, mi % 2, s5
+       order by a, b, z, c, mi%2, s5""".stripMargin,
+    2,
+    true, true)
+
+
+  test("sumRewrite2B",
+    """select l_linenumber a, (mi + 10) b, z, mi % 2 , sum(l_quantity) c, s5
+       from
+       (select r1.l_linenumber,  r1.l_quantity, mi, (mi + 10) as z, l_shipdate, s5
+        from orderLineItemPartSupplierBase r1
+       join
+       (select min(l_linenumber)mi, sum(c_acctbal) ma, sum(5) s5, count(1)
+       from orderLineItemPartSupplierBase
+       where not(l_shipdate is null) having count(1) > 0) r2) r3
+       where not(cast(l_shipdate as timestamp)is null) and  not (l_linenumber='NA')
+       group by l_linenumber, (mi + 10), z, mi % 2, s5
+       order by a, b, z, c, mi%2, s5""".stripMargin,
+    0,
+    true, true)
 }

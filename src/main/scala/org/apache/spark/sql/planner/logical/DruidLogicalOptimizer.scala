@@ -17,7 +17,7 @@
 package org.apache.spark.sql.planner.logical
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count, Sum}
 import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -27,7 +27,9 @@ import org.apache.spark.sql.util.{ExprUtil, PlanUtil}
 
 object DruidLogicalOptimizer extends Optimizer {
   override protected val batches: Seq[Batch] = DefaultOptimizer.batches.
-    asInstanceOf[Seq[Batch]] :+ Batch("Push GB through Project, Join", FixedPoint(100), PushGB)
+    asInstanceOf[Seq[Batch]] :+ Batch("Rewrite Sum(Literal) as Count(1)*Literal",
+    FixedPoint(100), SumOfLiteralRewrite) :+ Batch("Push GB through Project, Join",
+    FixedPoint(100), PushGB)
 }
 
 /**
@@ -235,4 +237,63 @@ object PushGB extends Rule[LogicalPlan] with PredicateHelper {
       None
     }
   }
+}
+
+object SumOfLiteralRewrite extends Rule[LogicalPlan] with PredicateHelper {
+  override def apply(plan: LogicalPlan): LogicalPlan = plan transform {
+    case RewriteSum(plan) => plan
+  }
+
+  object RewriteSum {
+    def unapply(op: LogicalPlan): Option[LogicalPlan] = op match {
+      case p@Project(se, Aggregate(ge, ae, c)) if rewriteCandidate(ae) =>
+        for (sli <- sumLiteralInfo(ae)) yield {
+          val newAgg = Aggregate(ge, sli._1, c)
+          val sMap = newAgg.aggregateExpressions.foldLeft(Map[String, Expression]()) { (m, e) =>
+            if (sli._2.contains(e.name)) {
+              m + (e.name -> Multiply(AttributeReference(e.name, e.dataType, e.nullable,
+                e.metadata)(e.exprId, e.qualifiers), sli._2.get(e.name).get._1))
+            } else {
+              m
+            }
+          }
+          val pl = se.map(e => ExprUtil.translateExpr(e, sMap)).asInstanceOf[Seq[NamedExpression]]
+          Project(pl, newAgg)
+        }
+      case a@Aggregate(ge, ae, c) if rewriteCandidate(ae) =>
+        for (sli <- sumLiteralInfo(ae)) yield {
+          val newAgg = Aggregate(ge, sli._1, c)
+          val pl: Seq[NamedExpression] = newAgg.aggregateExpressions.map {
+            case ne: NamedExpression if (sli._2.contains(ne.name)) =>
+              val ale = sli._2.get(ne.name).get
+              Alias(Multiply(AttributeReference(ne.name, ne.dataType, ne.nullable, ne.metadata)
+              (ne.exprId, ne.qualifiers), ale._1), ne.name)(ale._2.exprId,
+                ale._2.qualifiers, ale._2.explicitMetadata)
+            case ne: NamedExpression => AttributeReference(ne.name, ne.dataType, ne.nullable,
+              ne.metadata)(ne.exprId, ne.qualifiers)
+          }
+          Project(pl.asInstanceOf[Seq[NamedExpression]], newAgg)
+        }
+      case _ => None
+    }
+
+    private[this] def rewriteCandidate(ae: Seq[NamedExpression]) = ae.exists {
+      case Alias(AggregateExpression(Sum(Literal(v, _)), _, _), _) if (v != null) => true
+      case _ => false
+    }
+
+    private[this] def sumLiteralInfo(ae: Seq[NamedExpression]):
+    Option[(Seq[NamedExpression], Map[String, (Literal, Alias)])] = {
+      val sumLitInf =
+        ae.foldLeft((Seq[NamedExpression](), Map[String, (Literal, Alias)]()))((t, e) => e match {
+          case al@Alias(ae@AggregateExpression(Sum(l@Literal(lv, _)), _, _), n) if (lv != null) =>
+            ((t._1 :+
+              new Alias(AggregateExpression(Count(Literal(1)), ae.mode, ae.isDistinct), n)()),
+              t._2 + (n ->(l, al)))
+          case ag@_ => ((t._1 :+ ag), t._2)
+        })
+      if (sumLitInf._2.isEmpty) None else Some(sumLitInf)
+    }
+  }
+
 }

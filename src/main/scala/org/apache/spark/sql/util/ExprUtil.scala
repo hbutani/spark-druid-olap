@@ -270,9 +270,9 @@ object ExprUtil {
   Option[(Seq[Expression], Seq[NamedExpression], Option[Expression], LogicalPlan)] = {
     p match {
       case p@Project(_, _) if gbKeys.nonEmpty || aggKeys.nonEmpty =>
-        val tGBKeys = ExprUtil.translateExpr(gbKeys, p, false)
-        val tAggKeys = ExprUtil.translateExpr(aggKeys, p)
-        val tFil = if (fil.nonEmpty) ExprUtil.translateExpr(fil.get, p, true) else None
+        val tGBKeys = ExprUtil.translateExprDown(gbKeys, p, false)
+        val tAggKeys = ExprUtil.translateExprDown(aggKeys, p)
+        val tFil = if (fil.nonEmpty) ExprUtil.translateExprDown(fil.get, p, true) else None
         if ((gbKeys.isEmpty || tGBKeys.nonEmpty) &&
           (aggKeys.isEmpty || tAggKeys.nonEmpty) && (fil.isEmpty || tFil.nonEmpty)) {
           Some(tGBKeys.get, tAggKeys.get.asInstanceOf[Seq[NamedExpression]], tFil, p.child)
@@ -291,10 +291,10 @@ object ExprUtil {
     * @param preserveAlias Should we preserve alias of expression
     * @return
     */
-  def translateExpr(se: Seq[Expression], c: LogicalPlan, preserveAlias: Boolean = true)
+  def translateExprDown(se: Seq[Expression], c: LogicalPlan, preserveAlias: Boolean = true)
   : Option[Seq[Expression]] = {
     val translatedExprs = se.collect { case e: Expression =>
-      val v = ExprUtil.translateExpr(e, c, preserveAlias)
+      val v = ExprUtil.translateExprDown(e, c, preserveAlias)
       if (v.nonEmpty) v.get
     }
     if (translatedExprs.size == se.size) {
@@ -315,7 +315,7 @@ object ExprUtil {
     * @param preserveAlias Should we preserve alias of expression
     * @return
     */
-  def translateExpr(e: Expression, c: LogicalPlan, preserveAlias: Boolean)
+  def translateExprDown(e: Expression, c: LogicalPlan, preserveAlias: Boolean)
   : Option[Expression] = {
     if (c.isInstanceOf[Project]) {
       val aliasMap = AttributeMap(c.asInstanceOf[Project].projectList.collect {
@@ -335,5 +335,31 @@ object ExprUtil {
     } else {
       None
     }
+  }
+
+
+  /**
+    * Translate given expression by replacing the aliases
+    * with new expr (if they are present in the map)
+    *
+    * @param e Expression to translate
+    * @param aliasToNewExpr Map to aliases to new Expression that replaces it
+    * @return
+    */
+  def translateExpr(e: Expression, aliasToNewExpr: Map[String, Expression])
+  : Expression = {
+    val ne =
+      e match {
+        case a@Alias(c, n) => Alias(c.transform {
+          case at: Attribute => aliasToNewExpr.get(at.name).getOrElse(at)
+        }, n)(a.exprId, a.qualifiers, a.explicitMetadata)
+        case atr@AttributeReference(n, dt, nul, m) => Alias(e.transform {
+          case at: Attribute => aliasToNewExpr.get(at.name).getOrElse(at)
+        }, n)(atr.exprId, atr.qualifiers, Some(atr.metadata))
+        case _ => e.transform {
+          case at: Attribute => aliasToNewExpr.get(at.name).getOrElse(at)
+        }
+      }
+    ne
   }
 }
