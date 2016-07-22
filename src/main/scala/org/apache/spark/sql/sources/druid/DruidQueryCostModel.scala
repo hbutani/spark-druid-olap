@@ -230,6 +230,7 @@ case class CostInput[T <: QuerySpec](
                       indexIntervalMillis : Long,
                       queryIntervalMillis : Long,
                       segIntervalMillis : Long,
+                      numSegmentsProcessed: Long,
                       sparkCoresPerExecutor : Long,
                       numSparkExecutors : Int,
                       numProcessingThreadsPerHistorical : Long,
@@ -253,6 +254,7 @@ case class CostInput[T <: QuerySpec](
        |indexIntervalMillis = $indexIntervalMillis,
        |queryIntervalMillis = $queryIntervalMillis,
        |segIntervalMillis = $segIntervalMillis,
+       |numSegmentsProcessed = $numSegmentsProcessed,
        |sparkCoresPerExecutor = $sparkCoresPerExecutor,
        |numSparkExecutors = $numSparkExecutors,
        |numProcessingThreadsPerHistorical = $numProcessingThreadsPerHistorical,
@@ -307,9 +309,6 @@ object DruidQueryCostModel extends Logging {
       queryIntervalRatioScaleFactor
     )
 
-    val numSegmentsProcessed : Long =
-      Math.max(Math.round(queryIntervalMillis/segIntervalMillis + 0.5), 1L)
-
     val numSparkCores : Long = {
       numSparkExecutors * sparkCoresPerExecutor
     }
@@ -318,17 +317,22 @@ object DruidQueryCostModel extends Logging {
 
     val parallelismPerWave = Math.min(numHistoricalThreads, numSparkCores)
 
-    def estimateNumWaves(numSegsPerQuery : Long) : Long =
+    def estimateNumWaves(numSegsPerQuery : Long,
+                         parallelism : Long = parallelismPerWave) : Long =
       Math.round(
-        (numSegmentsProcessed/numSegsPerQuery)/ parallelismPerWave + 0.5
+        (numSegmentsProcessed/numSegsPerQuery)/ parallelism + 0.5
       )
 
     def brokerQueryCost : DruidQueryCost = {
-      val numWaves: Long = estimateNumWaves(1)
+      val numWaves: Long = estimateNumWaves(1, numHistoricalThreads)
       val processingCostPerHist : Double =
         segmentOutputSizeEstimate * histProcessingCostPerRow
-      var brokertMergeCost : Double =
-        (numSegmentsProcessed - 1) * segmentOutputSizeEstimate * brokerMergeCostPerRow
+
+      val numMerges = 2 * (numSegmentsProcessed - 1)
+
+      val brokertMergeCost : Double =
+        (Math.max(numMerges / numProcessingThreadsPerHistorical,1.0))  *
+          segmentOutputSizeEstimate * brokerMergeCostPerRow
       val segmentOutputTransportCost = queryOutputSizeEstimate *
         (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
       val queryCost: Double =
@@ -517,6 +521,13 @@ object DruidQueryCostModel extends Logging {
       intervalsMillis(List(segIn))
     }
 
+    val avgNumSegmentsPerSegInterval : Double = {
+      val totalSegments = DruidMetadataCache.getDataSourceInfo(
+        druidDSFullName, druidDSOptions)._1.segments.size
+      val totalIntervals : Long = Math.round(indexIntervalMillis/segIntervalMillis)
+      (totalSegments / totalIntervals)
+    }
+
     val queryOutputSizeEstimate = intervalNDVEstimate(queryIntervalMillis,
       indexIntervalMillis,
       dimsNDVEstimate,
@@ -529,8 +540,10 @@ object DruidQueryCostModel extends Logging {
       queryIntervalRatioScaleFactor
     )
 
-    val numSegmentsProcessed: Long =
-      Math.max(Math.round(queryIntervalMillis / segIntervalMillis), 1L)
+    val numSegmentsProcessed: Long = Math.round(
+      Math.max(Math.round(queryIntervalMillis / segIntervalMillis), 1L
+      ) * avgNumSegmentsPerSegInterval
+    )
 
     val sparkCoresPerExecutor =
       sqlContext.sparkContext.getConf.get(
@@ -564,6 +577,7 @@ object DruidQueryCostModel extends Logging {
         indexIntervalMillis,
         queryIntervalMillis,
         segIntervalMillis,
+        numSegmentsProcessed,
         sparkCoresPerExecutor,
         numSparkExecutors,
         numProcessingThreadsPerHistorical,
