@@ -1,0 +1,208 @@
+{
+  "type" : "index_hadoop",
+  "hadoopDependencyCoordinates": ["org.apache.hadoop:hadoop-client:2.7.2"],
+  "spec": {
+    "dataSchema": {
+      "dataSource": "tpch_1",
+      "parser": {
+      "type": "hadoopyString",
+      "parseSpec": {
+        "format": "tsv",
+        "timestampSpec": {
+          "column": "l_shipdate",
+          "format": "iso"
+        },
+      "columns": [
+            "o_orderkey",
+            "o_custkey",
+            "o_orderstatus",
+            "o_totalprice",
+            "o_orderdate",
+            "o_orderpriority",
+            "o_clerk",
+            "o_shippriority",
+            "o_comment",
+            "l_partkey",
+            "l_suppkey",
+            "l_linenumber",
+            "l_quantity",
+            "l_extendedprice",
+            "l_discount",
+            "l_tax",
+            "l_returnflag",
+            "l_linestatus",
+            "l_shipdate",
+            "l_commitdate",
+            "l_receiptdate",
+            "l_shipinstruct",
+            "l_shipmode",
+            "l_comment",
+            "order_year",
+            "ps_partkey",
+            "ps_suppkey",
+            "ps_availqty",
+            "ps_supplycost",
+            "ps_comment",
+            "s_name",
+            "s_address",
+            "s_phone",
+            "s_acctbal",
+            "s_comment",
+            "s_nation",
+            "s_region",
+            "p_name",
+            "p_mfgr",
+            "p_brand",
+            "p_type",
+            "p_size",
+            "p_container",
+            "p_retailprice",
+            "p_comment",
+            "c_name",
+            "c_address",
+            "c_phone",
+            "c_acctbal",
+            "c_mktsegment",
+            "c_comment",
+            "c_nation",
+            "c_region"
+          ],
+          "delimiter": "|",
+          "dimensionsSpec": {
+            "dimension": [
+              "o_orderkey",
+              "o_orderdate",
+              "o_orderstatus",
+              "o_orderpriority",
+              "o_clerk",
+              "o_shippriority",
+              "o_comment",
+              "l_returnflag",
+              "l_linestatus",
+              "l_commitdate",
+              "l_receiptdate",
+              "l_shipinstruct",
+              "l_shipmode",
+              "l_comment",
+              "ps_comment",
+              "s_name",
+              "s_address",
+              "s_phone",
+              "s_comment",
+              "s_nation",
+              "s_region",
+              "p_name",
+              "p_mfgr",
+              "p_brand",
+              "p_type",
+              "p_size",
+              "p_container",
+              "p_retailprice",
+              "p_comment",
+              "c_name",
+              "c_address",
+              "c_phone",
+              "c_mktsegment",
+              "c_comment",
+              "c_nation",
+              "c_region"
+            ],
+            "dimensionExclusions": ["o_orderkey", "o_custkey", "o_clerk", "o_comment", "l_partkey", "l_suppkey", "ps_partkey", "ps_suppkey", "ps_comment", "p_comment", "c_comment"],
+            "spatialDimensions": []
+          }
+        }
+      },
+      "metricsSpec": [
+        {
+          "type": "count",
+          "name": "count"
+        },
+        {
+          "type": "doubleSum",
+          "name": "o_totalprice",
+          "fieldName": "o_totalprice"
+        },
+        {
+          "type": "longSum",
+          "name": "l_quantity",
+          "fieldName": "l_quantity"
+        },
+        {
+          "type": "doubleSum",
+          "name": "l_extendedprice",
+          "fieldName": "l_extendedprice"
+        },
+        {
+          "type": "doubleSum",
+          "name": "l_tax",
+          "fieldName": "l_tax"
+        },
+        {
+          "type": "doubleSum",
+          "name": "l_discount",
+          "fieldName": "l_discount"
+        },
+        {
+          "type": "longSum",
+          "name": "ps_availqty",
+          "fieldName": "ps_availqty"
+        },
+        {
+          "type": "doubleSum",
+          "name": "ps_supplycost",
+          "fieldName": "ps_supplycost"
+        },
+        {
+          "type": "doubleSum",
+          "name": "c_acctbal",
+          "fieldName": "c_acctbal"
+        }
+      ],
+      "granularitySpec": {
+        "type": "uniform",
+        "segmentGranularity": "MONTH",
+        "queryGranularity": "all",
+        "intervals": [
+          "1993-01-01/1997-12-31"
+        ]
+      }
+    },
+    "ioConfig": {
+      "type": "hadoop",
+      "inputSpec": {
+            "type": "static",
+            "paths": "s3://tpchdataset/datascale1/orderLineItemPartSupplierCustomer",
+            "filePattern":"part-*"
+      }
+    },
+  "tuningConfig":{
+     "type":"hadoop",
+     "partitionsSpec":{
+        "type":"hashed",
+        "targetPartitionSize":1000000
+     },
+     "leaveIntermediate":false,
+     "cleanupOnFailure":true,
+     "overwriteFiles":false,
+     "ignoreInvalidRows":false,
+     "combineText":true,
+     "useCombiner":true,
+     "rowFlushBoundary":"100000",
+     "numBackgroundPersistThreads" : 1,
+     "jobProperties":{
+        "mapreduce.reduce.log.level":"INFO",
+        "mapreduce.job.user.classpath.first":"true",
+        "mapreduce.input.fileinputformat.split.maxsize" : 1368709120,
+        "mapreduce.reduce.shuffle.parallelcopies" : 50,
+         "mapreduce.reduce.shuffle.input.buffer.percent" : 0.5,
+        "mapreduce.task.io.sort.mb" : 256,
+        "mapreduce.task.io.sort.factor" : 100,
+        "mapreduce.map.memory.mb" : "3072",
+           "mapreduce.reduce.memory.mb" : "8096",
+           "mapreduce.map.java.opts" : "-Xmx3072m -Duser.timezone=UTC -Dfile.encoding=UTF-8",
+           "mapreduce.reduce.java.opts" : "-Xmx8096m -Duser.timezone=UTC -Dfile.encoding=UTF-8"
+     }
+  }
+  }
+
+}

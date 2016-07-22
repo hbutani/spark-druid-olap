@@ -1,0 +1,134 @@
+# Config File for query serving with TPCH1
+
+# # # # # # # # # # # # # Simple Settings (meta) # # # # # # # # # # # # #
+
+# Used for name of cluster and name of configuration
+    name="TPCH1"
+
+# Local directory in which the config files you wish to use are stored
+    LocalConfigFolder="$(pwd)/tpch1_configFiles/"
+
+# EMR Cluster Settings:
+    #  Name of key pair (must already be in AWS) that you wish to use.
+    #  You'll need this to access the instances in the cluster via SSH.
+    EC2KeyName=""
+
+    #  Additional Security groups that you want to add (by id) to all the 
+    #+ instances go here. Typically you'll want to have a security group 
+    #+ with your IP allowing inbound/outbound network traffic so that you
+    #+ can actually access the cluster. Also must already be in AWS.
+    SecurityGroupIDs=""
+
+    #  Type of instance that you wish the master/slave machines to be. 
+    #  More info on available instance types here: http://amzn.to/1SjDBb4
+    #  Make sure your availability area and zone (below) as well as your 
+    #+ spot price match match the instance types you choose.
+    MasterInstanceType="m3.xlarge"
+    SlaveInstanceType="m3.2xlarge"
+
+    #  Number of Slave Instances you want in the cluster.
+    #  Over 19 may be problematic.
+    NumSlaveInstances=2
+
+    #  Spot Bid Price for master and slave instances. 
+    #  More info here: http://amzn.to/29RxmKG
+    #  Consider instance types and regions when choosing these.
+    MasterSpotPrice="0.15"
+    SlaveSpotPrice="0.25"
+
+    #  Area and zone for the cluster. Can safely leave this as is.
+    availability_area="us-east-1"
+    availability_zone="${availability_area}d"
+
+# Determines where in S3 intermediary provisioning files are copied to.
+# Can be left alone in most cases.
+    S3SetupBucket="s3://tempSetupBucket/"
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+# Actual Settings (Leave these alone unless you know what you're doing)
+EMR_Provision="-a ${availability_area} -s ${S3SetupBucket}"
+EMR_Spinup=(
+	--name $name
+	--tags cluster_name="$name"
+	--release-label emr-4.7.1
+	--termination-protected
+	--applications Name="Hadoop" Name="Ganglia" Name="Spark"
+	--instance-groups Name="${name}-Master",InstanceGroupType="MASTER",InstanceCount=1,InstanceType="$MasterInstanceType",BidPrice="$MasterSpotPrice"
+					  Name="${name}-Slaves",InstanceGroupType="CORE",InstanceCount=$NumSlaveInstances,InstanceType="$SlaveInstanceType",BidPrice="$SlaveSpotPrice"
+	--use-default-roles
+	--ec2-attributes AvailabilityZone="${availability_zone}",KeyName="$EC2KeyName",AdditionalMasterSecurityGroups=["$SecurityGroupIDs"],AdditionalSlaveSecurityGroups=["$SecurityGroupIDs"]
+	--bootstrap-actions Path="${S3SetupBucket}provision.sh",Name=Provision
+)
+Obtain_IDs_And_IPs="true"
+Configure_File_Processor=(
+	"__MASTER_PUBLIC_HOSTNAME__:MASTER_PUBLIC_HOSTNAME"
+)
+psb_Start="/tmp/"
+psb_S3Tarball=(
+	"s3://emr-sparkline/emr-sparkline-spinup.tar.gz"
+	"/home/hadoop"
+)
+psb_Config_Files=(
+	"$name"
+	"$S3SetupBucket"
+	"DDL:${LocalConfigFolder}ddl/ddl.sql"
+	"COMMON_RUNTIME_PROP:${LocalConfigFolder}druid/_common/common.runtime.properties"
+	"LOG4J2:${LocalConfigFolder}druid/_common/log4j2.xml"
+	"BROKER_JVM_CONF:${LocalConfigFolder}druid/broker/jvm.config"
+	"BROKER_RUNTIME_PROP:${LocalConfigFolder}druid/broker/runtime.properties"
+	"COOR_JVM_CONF:${LocalConfigFolder}druid/coordinator/jvm.config"
+	"COOR_RUNTIME_PROP:${LocalConfigFolder}druid/coordinator/runtime.properties"
+	"HIST_JVM_CONF:${LocalConfigFolder}druid/historical/jvm.config"
+	"HIST_RUNTIME_PROP:${LocalConfigFolder}druid/historical/runtime.properties"
+	"SPARKLINE_JAR:${LocalConfigFolder}sparkline/spark-druid-olap-assembly-0.1.0.jar"
+	"SPARKLINE_PROP:${LocalConfigFolder}sparkline/sparkline.spark.properties"
+	"INDEXING_JSON:${LocalConfigFolder}indexing/tpch_1_index_hadoop.json"
+	"MIDDLE_JVM_CONF:${LocalConfigFolder}druid/middleManager/jvm.config"
+	"MIDDLE_RUNTIME_PROP:${LocalConfigFolder}druid/middleManager/runtime.properties"
+	"OVER_JVM_CONF:${LocalConfigFolder}druid/overlord/jvm.config"
+	"OVER_RUNTIME_PROP:${LocalConfigFolder}druid/overlord/runtime.properties"
+)
+psb_Misc="true"
+EMR_Wait="true"
+psb_Run="$S3SetupBucket"
+Start_Master="$S3SetupBucket"
+Start_Slaves="$S3SetupBucket"
+Add2Hosts="true $name"
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+# Internal Var Overrides:
+# CLUSTER_ID=""
+# MASTER_INSTANCE_ID=""
+# SLAVE_INSTANCE_IDS=()
+
+# MASTER_PRIVATE_HOSTNAME=""
+# MASTER_PRIVATE_IP=""
+# MASTER_PUBLIC_HOSTNAME=""
+# MASTER_PUBLIC_IP=""
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+printf ${CYAN}
+cat << EOF
+                                    
+                                88  
+                                88  
+                                88  
+,adPPYba,  ,adPPYba, ,adPPYYba, 88  
+I8[    "" a8P_____88 ""     \`Y8 88  
+ \`"Y8ba,  8PP""""""" ,adPPPPP88 88  
+aa    ]8I "8b,   ,aa 88,    ,88 88  
+\`"YbbdP"'  \`"Ybbd8"' \`"8bbdP"Y8 88  
+                                    
+..of approval. This config file is
+approved and tested by SparklineData.
+EOF
+printf ${NC}
+
+##########################
+# AUTHOR:  Rahul Butani  #
+# DATE:    July 22, 2016 #
+# VERSION: 0.3.3         #
+##########################
