@@ -110,14 +110,14 @@ object DruidPlanner {
 
   val DRUID_QUERY_COST_MODEL_HIST_MERGE_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.histMergeCostFactor",
-    defaultValue = Some(0.2),
+    defaultValue = Some(0.07),
     doc = "cost of performing a segment agg. merge in druid " +
       "historicals relative to spark shuffle cost"
   )
 
   val DRUID_QUERY_COST_MODEL_HIST_SEGMENTS_PERQUERY_LIMIT = intConf(
     "spark.sparklinedata.druid.querycostmodel.histSegsPerQueryLimit",
-    defaultValue = Some(3),
+    defaultValue = Some(5),
     doc = "the max. number of segments processed per historical query."
   )
 
@@ -134,14 +134,14 @@ object DruidPlanner {
 
   val DRUID_QUERY_COST_MODEL_HISTORICAL_PROCESSING_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.historicalProcessingCost",
-    defaultValue = Some(0.25),
+    defaultValue = Some(0.1),
     doc = "the cost per row of groupBy processing in historical servers " +
       "relative to spark shuffle cost"
   )
 
   val DRUID_QUERY_COST_MODEL_HISTORICAL_TIMESERIES_PROCESSING_COST = doubleConf(
     "spark.sparklinedata.druid.querycostmodel.historicalTimeSeriesProcessingCost",
-    defaultValue = Some(0.1),
+    defaultValue = Some(0.07),
     doc = "the cost per row of timeseries processing in historical servers " +
       "relative to spark shuffle cost"
   )
