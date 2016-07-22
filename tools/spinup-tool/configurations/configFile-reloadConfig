@@ -1,0 +1,103 @@
+# Config File for reloading configuration files
+
+# # # # # # # # # # # # # Simple Settings (meta) # # # # # # # # # # # # #
+
+# Cluster ID of existing EMR cluster
+	#  Can be found on the AWS Console or in the output from the spinup
+	#+ script when the cluster was set up.
+	#  If this is left blank, you will be prompted for the Cluster ID
+	#+ when the spinup script is run.
+	Existing_Cluster_ID=""
+
+# Used for name of new/reloaded configuration
+    name="TPCH1"
+
+# Local directory in which the config files you wish to use are stored
+    LocalConfigFolder="$(pwd)/tpch1_configFiles/"
+
+# Determines where in S3 intermediary provisioning files are copied to.
+# Can be left alone in most cases.
+	S3SetupBucket="s3://tempSetupBucket/"
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+# Actual Settings
+EMR_Instance_ID="$Existing_Cluster_ID"
+Obtain_IDs_And_IPs="true"
+Configure_File_Processor=(
+	"__MASTER_PUBLIC_HOSTNAME__:MASTER_PUBLIC_HOSTNAME"
+)
+psb_Start="/tmp/"
+psb_Config_Files=(
+	"$name"
+	"$S3SetupBucket"
+	"DDL:${LocalConfigFolder}ddl/ddl.sql"
+	"COMMON_RUNTIME_PROP:${LocalConfigFolder}druid/_common/common.runtime.properties"
+	"LOG4J2:${LocalConfigFolder}druid/_common/log4j2.xml"
+	"BROKER_JVM_CONF:${LocalConfigFolder}druid/broker/jvm.config"
+	"BROKER_RUNTIME_PROP:${LocalConfigFolder}druid/broker/runtime.properties"
+	"COOR_JVM_CONF:${LocalConfigFolder}druid/coordinator/jvm.config"
+	"COOR_RUNTIME_PROP:${LocalConfigFolder}druid/coordinator/runtime.properties"
+	"HIST_JVM_CONF:${LocalConfigFolder}druid/historical/jvm.config"
+	"HIST_RUNTIME_PROP:${LocalConfigFolder}druid/historical/runtime.properties"
+	"SPARKLINE_JAR:${LocalConfigFolder}sparkline/spark-druid-olap-assembly-0.1.0.jar"
+	"SPARKLINE_PROP:${LocalConfigFolder}sparkline/sparkline.spark.properties"
+	"INDEXING_JSON:${LocalConfigFolder}indexing/tpch_1_index_hadoop.json"
+	"MIDDLE_JVM_CONF:${LocalConfigFolder}druid/middleManager/jvm.config"
+	"MIDDLE_RUNTIME_PROP:${LocalConfigFolder}druid/middleManager/runtime.properties"
+	"OVER_JVM_CONF:${LocalConfigFolder}druid/overlord/jvm.config"
+	"OVER_RUNTIME_PROP:${LocalConfigFolder}druid/overlord/runtime.properties"
+)
+EMR_Wait="true"
+psb_Run="$S3SetupBucket"
+Start_Master="$S3SetupBucket"
+Start_Slaves="$S3SetupBucket"
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+# Internal Var Overrides:
+# CLUSTER_ID=""
+# MASTER_INSTANCE_ID=""
+# SLAVE_INSTANCE_IDS=()
+
+# MASTER_PRIVATE_HOSTNAME=""
+# MASTER_PRIVATE_IP=""
+# MASTER_PUBLIC_HOSTNAME=""
+# MASTER_PUBLIC_IP=""
+
+options=(
+    "EMR_Instance_ID"
+    "Obtain_IDs_And_IPs"
+    "Configure_File_Processor"
+    "psb_Start"
+    "psb_Config_Files"
+    "EMR_Wait"
+    "psb_Run"
+    "Start_Master"
+    "Start_Slaves"
+)
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+printf ${CYAN}
+cat << EOF
+                                    
+                                88  
+                                88  
+                                88  
+,adPPYba,  ,adPPYba, ,adPPYYba, 88  
+I8[    "" a8P_____88 ""     \`Y8 88  
+ \`"Y8ba,  8PP""""""" ,adPPPPP88 88  
+aa    ]8I "8b,   ,aa 88,    ,88 88  
+\`"YbbdP"'  \`"Ybbd8"' \`"8bbdP"Y8 88  
+                                    
+..of approval. This config file is
+approved and tested by SparklineData.
+EOF
+printf ${NC}
+
+##########################
+# AUTHOR:  Rahul Butani  #
+# DATE:    July 22, 2016 #
+# VERSION: 0.3.3         #
+##########################

@@ -1,0 +1,297 @@
+Script modes:
+	1) Interactive
+		- Used by default, or by specifying -i
+		- Runs through each setting/preference/option and provides help text
+		- Offers to create setup file at the end
+	2) Config File
+		- Specified using "-c" + a config file location
+		- 'Config' file is basically a .sh file with a bunch of variables
+			+ Remember to validate the variables...
+		- Sets preferences based on said variables
+		- Falls back to interactive mode for anything set incorrectly or not specified
+	3) Quiet Mode
+		- Specified using "-q"
+		- Same as config mode, without the fallback to interactive (stops with an error)
+		- Still provides text output (errors, status, etc.)
+	4) QuietQuiet Mode
+		- Specified using "-Q" (a la apt-get - not really because getopts, but it'll do)
+		- Same as Quiet Mode, except without any text output
+		- For use in scripts
+		- The logic behind Q Mode also disabling the interactive fallback is that you can't really have an interactive mode without text output... Also it doesn't make any sense.
+	5) Debug Mode
+		- Specified using "-D"
+		- Runs `set -x`
+	5) [TODO] Dry Mode
+		- Specified using "-d"?
+		- Merely lists out all actions without doing anything
+	6) [TODO] Verify config file mode
+		- Specified using "-v"?
+		- Stops after Step 2 in the script flow
+
+Script Flow:
+	1) Process arguments:
+		* First, check for correct usage of arguments
+			- Ex: "-J" doesn't exist, call printInstructions function, exit
+		* Second, process mode arguments (i, c, q, Q)
+			- If i (interactive), do nothing
+			- If c (config file), process config file (method call)
+				+ Sanitize config file input (only variables) + load (source it)
+			- If q (quiet), set $interactive to false
+			- If Q (quietquiet), set $output to "false"
+				~ SCRAPPED: All echo statements should end with $output
+	2) Check for dependencies:
+		- (List below)
+		- This is 2nd because help text
+	3) Process options:
+		- Essentially, run through a list of the options (provided in the array of options)
+		- Check if variable for that option is set
+			* If not, call corresponding function with -h
+			~ If $interactive is set to false, die.
+			* Record input to set that variable
+				- Set $changed variable to true (or just set it)
+		- If set, check the variable provided for that is valid 
+			* Call corresponding function with -v
+			* If returns error, repeat (until no error is returned) (and set changed to true)
+			~ Unless $interactive is set to false. In which case, after the error is printed, die. (don't repeat and don't allow user to enter anything)
+		- Once no error is returned (i.e. variable is verified)
+			* Call corresponding function with only the variable
+	4) End:
+		- Print out a list of all 'options' run.
+		- If $changed, then offer to save currently set variables to a new configFile
+		- echo "Fin."
+		- exit
+
+Architecture of Options in Script:
+	- Each 'option' should have:
+		1) A function in the script of the name: fun_(NameOfOption)()
+		2) A variable in the config file of the name $(NameOfOption)
+		3) An entry in the list of options
+	- [TODO] In the future, possibly switch to a system where:
+		- One bash file for script functions that includes an array of required options (by option name which can be used to get to function name), an array of all options, and all the option functions
+		- The file is sourced by the main script
+		- Probably won't do this, no real reason to..
+
+Architecture of Option Functions:
+	- If called with -h (help)
+		* Print out help text (what to provide as variable)
+		* Exit successfully
+	- If called with -v (verify)
+		* Verify provided arguments
+		* If arguments are right, exit successfully
+		* If not, print help text and exit with an error
+	- [PLANNED] If called with --dry(?)
+		* Run without actually running (list actions instead)
+	- [PLANNED] If called with --depend(?)
+		* List dependencies that function has
+		* On other functions and on bash utilites/programs
+		* And on global variables
+	- All other arguments can be used for whatever that function wants
+		+ Can have multiple arguments and flags, though one argument would be preferable (K.I.S.S)
+
+Tentative List of Option Functions (in order of execution)
+	0) mode
+		* Empty function for the purposes of universal mode variable
+		* Ex: Druid-Indexing, Query-Server, Benchmarking, etc.
+		NOTE: Abandoning this..
+	a) [PLANNED] EC2 Spot price setting thing (show user a graph of prices after asking for instance type and then ask them which availability zone; based on that set the availability zone variable)
+	1) EMR_Provision
+		- Set up provision script... (upload script to S3 with the right availability region built in)
+	2) EMR_Spinup
+		- Things to consider: (Potential Params)
+			* Name of Cluster
+			* Software to Install
+			* # of master nodes
+			# # of slave nodes
+			* Instance Type for Master (i.e. m.2xlarge, etc.)
+			* Instance Type for Slave
+			* Subnet (i.e. us-east1a)
+			* Spot Price for Master
+			* Spot Price for Slave(s)
+			* Key to use (.pem)
+			* Security Group
+			* Bootstrapping (Provision Script)
+		- This script should spin up the cluster
+			- And rename the nodes
+			- And set a global variable for the machines spun up
+		- And install the AWS SSM client on the machines
+		+ NOTE: The above assumes IAM is configured properly in the AWS console...
+		- Not including other actions in the at-spin-up provisioning allows for easier customizability (as decoupling from the spin up and using EC2 run allows other functions to do different things on their own)
+		# Finally, sets (other) guaranteed vars: (nvm, moved to Obtain_IDs_And_IPs)	
+	3) Obtain_IDs_And_IPs
+		- Private/Public IPs/DNS Names > saves them all to separate vars (all 4):
+			* MASTER_PRIVATE_HOSTNAME
+			* MASTER_PRIVATE_IP
+			* MASTER_PUBLIC_HOSTNAME
+			* MASTER_PUBLIC_IP
+	4) Configure_File_Processor
+		- Must run before psb_Config_Files if you want psb_Config_Files to replace things in the configuration files
+		- Essentially:
+			* takes the key:value pairs that the fileProcessor uses (this is the only param)
+			* verifies the pairs
+			* and finally saves them to a global var (replacements) for later use
+	5) psb_Start (psb = Provision Script Builder)
+		- Params:
+			+ Temp location for builder script
+		- Set global var for script temp location
+		- Create script..
+	6) psb_S3Tarball
+		- Params:
+			+ s3 location of tarball
+			- (or start of tarball name, should select the newest...)
+				* This is being scrapped because its unlikely to be useful and because aws s3 ls doesn't
+				* support flags..
+				+ NVM, Can use --query to do this, TODO
+			+ location to untar to
+		- Add to temp script
+	7) psb_Config_Files
+		- Params:
+			+ Name of configuration
+			+ S3 Setup Bucket
+			+ Array of key-value pairs (key:value):
+				* ( DDL 				:  ddl-> ddl.sql path 						   )
+				* ( COMMON_RUNTIME_PROP : _common-> common.runtime.properties path     )
+				* ( LOG4J2              : _common-> log4j2.xml path                    ) 
+				* ( BROKER_JVM_CONF		:  broker-> jvm.config path                    )
+				* ( BROKER_RUNTIME_PROP :  broker-> runtime.properties path            )
+				* ( COOR_JVM_CONF       :  coordinator-> jvm.config path               )
+				* ( COOR_RUNTIME_PROP   :  coordinator-> runtime.properties path       )
+				* ( HIST_JVM_CONF		:  historical-> jvm.config path                )
+				* ( HIST_RUNTIME_PROP   :  historical-> runtime.properties path        )
+				* ( SPARKLINE_JAR       :  sparkline-> spark-druid-olap-0.x.x.jar path )
+				* ( SPARKLINE_PROP      :  sparkline-> sparkline.spark.properties path ) (also goes to thriftserver...)
+				* ( INDEXING_JSON		:  indexing-> <name>_index_hadoop.json path    ) (optional)
+				* ( MIDDLE_JVM_CONF		:  middleManager-> jvm.config path             ) (optional)
+				* ( MIDDLE_RUNTIME_PROP :  middleManager-> runtime.properties path     ) (optional)
+				* ( OVER_JVM_CONF       :  overlord-> jvm.config path                  ) (optional)
+				* ( OVER_RUNTIME_PROP   :  overlord-> runtime.properties path          ) (optional)
+				- paths can be s3 or local or github
+		- In verify mode:
+			+ Checks that all keys are valid
+			+ Checks that all required keys are present
+			+ Checks that all file paths point to files that exist
+		+ First adds lines to provision script to set up directory structure
+			+ ~/home/configurations/{name of configuration}/
+			-											    |- ddl/
+			-											    |- druid/
+			-														 |- _common/
+			-														 |- broker/
+			-														 |- coordinator/
+			-														 |- historical/
+			-														 |- middleManager/
+			-														 |- overlord/
+			-											    |- indexing/
+			-											    |- sparkline/ (also possibly thriftserver??)
+		+ Next, runs all the files in the array through:
+			* the copier (copies the file from s3 or file path to /tmp/)
+			* the fileProcessor (makes replacements in the file in-place)
+			* the copier (copies file to s3://tmp/)
+			* finally, adds a line to the script
+		+ Finishes by adding a line to set the CONFIG_LOCATION var in .bashrc
+	8) psb_Misc
+	9) EMR_Wait
+	10) psb_Run
+	11) Start_Master
+	12) Start_Slaves
+	13) Add2Hosts
+	# 5) psb_ConfigName
+	# 	- Params:
+	# 		+ Config Name
+	# 	- Set global var for configName
+	# 	- Add lines to script to create folder in home for config files (using provided name)
+	# 6) psb_DDL
+	# 	- Params:
+	# 		+ File location (local or s3)
+	# 		+ Final file location on EC2 instance
+	# 	- Depends on:
+	# 		+ configName global variable
+	# 		+ copyFile function
+	# 7) psb_DruidConf
+	# 	- Same as above, but for Druid Config file
+
+Raw List of Actions Needed Per Node (after spinup):
+	- Install SSM-Agent
+	- Untar the tar
+		+ "Installs"/"Configures" Druid + Zookeeper
+		+ Adds all home directory things..
+		+ Adds .bashrc
+	- Make configuration files hierarchy + copy configuration files
+	- Set local variables:
+		+ Config files location
+		+ Druid_ZK_Host (master machine ip)
+	- Prepend spark thing (/usr/bin/spark/conf/spark-defaults.conf)
+	- Make other necessary folders (druid mounts)
+	- Copy thriftserver scripts to /usr/lib/spark/sbin
+	- Start!
+		- different on Master and on Slaves
+		- Master: Thriftserver && ZK && OCB
+		- Slave: Historical
+
+Internal Vars:
+	- Note that these are to be used for values that are not known before runtime (such as cluster id and master node IP) but are required during the spinup process.
+	1) CLUSTER_ID
+		- Set in EMR_Spinup
+		- Stores the cluster ID returned after creating the cluster
+		- To be used to obtain information about the cluster
+	2) MASTER_PRIVATE_IP
+		- Set in ObtainMasterIP
+		- Stores the internal IP (172.x.x.x) of the Master node
+
+Other functions:
+	1) copyFile()
+		- Given a file (s3 or local or github) and a final location (s3 or local), copies the file
+		- When called using -v, verifies that the file and output location are valid (s3, local, or gh)
+		- TODO: Perhaps eventually check if the file exists...
+		- Pseudo:
+			* Identify file as local, s3, or gh (note that github really just means a URL...shhh)
+			* Copy to /tmp/intermediary
+			* Identify final location as local or s3
+			* Accordingly run "aws s3 cp /tmp/intermediary $fileLoc" or "cp /tmp/intermediary $fileLoc"
+	2) fileProcessor()
+		- Takes a file and an array of key value pairs (in the form "key:value") and an output location
+		- Replaces all instances of each key with their respective value and outputs the new file to the specified location
+		- Will replace specific values of value with internal variables:
+			* value(_MASTER_IP_) -> $MASTER_IP
+	3) jsonParser()
+		- Takes a json file (or just json as a var?) and a desired value from the json file
+		- Uses a python one-liner to return the requested value
+		- NOTE: Probably unnecessary due to aws cli's parse
+	4) internalVarReplacer()
+		- Replies certain strings with the value of a variable
+		- Ex: "MASTER_IP" >> $MASTER_IP
+
+List of environment setup types for the script:
+	NOTE: Probably not going to make this an option...
+	1) Druid Indexing
+		- Requirements:
+			+ SQL Server (separate EC2 instance)
+			+ Druid on all nodes + Zookeeper
+			+ Hadoop/HDFS for S3
+	2) Query Server
+		- Requirements:
+			+ SQL Server for reading Druid index data (separate Ec2 Instance)
+			+ Druid on all nodes + Zookeeper (historicals on slaves)
+			+ Spark + SLD jar + custom thrift-server script (on Master)
+	3) Benchmarking
+		- Requirements:
+			???
+
+Script Dependencies:
+	- Runtime:
+		+ AWS CLI (w/keys?)
+		+ AWS CLI set to output either json or text (no tables!!)
+		+ Read/write access to /tmp/
+	- AWS Account:
+		+ IAM set up correctly for EC2 Run
+
+Script Limitations/Caveatsß:
+	- Really only designed for one master node at this time:
+		+ For the more detailed setup methods that is
+		+ This is because of the master ip stuff: one master node is assumed
+
+Config File Specs:
+	- Variables other than the option variable are allowed, HOWEVER:
+		+ They cannot be required by other option functions.
+		+ An option function can only depend on its own option variable and the option variables of other 
+
+Future TODO:
+	- Script to set up the environment in the .tar.gz...
