@@ -1,65 +1,96 @@
-name := "spark-druid-olap"
 
-version := "0.1.0"
+scalaVersion := "2.10.5"
 
-organization := "SparklineData"
-
-scalaVersion := "2.10.4"
-
-javaOptions += " -Xms1g -Xmx2g -Duser.timezone=UTC "
+crossScalaVersions := Seq("2.10.5", "2.11.6")
 
 parallelExecution in Test := false
 
-crossScalaVersions := Seq("2.10.4", "2.11.6")
-
-sparkVersion := "1.6.0"
-
-spName := "SparklineData/spark-druid-olap"
-
-//spAppendScalaVersion := true
-
-scalacOptions += "-feature"
-
-
-// All Spark Packages need a license
-licenses := Seq("Apache-2.0" -> url("http://opensource.org/licenses/Apache-2.0"))
-
-
-// Add Spark components this package depends on, e.g, "mllib", ....
-sparkComponents ++= Seq("sql", "hive", "hive-thriftserver")
-
-credentials += Credentials(Path.userHome / ".github.cred")
-
-// uncomment and change the value below to change the directory where your zip artifact will be created
-// spDistDirectory := target.value
-
-// add any Spark Package dependencies using spDependencies.
-// e.g. spDependencies += "databricks/spark-avro:0.1"
-
+val nscalaVersion = "1.6.0"
+val scalatestVersion = "2.2.4"
 val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
-val scalatestVersion = "2.2.4"
 val sparkdateTimeVersion = "0.0.2"
 val scoptVersion = "3.3.0"
+val sparkVersion = "1.6.0"
 
-libraryDependencies ++= Seq(
+val coreDependencies = Seq(
+  "com.github.nscala-time" %% "nscala-time" % nscalaVersion,
+  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion % "provided",
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
   //"org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
   "com.sparklinedata" %% "spark-datetime" % sparkdateTimeVersion,
   "com.github.scopt" %% "scopt" % scoptVersion,
+  "org.scalatest" %% "scalatest" % scalatestVersion % "test"
+)
+
+val coreTestDependencies = Seq(
   "org.scalatest" %% "scalatest" % scalatestVersion % "test",
   "com.databricks" %% "spark-csv" % "1.1.0" % "test"
 )
 
-assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+lazy val commonSettings = Seq(
+  organization := "com.sparklinedata",
 
-test in assembly := {}
+  version := "0.1.0",
 
-spShortDescription := "Spark Druid Package" // Your one line description of your package
+  javaOptions := Seq("-Xms1g", "-Xmx2g", "-Duser.timezone=UTC", "-XX:MaxPermSize=256M"),
 
-spDescription := """Spark-Druid package enables'Logical Plans' written against a raw event dataset
-                     to be rewritten to take advantage of a Drud Index of the Event data. It
-                     comprises of a 'Druid DataSource' that wraps the 'raw event dataset', and a
-                     'Druid Planner' that contains a set of Rewrite Rules to convert
-                     'Project-Filter-Aggregation-Having-Sort-Limit' plans to Druid Index Rest calls.""".stripMargin
+  // Target Java 7
+  scalacOptions += "-target:jvm-1.7",
+  javacOptions in compile ++= Seq("-source", "1.7", "-target", "1.7"),
+
+  scalacOptions := Seq("-feature", "-deprecation"),
+
+  licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+
+  homepage := Some(url("https://github.com/SparklineData/spark-datetime")),
+
+  publishMavenStyle := true,
+
+  publishTo := Some("releases" at "https://oss.sonatype.org/service/local/staging/deploy/maven2/"),
+
+  publishArtifact in Test := false,
+
+  pomIncludeRepository := { _ => false },
+
+  test in assembly := {},
+
+  useGpg := true,
+
+  usePgpKeyHex("C922EB45"),
+
+  pomExtra := (
+    <scm>
+      <url>https://github.com/SparklineData/spark-datetime.git</url>
+      <connection>scm:git:git@github.com:SparklineData/spark-datetime.git</connection>
+    </scm>
+      <developers>
+        <developer>
+          <name>Harish Butani</name>
+          <organization>SparklineData</organization>
+          <organizationUrl>http://sparklinedata.com/</organizationUrl>
+        </developer>
+      </developers>),
+
+  fork in Test := true
+) ++ releaseSettings ++ Seq(
+  ReleaseKeys.publishArtifactsAction := PgpKeys.publishSigned.value
+)
+
+
+lazy val root = project.in(file("."))
+  .settings(commonSettings: _*)
+  .settings(name := "accelerator")
+  .settings(libraryDependencies ++= (coreDependencies ++ coreTestDependencies))
+  .settings(assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false))
+  .settings(
+    artifact in (Compile, assembly) ~= { art =>
+      art.copy(`classifier` = Some("assembly"))
+    }
+  )
+  .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
+
