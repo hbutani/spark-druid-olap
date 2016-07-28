@@ -3,6 +3,7 @@
 resolvers ++= Seq(
   "Central" at "https://oss.sonatype.org/content/repositories/releases/"
 )
+resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/"
 
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
 
@@ -15,3 +16,5 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.0.5")
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.6.0")
 
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
+
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.0.5")

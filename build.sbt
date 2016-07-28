@@ -20,7 +20,7 @@ val coreDependencies = Seq(
   "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion % "provided",
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
-  //"org.json4s" %% "json4s-native" % json4sVersion,
+  // "org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
   "com.sparklinedata" %% "spark-datetime" % sparkdateTimeVersion,
   "com.github.scopt" %% "scopt" % scoptVersion,
@@ -35,7 +35,7 @@ val coreTestDependencies = Seq(
 lazy val commonSettings = Seq(
   organization := "com.sparklinedata",
 
-  version := "0.1.0",
+  version := "0.2.0",
 
   javaOptions := Seq("-Xms1g", "-Xmx2g", "-Duser.timezone=UTC", "-XX:MaxPermSize=256M"),
 
@@ -45,13 +45,23 @@ lazy val commonSettings = Seq(
 
   scalacOptions := Seq("-feature", "-deprecation"),
 
-  licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
+  licenses := Seq("Apache License, Version 2.0" ->
+    url("http://www.apache.org/licenses/LICENSE-2.0")
+  ),
 
   homepage := Some(url("https://github.com/SparklineData/spark-datetime")),
 
   publishMavenStyle := true,
 
-  publishTo := Some("releases" at "https://oss.sonatype.org/service/local/staging/deploy/maven2/"),
+  publishTo := {
+      val nexus = "https://oss.sonatype.org/"
+      if (version.value.trim.endsWith("SNAPSHOT")) {
+          Some("snapshots" at nexus + "content/repositories/snapshots")
+      }
+      else {
+          Some("releases" at nexus + "service/local/staging/deploy/maven2")
+      }
+  },
 
   publishArtifact in Test := false,
 
@@ -86,7 +96,9 @@ lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
   .settings(name := "accelerator")
   .settings(libraryDependencies ++= (coreDependencies ++ coreTestDependencies))
-  .settings(assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false))
+  .settings(assemblyOption in assembly :=
+    (assemblyOption in assembly).value.copy(includeScala = false)
+  )
   .settings(
     artifact in (Compile, assembly) ~= { art =>
       art.copy(`classifier` = Some("assembly"))
