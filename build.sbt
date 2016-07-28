@@ -36,22 +36,17 @@ credentials += Credentials(Path.userHome / ".github.cred")
 // add any Spark Package dependencies using spDependencies.
 // e.g. spDependencies += "databricks/spark-avro:0.1"
 
-resolvers ++= Seq(
-  "JitPack.IO" at "https://jitpack.io",
-  Resolver.sonatypeRepo("public")
-)
-
 val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
 val scalatestVersion = "2.2.4"
-val sparkdateTimeVersion = "bf5693a575a1dea5b663e4e8b30a0ba94c21d62d"
+val sparkdateTimeVersion = "0.0.2"
 val scoptVersion = "3.3.0"
 
 libraryDependencies ++= Seq(
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
   //"org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
-  "com.github.SparklineData" % "spark-datetime" % sparkdateTimeVersion,
+  "com.sparklinedata" %% "spark-datetime" % sparkdateTimeVersion,
   "com.github.scopt" %% "scopt" % scoptVersion,
   "org.scalatest" %% "scalatest" % scalatestVersion % "test",
   "com.databricks" %% "spark-csv" % "1.1.0" % "test"
