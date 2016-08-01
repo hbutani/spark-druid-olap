@@ -33,7 +33,7 @@ docs/auto/
 *.blg
 *.fdb_latexmk
 *.fls
-*.xml
+docs/*.xml
 *.tex
 *.tiff
 docs/benchmark/*.html
