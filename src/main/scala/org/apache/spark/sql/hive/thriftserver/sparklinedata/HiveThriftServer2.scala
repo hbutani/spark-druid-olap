@@ -18,19 +18,24 @@
 package org.apache.spark.sql.hive.thriftserver.sparklinedata
 
 import java.io.PrintStream
-import scala.collection.JavaConverters._
+
 import org.apache.hive.service.server.HiveServerServerOptionsProcessor
 import org.apache.spark.scheduler.StatsReportListener
-import org.apache.spark.{Logging, SparkConf, SparkContext}
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
-import org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver
-import org.apache.spark.sql.hive.thriftserver.{SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
+import org.apache.spark.sql.hive.thriftserver.HiveThriftServer2.HiveThriftServer2Listener
 import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
-import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.apache.spark.sql.hive.thriftserver.sparklinedata.ui.DruidStatisticalTab
+import org.apache.spark.sql.hive.thriftserver.ui.ThriftServerTab
+import org.apache.spark.sql.hive.thriftserver.{SparkSQLCLIDriver, SparkSQLEnv, HiveThriftServer2 => realServer}
 import org.apache.spark.sql.planner.logical.DruidLogicalOptimizer
+import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.apache.spark.ui.SparkUI
 import org.apache.spark.util.{ShutdownHookManager, Utils}
+import org.apache.spark.{Logging, SparkConf, SparkContext, SparkException}
 import org.sparklinedata.spark.dateTime.Functions
+
+import scala.collection.JavaConverters._
 
 /**
   * A wrapper for spark's [[org.apache.spark.sql.hive.thriftserver.HiveThriftServer2]].
@@ -44,7 +49,6 @@ object HiveThriftServer2 extends Logging {
     if (!optionsProcessor.process(args)) {
       System.exit(-1)
     }
-
     logInfo("Starting SparkContext")
     SparklineSQLEnv.init()
 
@@ -53,12 +57,11 @@ object HiveThriftServer2 extends Logging {
 
     ShutdownHookManager.addShutdownHook { () =>
       SparkSQLEnv.stop()
-      RealHiveThriftServer2.uiTab.foreach(_.detach())
+      realServer.uiTab.foreach(_.detach())
     }
 
     try {
-      RealHiveThriftServer2.startWithContext(SparkSQLEnv.hiveContext)
-
+      this.startWithContextT(SparkSQLEnv.hiveContext)
       if (SparkSQLEnv.sparkContext.stopped.get()) {
         logError("SparkContext has stopped even if HiveServer2 has started, so exit")
         System.exit(-1)
@@ -70,6 +73,20 @@ object HiveThriftServer2 extends Logging {
     }
   }
 
+  def startWithContextT(sqlContext: HiveContext): Unit = {
+    val server = new realServer(sqlContext)
+    server.init(sqlContext.hiveconf)
+    server.start()
+    realServer.listener = new HiveThriftServer2Listener(server, sqlContext.conf)
+    sqlContext.sparkContext.addSparkListener(realServer.listener)
+
+     if (sqlContext.sparkContext.getConf.getBoolean("spark.ui.enabled", true)) {
+        Some(new ThriftServerTab(sqlContext.sparkContext))
+        Some(new DruidStatisticalTab(sqlContext.sparkContext))
+    } else {
+      None
+    }
+  }
 }
 
 object SparklineSQLEnv extends Logging {

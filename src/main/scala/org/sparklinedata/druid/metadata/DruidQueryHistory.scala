@@ -61,6 +61,4 @@ object DruidQueryHistory {
   def getHistory : List[DruidQueryExecutionView] = synchronized {
     history.toList
   }
-
-
 }
