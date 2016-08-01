@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.sql.hive.thriftserver.sparklinedata.ui
 
 import javax.servlet.http.HttpServletRequest
@@ -7,11 +24,11 @@ import org.sparklinedata.druid.metadata.{DruidQueryExecutionView, DruidQueryHist
 import scala.xml.Node
 
 
-private[ui] class DruidStatisticalPage(parent: DruidStatisticalTab) extends WebUIPage("") with Logging {
+private[ui] class DruidQueriesPage(parent: DruidQueriesTab) extends WebUIPage("") with Logging {
 
   def render(request: HttpServletRequest): Seq[Node] = {
     val content = generateDruidStatsTable()
-    UIUtils.headerSparkPage("DruidQuery Statistics", content, parent, Some(5000))
+    UIUtils.headerSparkPage("Druid Query Details", content, parent, Some(5000))
   }
 
   private def generateDruidStatsTable(): Seq[Node] = {
@@ -49,10 +66,10 @@ private[ui] class DruidStatisticalPage(parent: DruidStatisticalTab) extends WebU
       None
     }
     val content =
-      <h5 id="sqlstat">Druid Query Statistics</h5> ++
+      <h5 id="sqlstat">Druid Query Details</h5> ++
         <div>
           <ul class="unstyled">
-            {table.getOrElse("No statistics have been generated yet.")}
+            {table.getOrElse("No queries have been executed yet.")}
           </ul>
         </div>
     content
