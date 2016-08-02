@@ -127,6 +127,12 @@ class DefaultSource extends RelationProvider with Logging {
     val numProcessingThreadsPerHistorical =
       parameters.get(NUM_PROCESSING_THREADS_PER_HISTORICAL).map(_.toInt)
 
+    val nonAggregateQueryHandling:
+    NonAggregateQueryHandling.Value = NonAggregateQueryHandling.withName(
+      parameters.get(NON_AGG_QUERY_HANDLING).
+        getOrElse(DEFAULT_NON_AGG_QUERY_HANDLING)
+    )
+
     val options = DruidRelationOptions(
       maxCardinality,
       cardinalityPerDruidQuery,
@@ -140,7 +146,8 @@ class DefaultSource extends RelationProvider with Logging {
       zkQualifyDiscoveryNames,
       numSegmentsPerHistoricalQuery,
       useSmile,
-      numProcessingThreadsPerHistorical
+      numProcessingThreadsPerHistorical,
+      nonAggregateQueryHandling
     )
 
 
@@ -257,5 +264,8 @@ object DefaultSource {
   val DEFAULT_USE_SMILE = "true"
 
   val NUM_PROCESSING_THREADS_PER_HISTORICAL = "numProcessingThreadsPerHistorical"
+
+  val NON_AGG_QUERY_HANDLING = "nonAggregateQueryHandling"
+  val DEFAULT_NON_AGG_QUERY_HANDLING = NonAggregateQueryHandling.PUSH_NONE.toString
 
 }

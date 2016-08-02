@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.client
 
 import org.scalatest.{BeforeAndAfterAll, fixture}
-import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationOptions}
+import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationOptions, NonAggregateQueryHandling}
 
 class CuratorConnectionTest extends fixture.FunSuite with
   fixture.TestDataFixture {
@@ -38,7 +38,10 @@ class CuratorConnectionTest extends fixture.FunSuite with
       false,
       true,
       Int.MaxValue,
-      true
+      true,
+      None,
+      NonAggregateQueryHandling.PUSH_NONE
+
     )
 
     val cc = new CuratorConnection(zkHosts,

@@ -20,13 +20,13 @@ package org.sparklinedata.druid
 import java.io.InputStream
 import java.util.Locale
 
-import org.apache.spark.sql.sources.druid.{DruidQueryResultIterator, SearchQueryResultIterator}
+import org.apache.spark.sql.sources.druid.{DruidQueryResultIterator, DruidSelectResultIterator, SearchQueryResultIterator}
 
 import scala.collection.breakOut
-import org.apache.spark.sql.types.{DataType, DoubleType, LongType, StringType}
+import org.apache.spark.sql.types._
 import org.joda.time.Interval
-import org.sparklinedata.druid.client.QueryResultRow
-import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDataType, DruidSegmentInfo}
+import org.sparklinedata.druid.client._
+import org.sparklinedata.druid.metadata.{DruidDataSource, DruidDataType, DruidRelationInfo, DruidSegmentInfo}
 
 sealed trait ExtractionFunctionSpec {
   val `type`: String
@@ -162,7 +162,17 @@ case class SelectorFilterSpec(`type`: String,
 
 case class RegexFilterSpec(`type`: String,
                            dimension: String,
-                           pattern: String) extends FilterSpec
+                           pattern: String) extends FilterSpec {
+  def this(dimension: String,
+           pattern: String) = this("regex", dimension, pattern)
+}
+
+case class StringContainsSpec(`type`: String,
+                              dimension: String,
+                              value: String) extends FilterSpec {
+  def this(dimension: String,
+           value: String) = this("contains", dimension, value)
+}
 
 case class LogicalFilterSpec(`type`: String,
                              fields: List[FilterSpec]) extends FilterSpec
@@ -491,9 +501,7 @@ sealed trait QuerySpec {
   def setIntervals(ins : List[Interval]) : QuerySpec
   def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec
 
-  def dimensions : List[DimensionSpec] = Nil
-  def aggregations : List[AggregationSpec] = Nil
-  def postAggregations : Option[List[PostAggregationSpec]] = None
+  def dimensionSpecs : List[DimensionSpec] = Nil
 
   def filter : Option[FilterSpec]
 
@@ -501,9 +509,50 @@ sealed trait QuerySpec {
 
   def apply(useSmile : Boolean,
             is : InputStream,
+            druidQuerySvrConn: DruidClient,
             onDone : => Unit = (),
-            fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
+            fromList : Boolean = false) : CloseableIterator[ResultRow]
+
+  def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType
+
+  def executeQuery(queryClient : DruidQueryServerClient) : CloseableIterator[ResultRow] =
+    queryClient.executeQueryAsStream(this)
+
+  def mapSparkColNameToDruidColName(druidRelationInfo: DruidRelationInfo) : Map[String, String] =
+    Map()
+
+}
+
+abstract class AggQuerySpec extends QuerySpec {
+  self : Product =>
+
+  def dimensions : List[DimensionSpec] = Nil
+  override def dimensionSpecs : List[DimensionSpec] = dimensions
+  def aggregations : List[AggregationSpec] = Nil
+  def postAggregations : Option[List[PostAggregationSpec]] = None
+
+  def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType = {
+    val fields : List[StructField] = dimensionSpecs.map{ d =>
+      new StructField(d.outputName, d.sparkDataType(dInfo.druidDS))
+    } ++
+      aggregations.map {a =>
+        new StructField(a.name, a.sparkDataType(dInfo.druidDS))
+      } ++
+      postAggregations.map{ ps =>
+        ps.map {p =>
+          new StructField(p.name, p.sparkDataType(dInfo.druidDS))
+        }
+      }.getOrElse(Nil)
+    StructType(fields)
+  }
+
+  override def apply(useSmile : Boolean,
+                     is : InputStream,
+                     druidQuerySvrConn: DruidClient,
+                     onDone : => Unit = (),
+                     fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
     DruidQueryResultIterator(useSmile, is, onDone, fromList)
+
 }
 
 case class GroupByQuerySpec(
@@ -517,7 +566,7 @@ case class GroupByQuerySpec(
                              override val aggregations: List[AggregationSpec],
                              override val postAggregations: Option[List[PostAggregationSpec]],
                              val intervals: List[String]
-                             ) extends QuerySpec {
+                             ) extends AggQuerySpec {
   def this(dataSource: String,
            dimensions: List[DimensionSpec],
            limitSpec: Option[LimitSpec],
@@ -537,7 +586,7 @@ case class GroupByQuerySpec(
     GroupByQuerySpecWithSegIntervals(
       queryType,
       dataSource,
-      dimensions,
+      dimensionSpecs,
       limitSpec,
       having,
       granularity,
@@ -551,17 +600,18 @@ case class GroupByQuerySpec(
 }
 
 case class GroupByQuerySpecWithSegIntervals(
-                             val queryType: String,
-                             val dataSource: String,
-                             override val dimensions: List[DimensionSpec],
-                             val limitSpec: Option[LimitSpec],
-                             val having: Option[HavingSpec],
-                             val granularity: Either[String,GranularitySpec],
-                             val filter: Option[FilterSpec],
-                             override val aggregations: List[AggregationSpec],
-                             override val postAggregations: Option[List[PostAggregationSpec]],
-                             val intervals: SegmentIntervals
-                           ) extends QuerySpec {
+                                             val queryType: String,
+                                             val dataSource: String,
+                                             override val dimensions: List[DimensionSpec],
+                                             val limitSpec: Option[LimitSpec],
+                                             val having: Option[HavingSpec],
+                                             val granularity: Either[String,GranularitySpec],
+                                             val filter: Option[FilterSpec],
+                                             override val aggregations: List[AggregationSpec],
+                                             override val postAggregations:
+                                             Option[List[PostAggregationSpec]],
+                                             val intervals: SegmentIntervals
+                           ) extends AggQuerySpec {
 
   override def intervalList: List[String] = intervals.segments.map(_.itvl)
 
@@ -581,7 +631,7 @@ case class TimeSeriesQuerySpec(
                                 val filter: Option[FilterSpec],
                                 override val aggregations: List[AggregationSpec],
                                 override val postAggregations: Option[List[PostAggregationSpec]]
-                                ) extends QuerySpec {
+                                ) extends AggQuerySpec {
   def this(dataSource: String,
            intervals: List[String],
            granularity: Either[String,GranularitySpec],
@@ -616,7 +666,7 @@ case class TimeSeriesQuerySpecWithSegIntervals(
                                              override val postAggregations:
                                              Option[List[PostAggregationSpec]],
                                              val intervals: SegmentIntervals
-                                           ) extends QuerySpec {
+                                           ) extends AggQuerySpec {
 
   override def intervalList: List[String] = intervals.segments.map(_.itvl)
 
@@ -639,7 +689,7 @@ case class TopNQuerySpec(
                           val dimension: DimensionSpec,
                           val threshold: Int,
                           val metric: TopNMetricSpec
-                          ) extends QuerySpec {
+                          ) extends AggQuerySpec {
   def this(dataSource: String,
            intervals: List[String],
            granularity: Either[String,GranularitySpec],
@@ -672,7 +722,7 @@ case class SearchQuerySpec(
                             val query : SearchQueryQuerySpec,
                             val limit : Int,
                             val sort : Option[SortSearchQuerySpec]
-                          ) extends QuerySpec {
+                          ) extends AggQuerySpec {
 
   def this(dataSource: String,
            intervals: List[String],
@@ -707,6 +757,7 @@ case class SearchQuerySpec(
 
   override def apply(useSmile : Boolean,
                      is : InputStream,
+                     druidQuerySvrConn: DruidClient,
                      onDone : => Unit = (),
                      fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
     new SearchQueryResultIterator(useSmile, is, onDone)
@@ -714,6 +765,7 @@ case class SearchQuerySpec(
 
   override def dimensions : List[DimensionSpec] =
     searchDimensions.map(d => new DefaultDimensionSpec(d, d))
+
 }
 
 case class SearchQuerySpecWithSegIntervals(
@@ -726,7 +778,7 @@ case class SearchQuerySpecWithSegIntervals(
                             val query : SearchQueryQuerySpec,
                             val limit : Int,
                             val sort : Option[SortSearchQuerySpec]
-                          ) extends QuerySpec {
+                          ) extends AggQuerySpec {
 
   def this(dataSource: String,
            intervals: SegmentIntervals,
@@ -751,10 +803,122 @@ case class SearchQuerySpecWithSegIntervals(
 
   override def apply(useSmile : Boolean,
                      is : InputStream,
+                     druidQuerySvrConn: DruidClient,
                      onDone : => Unit = (),
                      fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
     new SearchQueryResultIterator(useSmile, is, onDone)
 
   override def dimensions : List[DimensionSpec] =
-    searchDimensions.map(d => new DefaultDimensionSpec(d, d))
+    searchDimensions.map(n => new DefaultDimensionSpec(n,n))
+}
+
+case class PagingSpec(pagingIdentifiers : Map[String, Int],
+                      threshold : Int)
+
+abstract class SelectSpec extends QuerySpec {
+  self : Product =>
+  def withPagingIdentifier(ps :  Map[String, Int]) : SelectSpec
+
+  def dimensions : List[String]
+  override def dimensionSpecs : List[DimensionSpec] =
+    dimensions.map(n => new DefaultDimensionSpec(n,n))
+  def metrics : List[String]
+
+  def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType = {
+    val fields : List[StructField] = dimensions.map{ d =>
+      val dc = dInfo.druidDS.columns(d)
+      new StructField(d, DruidDataType.sparkDataType(dc.dataType))
+    } ++ metrics.map{d =>
+      val dc = dInfo.druidDS.columns(d)
+      new StructField(d, DruidDataType.sparkDataType(dc.dataType))
+    }
+    StructType(fields)
+  }
+
+  override def apply(useSmile : Boolean,
+                     is : InputStream,
+                     druidQuerySvrConn: DruidClient,
+                     onDone : => Unit = (),
+                     fromList : Boolean = false) : CloseableIterator[ResultRow] =
+    DruidSelectResultIterator(useSmile, is, this,
+      druidQuerySvrConn.asInstanceOf[DruidQueryServerClient], onDone, fromList
+    )
+
+  override def mapSparkColNameToDruidColName(druidRelationInfo: DruidRelationInfo) :
+  Map[String, String] =
+    druidRelationInfo.sourceToDruidMapping.mapValues(_.name)
+}
+
+case class SelectSpecWithIntervals(queryType: String,
+                                   dataSource: String,
+                                   dimensions: List[String],
+                                   metrics: List[String],
+                                   filter: Option[FilterSpec],
+                                   pagingSpec : PagingSpec,
+                                   intervals: List[String] = List(),
+                                   descending : Boolean = false,
+                                   granularity : String = "all")
+  extends SelectSpec {
+
+  def this(dataSource: String,
+           dimensions: List[String],
+           metrics: List[String],
+           filter: Option[FilterSpec],
+           pagingSpec : PagingSpec,
+           intervals: List[String] = List(),
+           descending : Boolean = false,
+           granularity : String = "all") = this(
+    "select", dataSource, dimensions, metrics, filter, pagingSpec,
+    intervals, descending, granularity
+  )
+
+  def withPagingIdentifier(ps :  Map[String, Int]) = {
+    copy(pagingSpec = pagingSpec.copy(pagingIdentifiers = ps))
+  }
+
+  override def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
+
+  override def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec =
+    SelectSpecWithSegmentIntervals(
+      queryType,
+      dataSource,
+      dimensions,
+      metrics,
+      filter,
+      pagingSpec,
+      null,
+      descending,
+      granularity
+    ).setSegIntervals(segIns)
+
+  def intervalList: List[String] = intervals
+
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
+}
+
+case class SelectSpecWithSegmentIntervals(queryType: String,
+                                          dataSource: String,
+                                          dimensions: List[String],
+                                          metrics: List[String],
+                                          filter: Option[FilterSpec],
+                                          pagingSpec : PagingSpec,
+                                          intervals: SegmentIntervals,
+                                          descending : Boolean = false,
+                                          granularity : String = "all")
+  extends SelectSpec {
+
+  def withPagingIdentifier(ps :  Map[String, Int]) = {
+    copy(pagingSpec = pagingSpec.copy(pagingIdentifiers = ps))
+  }
+
+  override def setSegIntervals(segInAssignments: List[(DruidSegmentInfo, Interval)]): QuerySpec = {
+    this.copy(intervals = new SegmentIntervals(segInAssignments))
+  }
+
+  override def setIntervals(ins: List[Interval]): QuerySpec = ???
+
+  override def intervalList: List[String] = intervals.segments.map(_.itvl)
+
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
+
 }

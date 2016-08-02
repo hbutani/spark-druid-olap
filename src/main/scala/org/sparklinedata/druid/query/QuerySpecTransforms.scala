@@ -115,7 +115,7 @@ object AllGroupingGroupByQuerySpecToTimeSeriesSpec extends Transform {
     qSpec match {
 
       case gbSpec : GroupByQuerySpec
-        if (gbSpec.dimensions.isEmpty &&
+        if (gbSpec.dimensionSpecs.isEmpty &&
           !gbSpec.having.isDefined &&
           !gbSpec.limitSpec.isDefined
           ) =>

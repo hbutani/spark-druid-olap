@@ -39,13 +39,20 @@ lazy val commonSettings = Seq(
 
   version := "0.3.0-SNAPSHOT",
 
-  javaOptions := Seq("-Xms1g", "-Xmx2g", "-Duser.timezone=UTC", "-XX:MaxPermSize=256M"),
+  javaOptions := Seq("-Xms1g", "-Xmx3g",
+    "-Duser.timezone=UTC",
+    "-Dscalac.patmat.analysisBudget=512",
+    "-XX:MaxPermSize=256M"),
 
   // Target Java 7
   scalacOptions += "-target:jvm-1.7",
   javacOptions in compile ++= Seq("-source", "1.7", "-target", "1.7"),
 
   scalacOptions := Seq("-feature", "-deprecation"),
+
+  dependencyOverrides := Set(
+    "org.apache.commons" % "commons-lang3" % "3.3.2"
+  ),
 
   licenses := Seq("Apache License, Version 2.0" ->
     url("http://www.apache.org/licenses/LICENSE-2.0")

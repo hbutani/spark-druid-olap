@@ -23,6 +23,13 @@ import org.apache.spark.sql.types._
 
 import scala.collection.mutable.{Map => MMap}
 
+object NonAggregateQueryHandling extends Enumeration {
+  val PUSH_FILTERS = Value("push_filters")
+  val PUSH_PROJECT_AND_FILTERS = Value("push_project_and_filters")
+  val PUSH_NONE = Value("push_none")
+
+}
+
 case class DruidRelationName(
                             sparkDataSource : String,
                             druidHost : String,
@@ -64,7 +71,8 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 zkQualifyDiscoveryNames : Boolean,
                                 numSegmentsPerHistoricalQuery : Int,
                                 useSmile : Boolean,
-                                numProcessingThreadsPerHistorical : Option[Int] = None) {
+                                numProcessingThreadsPerHistorical : Option[Int] = None,
+                                nonAggQueryHandling : NonAggregateQueryHandling.Value) {
 
   def sqlContextOption(nm : String) = s"spark.sparklinedata.druid.option.$nm"
 

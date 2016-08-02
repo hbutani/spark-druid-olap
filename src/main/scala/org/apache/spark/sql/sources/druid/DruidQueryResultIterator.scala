@@ -45,7 +45,7 @@ private[druid] class OM(mapper : ObjectMapper) extends ObjectMapper(mapper) {
 
 }
 
-sealed trait JsonOperations {
+trait JsonOperations {
   def useSmile : Boolean
   val jsonMethods = if (useSmile) {
     org.json4s.jackson.sparklinedata.SmileJsonMethods
