@@ -40,9 +40,13 @@ case class SegmentTimeRange(minTime : DateTime,
                             maxTime : DateTime)
 case class CoordDataSourceInfo(segments : SegmentTimeRange)
 
+sealed trait ResultRow {
+  def event : Map[String, Any]
+}
+
 case class QueryResultRow(version : String,
                            timestamp : String,
-                           event : Map[String, Any])
+                           event : Map[String, Any])  extends ResultRow
 
 class QueryResultRowSerializer extends CustomSerializer[QueryResultRow](format => (
   {
@@ -71,3 +75,31 @@ class QueryResultRowSerializer extends CustomSerializer[QueryResultRow](format =
       throw new RuntimeException("QueryRow serialization not supported.")
   }
   ))
+
+
+case class SelectResultContainer(timestamp: String,
+                                 result: SelectResult
+                                )
+
+case class SelectResult(pagingIdentifiers: Map[String, Int],
+                        events: List[SelectResultRow]
+                       )
+
+case class SelectResultRow(segmentId: String,
+                           offset: Int,
+                           event: Map[String, Any]) extends ResultRow
+
+class SelectResultRowSerializer extends CustomSerializer[SelectResultRow](format => ( {
+  case JObject(
+  JField("segmentId", JString(v)) ::
+    JField("offset", JInt(t)) ::
+    JField("event", JObject(obj)) :: Nil
+  ) =>
+    val m: Map[String, Any] = obj.map(t => (t._1, t._2.values)).toMap
+    SelectResultRow(v, t.toInt, m)
+}, {
+  case x: SelectResultRow =>
+    throw new RuntimeException("SelectResultRow serialization not supported.")
+}
+  )
+)

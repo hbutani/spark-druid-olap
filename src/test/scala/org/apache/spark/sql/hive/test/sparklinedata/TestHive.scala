@@ -50,7 +50,8 @@ object TestHive
         .set("spark.sql.hive.metastore.barrierPrefixes",
           "org.apache.spark.sql.hive.execution.PairSerDe")
         // SPARK-8910
-        .set("spark.ui.enabled", "false")))
+        .set("spark.ui.enabled", "false")
+        .set("spark.executor.heartbeatInterval", "20s")))
 
 /*
   * Have to copy TestHiveContext so that it can extends SparklineDataContext

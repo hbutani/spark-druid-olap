@@ -29,7 +29,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.sources.druid.DruidQueryCostModel
 import org.apache.spark.sql.sparklinedata.execution.metrics.DruidQueryExecutionMetric
 import org.joda.time.Interval
-import org.sparklinedata.druid.client.{DruidQueryServerClient, QueryResultRow}
+import org.sparklinedata.druid.client.{DruidQueryServerClient, QueryResultRow, ResultRow}
 import org.sparklinedata.druid.metadata._
 
 import scala.util.Random
@@ -85,6 +85,15 @@ class DruidRDD(sqlContext: SQLContext,
   val drDSIntervals = drInfo.druidDS.intervals
   val ndvEstimate = DruidQueryCostModel.estimateNDV(dQuery.q, drInfo)
 
+  val sparkToDruidColName: Map[String, String] =
+    dQuery.q.mapSparkColNameToDruidColName(drInfo).map(identity)
+  // scalastyle:off line.size.limit
+  // why map identity?
+  // see http://stackoverflow.com/questions/17709995/notserializableexception-for-mapstring-string-alias
+  // scalastyle:on line.size.limit
+
+  def druidColName(n : String) = sparkToDruidColName.getOrElse(n, n)
+
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
 
@@ -95,7 +104,7 @@ class DruidRDD(sqlContext: SQLContext,
 
     val qrySTime = System.currentTimeMillis()
     val qrySTimeStr = s"${new java.util.Date()}"
-    val dr = client.executeQueryAsStream(mQry)
+    val dr = mQry.executeQuery(client)
     val druidExecTime = (System.currentTimeMillis() - qrySTime)
     var numRows : Int = 0
 
@@ -122,13 +131,14 @@ class DruidRDD(sqlContext: SQLContext,
       dr.closeIfNeeded()
     }
 
-    val r = new InterruptibleIterator[QueryResultRow](context, dr)
+    val r = new InterruptibleIterator[ResultRow](context, dr)
     val nameToTF = dQuery.getValTFMap
     r.map { r =>
       numRows += 1
-      new GenericInternalRowWithSchema(schema.fields.map
+      val row = new GenericInternalRowWithSchema(schema.fields.map
       (f => DruidValTransform.sparkValue(
-        f, r.event(f.name), nameToTF.get(f.name))), schema)
+        f, r.event(druidColName(f.name)), nameToTF.get(druidColName(f.name)))), schema)
+      row
     }
   }
 

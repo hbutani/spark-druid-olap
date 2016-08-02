@@ -54,20 +54,7 @@ case class DruidQuery(q : QuerySpec,
       q.intervalList.map(Interval.parse(_)), None)
 
   private def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType = {
-
-    val fields : List[StructField] = q.dimensions.map{d =>
-      new StructField(d.outputName, d.sparkDataType(dInfo.druidDS))
-    } ++
-      q.aggregations.map {a =>
-        new StructField(a.name, a.sparkDataType(dInfo.druidDS))
-      } ++
-      q.postAggregations.map{ ps =>
-        ps.map {p =>
-          new StructField(p.name, p.sparkDataType(dInfo.druidDS))
-        }
-      }.getOrElse(Nil)
-
-    StructType(fields)
+    q.schemaFromQuerySpec(dInfo)
   }
 
   private def schemaFromOutputSpec : StructType = {

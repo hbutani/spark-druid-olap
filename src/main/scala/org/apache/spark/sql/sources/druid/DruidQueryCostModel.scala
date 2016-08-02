@@ -476,7 +476,7 @@ object DruidQueryCostModel extends Logging {
       case _ => ()
     }
 
-    qs.dimensions.foreach { d =>
+    qs.dimensionSpecs.foreach { d =>
       m(d.dimension) =
         drInfo.druidDS.columns(d.dimension).cardinality
     }

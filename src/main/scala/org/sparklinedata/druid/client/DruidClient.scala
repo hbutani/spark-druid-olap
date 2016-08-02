@@ -91,9 +91,9 @@ abstract class DruidClient(val host : String,
 
   @throws(classOf[DruidDataSourceException])
   protected def perform(url : String,
-                       reqType : String => HttpRequestBase,
-                      payload : JValue,
-                      reqHeaders: Map[String, String]) : JValue =  {
+                        reqType : String => HttpRequestBase,
+                        payload : JValue,
+                        reqHeaders: Map[String, String]) : JValue =  {
     var resp: CloseableHttpResponse = null
 
     val js : Try[JValue] = for {
@@ -147,13 +147,13 @@ abstract class DruidClient(val host : String,
 
   @throws(classOf[DruidDataSourceException])
   protected def performQuery(url : String,
-                            reqType : String => HttpRequestBase,
+                             reqType : String => HttpRequestBase,
                              qrySpec : QuerySpec,
-                           payload : JValue,
-                           reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
+                             payload : JValue,
+                             reqHeaders: Map[String, String]) : CloseableIterator[ResultRow] =  {
     var resp: CloseableHttpResponse = null
 
-    val it: Try[CloseableIterator[QueryResultRow]] = for {
+    val it: Try[CloseableIterator[ResultRow]] = for {
       r <- Try {
         val req: CloseableHttpClient = httpClient
         val request: HttpRequestBase = reqType(url)
@@ -174,7 +174,7 @@ abstract class DruidClient(val host : String,
       it <- Try {
         val status = r.getStatusLine().getStatusCode()
         if (status >= 200 && status < 300) {
-          qrySpec(useSmile, r.getEntity.getContent, {
+          qrySpec(useSmile, r.getEntity.getContent, this, {
             release(r)
           })
         } else {
@@ -194,19 +194,19 @@ abstract class DruidClient(val host : String,
 
   protected def post(url : String,
                      payload : JValue,
-                   reqHeaders: Map[String, String] = null ) : JValue =
+                     reqHeaders: Map[String, String] = null ) : JValue =
     perform(url, postRequest _, payload, reqHeaders)
 
   protected def postQuery(url : String,
                           qrySpec : QuerySpec,
                           payload : JValue,
-                        reqHeaders: Map[String, String] = null ) :
-  CloseableIterator[QueryResultRow] =
+                          reqHeaders: Map[String, String] = null ) :
+  CloseableIterator[ResultRow] =
     performQuery(url, postRequest _, qrySpec, payload, reqHeaders)
 
   protected def get(url : String,
                     payload : JValue = null,
-                  reqHeaders: Map[String, String] = null) : JValue =
+                    reqHeaders: Map[String, String] = null) : JValue =
     perform(url, getRequest _, payload, reqHeaders)
 
   protected def addHeaders(req: HttpRequestBase, reqHeaders: Map[String, String]) {
@@ -223,7 +223,7 @@ abstract class DruidClient(val host : String,
 
   @throws(classOf[DruidDataSourceException])
   def executeQuery(url : String,
-                   qry : QuerySpec) : List[QueryResultRow] = {
+                   qry : QuerySpec) : List[ResultRow] = {
 
     val jR = render(Extraction.decompose(qry))
     val jV = post(url, jR)
@@ -234,7 +234,7 @@ abstract class DruidClient(val host : String,
 
   @throws(classOf[DruidDataSourceException])
   def executeQueryAsStream(url : String,
-                           qry : QuerySpec) : CloseableIterator[QueryResultRow] = {
+                           qry : QuerySpec) : CloseableIterator[ResultRow] = {
     val jR = render(Extraction.decompose(qry))
     postQuery(url, qry, jR)
   }
@@ -347,12 +347,12 @@ class DruidQueryServerClient(host : String, port : Int, useSmile : Boolean = fal
   }
 
   @throws(classOf[DruidDataSourceException])
-  def executeQuery(qry : QuerySpec) : List[QueryResultRow] = {
+  def executeQuery(qry : QuerySpec) : List[ResultRow] = {
     executeQuery(url, qry)
   }
 
   @throws(classOf[DruidDataSourceException])
-  def executeQueryAsStream(qry : QuerySpec) : CloseableIterator[QueryResultRow] = {
+  def executeQueryAsStream(qry : QuerySpec) : CloseableIterator[ResultRow] = {
     executeQueryAsStream(url, qry)
   }
 }
@@ -383,8 +383,8 @@ class DruidCoordinatorClient(host : String, port : Int, useSmile : Boolean = fal
 
   @throws(classOf[DruidDataSourceException])
   def metadataFromHistorical(histServer : HistoricalServerInfo,
-               dataSource : String,
-               fullIndex : Boolean) : DruidDataSource = {
+                             dataSource : String,
+                             fullIndex : Boolean) : DruidDataSource = {
     val (h,p) = DruidClient.hosPort(histServer.host)
     val url = s"http://$h:$p/druid/v2/?pretty"
     metadata(url, dataSource, histServer.segments.values.toList, fullIndex)

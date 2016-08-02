@@ -18,16 +18,18 @@
 package org.sparklinedata.druid
 
 import java.util.concurrent.atomic.AtomicLong
-
+import scala.collection.mutable.{Map => MMap}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.types.DataType
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidRelationInfo}
+import scala.collection.mutable
 
 /**
  *
  * @param drInfo
  * @param queryIntervals
+ * @param referencedDruidColumns
  * @param dimensions
  * @param limitSpec
  * @param havingSpec
@@ -48,6 +50,7 @@ import org.sparklinedata.druid.metadata.{DruidColumn, DruidRelationInfo}
  */
 case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
                              queryIntervals: QueryIntervals,
+                             referencedDruidColumns : MMap[String,DruidColumn] = MMap(),
                              dimensions: List[DimensionSpec] = Nil,
                              limitSpec: Option[LimitSpec] = None,
                              havingSpec: Option[HavingSpec] = None,
@@ -133,7 +136,10 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
   }
 
   def druidColumn(name: String): Option[DruidColumn] = {
-    drInfo.sourceToDruidMapping.get(projectionAliasMap.getOrElse(name, name))
+    drInfo.sourceToDruidMapping.get(projectionAliasMap.getOrElse(name, name)).map { dc =>
+      referencedDruidColumns(name) = dc
+      dc
+    }
   }
 
   def addAlias(alias: String, col: String) = {
@@ -157,6 +163,7 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
   /**
     * currently we don't transform queries with [[LimitSpec]] or [[HavingSpec]] into
     * post DruidOperations in Spark.
+    *
     * @return
     */
   def canPushToHistorical = !(
