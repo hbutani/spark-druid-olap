@@ -25,7 +25,13 @@ object QueryIntervals {
 
   def queryForEntireDataSourceInterval(drInfo : DruidRelationInfo,
                                        qSpec : QuerySpec) : Boolean = {
-    val qIntervals = qSpec.intervalList.map(Interval.parse(_)).sortBy(i => (i.start, i.end))
+    val qIntervals = qSpec.intervalList.map { x =>
+      val i : Interval = Interval.parse(x)
+      new Interval(
+        i.getStart.toDateTime(DateTimeZone.UTC),
+        i.getEnd.toDateTime(DateTimeZone.UTC)
+      )
+    }.sortBy(i => (i.start, i.end))
     val dsIntervals = drInfo.druidDS.intervals.sortBy(i => (i.start, i.end))
     qIntervals == dsIntervals
   }

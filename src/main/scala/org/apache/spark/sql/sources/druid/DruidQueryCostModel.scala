@@ -335,8 +335,16 @@ object DruidQueryCostModel extends Logging {
           segmentOutputSizeEstimate * brokerMergeCostPerRow
       val segmentOutputTransportCost = queryOutputSizeEstimate *
         (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
-      val queryCost: Double =
-        numWaves * processingCostPerHist + segmentOutputTransportCost + brokertMergeCost
+      val queryCost: Double = {
+        /*
+         * SearchQuerySpecs cannot be run against broker.
+         */
+        if ( classOf[SearchQuerySpec].isAssignableFrom(cI.querySpecClass)) {
+          Double.MaxValue
+        } else {
+          numWaves * processingCostPerHist + segmentOutputTransportCost + brokertMergeCost
+        }
+      }
 
       BrokerQueryCost(
         numWaves,

@@ -18,6 +18,7 @@
 package org.sparklinedata.druid.query
 
 import org.apache.spark.Logging
+import org.apache.spark.sql.sources.druid.DruidQueryCostModel
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.DruidRelationInfo
 
@@ -178,18 +179,20 @@ object SearchQuerySpecTransform extends Transform {
     List(),
     None,
     intervals
-    ) if dName == oName && QueryIntervals.queryForEntireDataSourceInterval(drInfo, qSpec) =>
+    ) if dName == oName &&
+      QueryIntervals.queryForEntireDataSourceInterval(drInfo, qSpec) =>
       new SearchQuerySpec(
         ds,
         intervals,
         granularity,
         filter,
         List(dName),
-        new InsensitiveContainsSearchQuerySpec()
+        new InsensitiveContainsSearchQuerySpec(),
+        Integer.MAX_VALUE
       )
     case GroupByQuerySpec(_, ds,
     List(DefaultDimensionSpec(_, dName, oName)),
-    Some(LimitSpec(_, Integer.MAX_VALUE, List(OrderByColumnSpec(ordName, "ascending")))),
+    Some(LimitSpec(_, limValue, List(OrderByColumnSpec(ordName, "ascending")))),
     None,
     granularity,
     filter,
@@ -205,6 +208,7 @@ object SearchQuerySpecTransform extends Transform {
         filter,
         List(dName),
         new InsensitiveContainsSearchQuerySpec(),
+        limValue,
         Some(SortSearchQuerySpec("lexicographic"))
       )
     case _ => qSpec
