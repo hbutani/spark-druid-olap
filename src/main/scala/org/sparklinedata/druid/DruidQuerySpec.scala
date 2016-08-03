@@ -656,6 +656,9 @@ case class TopNQuerySpec(
 
   def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec = ???
   def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
+
+  override def dimensions : List[DimensionSpec] =
+    List(dimension)
 }
 
 case class SearchQuerySpec(
@@ -666,6 +669,7 @@ case class SearchQuerySpec(
                             val filter: Option[FilterSpec],
                             val searchDimensions : List[String],
                             val query : SearchQueryQuerySpec,
+                            val limit : Int,
                             val sort : Option[SortSearchQuerySpec]
                           ) extends QuerySpec {
 
@@ -675,8 +679,10 @@ case class SearchQuerySpec(
            filter: Option[FilterSpec],
            searchDimensions : List[String],
            query : SearchQueryQuerySpec,
+           limit : Int,
            sort : Option[SortSearchQuerySpec] = None
-  ) = this("search", dataSource, intervals, granularity, filter, searchDimensions, query, sort)
+  ) = this("search", dataSource, intervals, granularity,
+    filter, searchDimensions, query, limit, sort)
 
   override def intervalList: List[String] = intervals
 
@@ -689,6 +695,7 @@ case class SearchQuerySpec(
       filter,
       searchDimensions,
       query,
+      limit,
       sort
     ).setSegIntervals(segIns)
 
@@ -701,6 +708,10 @@ case class SearchQuerySpec(
             onDone : => Unit = (),
             fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
     new SearchQueryResultIterator(is, onDone)
+
+
+  override def dimensions : List[DimensionSpec] =
+    searchDimensions.map(d => new DefaultDimensionSpec(d, d))
 }
 
 case class SearchQuerySpecWithSegIntervals(
@@ -711,6 +722,7 @@ case class SearchQuerySpecWithSegIntervals(
                             val filter: Option[FilterSpec],
                             val searchDimensions : List[String],
                             val query : SearchQueryQuerySpec,
+                            val limit : Int,
                             val sort : Option[SortSearchQuerySpec]
                           ) extends QuerySpec {
 
@@ -720,9 +732,10 @@ case class SearchQuerySpecWithSegIntervals(
            filter: Option[FilterSpec],
            searchDimensions : List[String],
            query : SearchQueryQuerySpec,
+           limit : Int,
            sort : Option[SortSearchQuerySpec] = None
           ) =
-    this("search", dataSource, intervals, granularity, filter, searchDimensions, query, sort)
+    this("search", dataSource, intervals, granularity, filter, searchDimensions, query, limit, sort)
 
   override def intervalList: List[String] = intervals.segments.map(_.itvl)
 
@@ -738,4 +751,7 @@ case class SearchQuerySpecWithSegIntervals(
                      onDone : => Unit = (),
                      fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
     new SearchQueryResultIterator(is, onDone)
+
+  override def dimensions : List[DimensionSpec] =
+    searchDimensions.map(d => new DefaultDimensionSpec(d, d))
 }
