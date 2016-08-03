@@ -35,7 +35,7 @@ val coreTestDependencies = Seq(
 lazy val commonSettings = Seq(
   organization := "com.sparklinedata",
 
-  version := "0.2.0",
+  version := "0.2.1",
 
   javaOptions := Seq("-Xms1g", "-Xmx2g", "-Duser.timezone=UTC", "-XX:MaxPermSize=256M"),
 
