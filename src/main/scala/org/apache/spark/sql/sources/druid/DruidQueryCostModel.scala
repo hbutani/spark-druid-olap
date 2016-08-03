@@ -526,7 +526,15 @@ object DruidQueryCostModel extends Logging {
     val segIntervalMillis = {
       val segIn = DruidMetadataCache.getDataSourceInfo(
         druidDSFullName, druidDSOptions)._1.segments.head._interval
-      intervalsMillis(List(segIn))
+      val segInMillis = intervalsMillis(List(segIn))
+      /*
+      * cannot have 1 segment's interval be greater than the entire index's interval.
+      */
+      if ( segInMillis > indexIntervalMillis) {
+        log.info(s"Druid Index Interval ${indexIntervalMillis}")
+        log.info(s"Druid Segment Interval ${segInMillis}")
+      }
+      Math.min(indexIntervalMillis, segInMillis)
     }
 
     val avgNumSegmentsPerSegInterval : Double = {
