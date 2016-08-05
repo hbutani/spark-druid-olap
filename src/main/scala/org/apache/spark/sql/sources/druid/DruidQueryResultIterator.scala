@@ -17,21 +17,20 @@
 
 package org.apache.spark.sql.sources.druid
 
-import java.io.InputStream
+import java.io.{ByteArrayInputStream, InputStream}
 
 import com.fasterxml.jackson.core.{JsonParser, JsonToken}
 import com.fasterxml.jackson.databind.deser.DefaultDeserializationContext
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonDeserializer, ObjectMapper}
 import org.apache.commons.io.IOUtils
 import org.apache.spark.util.NextIterator
-import org.json4s.JsonAST
+import org.json4s.{JsonAST, JsonInput}
 import org.json4s.jackson.Json4sScalaModule
-import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.Utils
 import org.sparklinedata.druid.client.QueryResultRow
 import org.sparklinedata.druid.CloseableIterator
 
-private[druid] class OM extends ObjectMapper {
+private[druid] class OM(mapper : ObjectMapper) extends ObjectMapper(mapper) {
 
   type JValue   = JsonAST.JValue
 
@@ -46,13 +45,25 @@ private[druid] class OM extends ObjectMapper {
 
 }
 
-private class DruidQueryResultIterator(val is : InputStream,
-                                       onDone : => Unit = ())
-  extends NextIterator[QueryResultRow] with CloseableIterator[QueryResultRow] {
+sealed trait JsonOperations {
+  def useSmile : Boolean
+  val jsonMethods = if (useSmile) {
+    org.json4s.jackson.sparklinedata.SmileJsonMethods
+  } else {
+    org.json4s.jackson.JsonMethods
+  }
 
+}
+
+private class DruidQueryResultIterator(val useSmile : Boolean,
+                                       val is : InputStream,
+                                       onDone : => Unit = ())
+  extends NextIterator[QueryResultRow] with CloseableIterator[QueryResultRow] with JsonOperations {
+
+  import jsonMethods._
   import Utils._
 
-  val m = new OM()
+  val m = new OM(mapper)
   m.registerModule(new Json4sScalaModule)
   val jF = m.getFactory
   val jp = jF.createParser(is)
@@ -78,14 +89,22 @@ private class DruidQueryResultIterator(val is : InputStream,
   }
 }
 
-private class DruidQueryResultIterator2(val is : InputStream,
+private class DruidQueryResultIterator2(val useSmile : Boolean,
+                                         val is : InputStream,
                                         onDone : => Unit = ())
-  extends NextIterator[QueryResultRow] with CloseableIterator[QueryResultRow] {
+  extends NextIterator[QueryResultRow] with CloseableIterator[QueryResultRow] with JsonOperations {
 
+  import jsonMethods._
   import Utils._
 
-  val s = IOUtils.toString(is)
+  val s : JsonInput = if (useSmile) {
+    new ByteArrayInputStream(IOUtils.toByteArray(is))
+  } else {
+    IOUtils.toString(is)
+  }
+
   onDone
+
   val jV = parse(s)
   val it = jV.extract[List[QueryResultRow]].iterator
 
@@ -106,14 +125,22 @@ case class SearchQueryResult(
                             result : List[QueryResultRow]
                             )
 
-class SearchQueryResultIterator(val is : InputStream,
+class SearchQueryResultIterator(val useSmile : Boolean,
+                                val is : InputStream,
                                 onDone : => Unit = ())
-  extends NextIterator[QueryResultRow] with CloseableIterator[QueryResultRow] {
+  extends NextIterator[QueryResultRow] with CloseableIterator[QueryResultRow] with JsonOperations {
 
+  import jsonMethods._
   import Utils._
 
-  val s = IOUtils.toString(is)
+  val s : JsonInput = if (useSmile) {
+    new ByteArrayInputStream(IOUtils.toByteArray(is))
+  } else {
+    IOUtils.toString(is)
+  }
+
   onDone
+
   val jV = parse(s)
   val searchResult = jV.extract[SearchQueryResult]
   val it = searchResult.result.iterator
@@ -131,14 +158,15 @@ class SearchQueryResultIterator(val is : InputStream,
 }
 
 object DruidQueryResultIterator {
-  def apply(is : InputStream,
+  def apply(useSmile : Boolean,
+            is : InputStream,
             onDone : => Unit = (),
             fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
     if (!fromList) {
-      new DruidQueryResultIterator(is, onDone)
+      new DruidQueryResultIterator(useSmile, is, onDone)
     }
     else {
-      new DruidQueryResultIterator2(is, onDone)
+      new DruidQueryResultIterator2(useSmile, is, onDone)
     }
 
 }

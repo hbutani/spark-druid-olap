@@ -22,6 +22,8 @@ val coreDependencies = Seq(
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
   // "org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % "2.4.6",
+  "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-smile-provider" % "2.4.6",
   "com.sparklinedata" %% "spark-datetime" % sparkdateTimeVersion,
   "com.github.scopt" %% "scopt" % scoptVersion,
   "org.scalatest" %% "scalatest" % scalatestVersion % "test"

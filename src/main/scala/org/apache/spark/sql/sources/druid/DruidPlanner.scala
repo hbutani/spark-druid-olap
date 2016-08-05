@@ -164,6 +164,12 @@ object DruidPlanner {
     doc = "the cost per row to transport druid output relative to the shuffle cost"
   )
 
+  val DRUID_USE_SMILE = booleanConf(
+    "spark.sparklinedata.druid.option.useSmile",
+    defaultValue = Some(true),
+    doc = "for druid queries use the smile binary protocol"
+  )
+
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
       case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery

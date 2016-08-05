@@ -119,6 +119,11 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(NUM_SEGMENTS_PER_HISTORICAL_QUERY).
         getOrElse(DEFAULT_NUM_SEGMENTS_PER_HISTORICAL_QUERY).toInt
 
+    val useSmile : Boolean =
+      parameters.get(USE_SMILE).
+        getOrElse(DEFAULT_USE_SMILE).toBoolean
+
+
     val numProcessingThreadsPerHistorical =
       parameters.get(NUM_PROCESSING_THREADS_PER_HISTORICAL).map(_.toInt)
 
@@ -134,6 +139,7 @@ class DefaultSource extends RelationProvider with Logging {
       queryHistorical,
       zkQualifyDiscoveryNames,
       numSegmentsPerHistoricalQuery,
+      useSmile,
       numProcessingThreadsPerHistorical
     )
 
@@ -246,6 +252,9 @@ object DefaultSource {
 
   val NUM_SEGMENTS_PER_HISTORICAL_QUERY = "numSegmentsPerHistoricalQuery"
   val DEFAULT_NUM_SEGMENTS_PER_HISTORICAL_QUERY = Int.MaxValue.toString
+
+  val USE_SMILE = "useSmile"
+  val DEFAULT_USE_SMILE = "true"
 
   val NUM_PROCESSING_THREADS_PER_HISTORICAL = "numProcessingThreadsPerHistorical"
 
