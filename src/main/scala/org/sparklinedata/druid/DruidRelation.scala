@@ -39,6 +39,7 @@ case class DruidOperatorAttribute(exprId : ExprId, name : String, dataType : Dat
  *                       on the ExprId.
  */
 case class DruidQuery(q : QuerySpec,
+                      useSmile : Boolean,
                       queryHistoricalServer : Boolean,
                       numSegmentsPerQuery : Int,
                       intervalSplits : List[Interval],
@@ -46,9 +47,10 @@ case class DruidQuery(q : QuerySpec,
                        ) {
 
   def this(q : QuerySpec,
+           useSmile : Boolean = true,
            queryHistoricalServer : Boolean = false,
            numSegmentsPerQuery : Int = -1) =
-    this(q, queryHistoricalServer, numSegmentsPerQuery,
+    this(q, useSmile, queryHistoricalServer, numSegmentsPerQuery,
       q.intervalList.map(Interval.parse(_)), None)
 
   private def schemaFromQuerySpec(dInfo : DruidRelationInfo) : StructType = {

@@ -84,6 +84,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
          * 5. Setup DruidRelation
          */
         val dq = DruidQuery(qs,
+          dqb.drInfo.options.useSmile(planner.sqlContext),
           queryHistorical,
           numSegsPerQuery,
           intervals,

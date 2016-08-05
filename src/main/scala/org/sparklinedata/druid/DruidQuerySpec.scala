@@ -499,10 +499,11 @@ sealed trait QuerySpec {
 
   def setFilter(fSpec : FilterSpec) : QuerySpec
 
-  def apply(is : InputStream,
-    onDone : => Unit = (),
-  fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
-    DruidQueryResultIterator(is, onDone, fromList)
+  def apply(useSmile : Boolean,
+            is : InputStream,
+            onDone : => Unit = (),
+            fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
+    DruidQueryResultIterator(useSmile, is, onDone, fromList)
 }
 
 case class GroupByQuerySpec(
@@ -704,10 +705,11 @@ case class SearchQuerySpec(
 
   override def setFilter(fSpec: FilterSpec): QuerySpec = this.copy(filter = Some(fSpec))
 
-  override def apply(is : InputStream,
-            onDone : => Unit = (),
-            fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
-    new SearchQueryResultIterator(is, onDone)
+  override def apply(useSmile : Boolean,
+                     is : InputStream,
+                     onDone : => Unit = (),
+                     fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
+    new SearchQueryResultIterator(useSmile, is, onDone)
 
 
   override def dimensions : List[DimensionSpec] =
@@ -747,10 +749,11 @@ case class SearchQuerySpecWithSegIntervals(
 
   override def setFilter(fSpec: FilterSpec): QuerySpec = this.copy(filter = Some(fSpec))
 
-  override def apply(is : InputStream,
+  override def apply(useSmile : Boolean,
+                     is : InputStream,
                      onDone : => Unit = (),
                      fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
-    new SearchQueryResultIterator(is, onDone)
+    new SearchQueryResultIterator(useSmile, is, onDone)
 
   override def dimensions : List[DimensionSpec] =
     searchDimensions.map(d => new DefaultDimensionSpec(d, d))

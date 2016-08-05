@@ -35,7 +35,7 @@ import org.sparklinedata.druid.metadata._
 import scala.util.Random
 
 abstract class DruidPartition extends Partition {
-  def queryClient : DruidQueryServerClient
+  def queryClient(useSmile : Boolean) : DruidQueryServerClient
   def intervals : List[Interval]
   def segIntervals : List[(DruidSegmentInfo, Interval)]
 
@@ -52,7 +52,8 @@ class HistoricalPartition(idx: Int, hs : HistoricalServerAssignment) extends Dru
   val index: Int = idx
   val hsName = hs.server.host
 
-  def queryClient : DruidQueryServerClient = new DruidQueryServerClient(hsName)
+  def queryClient(useSmile : Boolean) : DruidQueryServerClient =
+    new DruidQueryServerClient(hsName, useSmile)
 
   val intervals : List[Interval] = hs.segmentIntervals.map(_._2)
 
@@ -63,7 +64,8 @@ class BrokerPartition(idx: Int,
                       val broker : String,
                       val i : Interval) extends DruidPartition {
   override def index: Int = idx
-  def queryClient : DruidQueryServerClient = new DruidQueryServerClient(broker)
+  def queryClient(useSmile : Boolean)  : DruidQueryServerClient =
+    new DruidQueryServerClient(broker, useSmile)
   def intervals : List[Interval] = List(i)
 
   def segIntervals : List[(DruidSegmentInfo, Interval)] = null
@@ -76,6 +78,7 @@ class DruidRDD(sqlContext: SQLContext,
 
   val druidQueryAcc : DruidQueryExecutionMetric = new DruidQueryExecutionMetric()
   val numSegmentsPerQuery = dQuery.numSegmentsPerQuery
+  val useSmile = dQuery.useSmile
   val schema = dQuery.schema(drInfo)
   val drOptions = drInfo.options
   val drFullName = drInfo.fullName
@@ -88,7 +91,7 @@ class DruidRDD(sqlContext: SQLContext,
     val p = split.asInstanceOf[DruidPartition]
     val mQry = p.setIntervalsOnQuerySpec(dQuery.q)
     Utils.logQuery(mQry)
-    val client = p.queryClient
+    val client = p.queryClient(useSmile)
 
     val qrySTime = System.currentTimeMillis()
     val qrySTimeStr = s"${new java.util.Date()}"

@@ -81,14 +81,14 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
       recordTime("streamed read") {
 
         val is = IOUtils.toBufferedInputStream(qRis)
-        val it = DruidQueryResultIterator(is)
+        val it = DruidQueryResultIterator(false, is)
         while (it.hasNext) {
           it.next
         }
       }
       recordTime("list read") {
         val is = IOUtils.toBufferedInputStream(qRis)
-        val it = DruidQueryResultIterator(is, (), true)
+        val it = DruidQueryResultIterator(false, is, (), true)
         while (it.hasNext) {
           it.next
         }

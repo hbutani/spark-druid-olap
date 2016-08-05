@@ -17,21 +17,26 @@
 
 package org.sparklinedata.druid.client
 
+import java.io.InputStream
+
+import com.fasterxml.jackson.jaxrs.smile.SmileMediaTypes
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang.exception.ExceptionUtils
+import org.apache.http.HttpEntity
 import org.apache.http.client.methods._
-import org.apache.http.entity.{ContentType, StringEntity}
+import org.apache.http.entity.{ByteArrayEntity, ContentType, StringEntity}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.util.EntityUtils
 import org.apache.spark.Logging
-import org.apache.spark.sql.{DataFrame, SQLContext}
-import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryResultIterator}
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.jboss.netty.handler.codec.http.HttpHeaders
 import org.joda.time.{DateTime, Interval}
 import org.json4s._
-import org.json4s.jackson.JsonMethods._
+import org.json4s.jackson.sparklinedata.SmileJsonMethods._
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.{DependencyGraph, DruidRelationInfo, _}
+import org.sparklinedata.druid.metadata._
 
 import scala.collection.mutable.{Map => MMap}
 import scala.util.Try
@@ -55,10 +60,11 @@ object ConnectionManager {
 }
 
 abstract class DruidClient(val host : String,
-                  val port : Int) extends Logging {
+                           val port : Int,
+                           val useSmile : Boolean = false) extends Logging {
 
-  import org.json4s.JsonDSL._
   import Utils._
+  import org.json4s.JsonDSL._
 
   def this(t : (String, Int)) = {
     this(t._1, t._2)
@@ -86,27 +92,37 @@ abstract class DruidClient(val host : String,
   @throws(classOf[DruidDataSourceException])
   protected def perform(url : String,
                        reqType : String => HttpRequestBase,
-                      payload : String,
+                      payload : JValue,
                       reqHeaders: Map[String, String]) : JValue =  {
     var resp: CloseableHttpResponse = null
 
     val js : Try[JValue] = for {
-      r <- Try {
+      (request, r) <- Try {
         val req: CloseableHttpClient = httpClient
         val request: HttpRequestBase = reqType(url)
         if ( payload != null && request.isInstanceOf[HttpEntityEnclosingRequestBase]) {
-          val input: StringEntity = new StringEntity(payload, ContentType.APPLICATION_JSON)
+          val input: HttpEntity = if (!useSmile) {
+            val s : String = compact(payload)
+            new StringEntity(s, ContentType.APPLICATION_JSON)
+          } else {
+            val b = mapper.writeValueAsBytes(payload)
+            new ByteArrayEntity(b, null)
+          }
           request.asInstanceOf[HttpEntityEnclosingRequestBase].setEntity(input)
         }
         addHeaders(request, reqHeaders)
         resp = req.execute(request)
-        resp
+        (request, resp)
       }
       respStr <- Try {
         val status = r.getStatusLine().getStatusCode();
         if (status >= 200 && status < 300) {
           if (r.getEntity != null ) {
-            IOUtils.toString(r.getEntity.getContent)
+            if (request.isInstanceOf[HttpGet] || !useSmile) {
+              IOUtils.toString(r.getEntity.getContent)
+            } else {
+              r.getEntity.getContent
+            }
           } else {
             throw new DruidDataSourceException(s"Unexpected response status: ${r.getStatusLine}")
           }
@@ -114,7 +130,12 @@ abstract class DruidClient(val host : String,
           throw new DruidDataSourceException(s"Unexpected response status: ${r.getStatusLine}")
         }
       }
-      j <- Try {parse(respStr)}
+      j <- Try {
+        respStr match {
+          case rs: InputStream => parse(rs)
+          case rs => parse(rs.toString)
+        }
+      }
     } yield j
 
     release(resp)
@@ -128,16 +149,22 @@ abstract class DruidClient(val host : String,
   protected def performQuery(url : String,
                             reqType : String => HttpRequestBase,
                              qrySpec : QuerySpec,
-                           payload : String,
+                           payload : JValue,
                            reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
     var resp: CloseableHttpResponse = null
 
-    val it : Try[CloseableIterator[QueryResultRow]] = for {
+    val it: Try[CloseableIterator[QueryResultRow]] = for {
       r <- Try {
         val req: CloseableHttpClient = httpClient
         val request: HttpRequestBase = reqType(url)
         if (payload != null && request.isInstanceOf[HttpEntityEnclosingRequestBase]) {
-          val input: StringEntity = new StringEntity(payload, ContentType.APPLICATION_JSON)
+          val input: HttpEntity = if (!useSmile) {
+            val s: String = compact(payload)
+            new StringEntity(s, ContentType.APPLICATION_JSON)
+          } else {
+            val b = mapper.writeValueAsBytes(payload)
+            new ByteArrayEntity(b, null)
+          }
           request.asInstanceOf[HttpEntityEnclosingRequestBase].setEntity(input)
         }
         addHeaders(request, reqHeaders)
@@ -147,7 +174,9 @@ abstract class DruidClient(val host : String,
       it <- Try {
         val status = r.getStatusLine().getStatusCode()
         if (status >= 200 && status < 300) {
-          qrySpec(r.getEntity.getContent, {release(r)})
+          qrySpec(useSmile, r.getEntity.getContent, {
+            release(r)
+          })
         } else {
           throw new DruidDataSourceException(s"Unexpected response status: ${resp.getStatusLine} " +
             s"on $url for query: \n $payload")
@@ -157,30 +186,35 @@ abstract class DruidClient(val host : String,
     it.getOrElse {
       release(resp)
       it.failed.get match {
-        case dE : DruidDataSourceException => throw dE
+        case dE: DruidDataSourceException => throw dE
         case x => throw new DruidDataSourceException("Failed in communication with Druid", x)
       }
     }
   }
 
   protected def post(url : String,
-                     payload : String,
+                     payload : JValue,
                    reqHeaders: Map[String, String] = null ) : JValue =
     perform(url, postRequest _, payload, reqHeaders)
 
   protected def postQuery(url : String,
                           qrySpec : QuerySpec,
-                          payload : String,
+                          payload : JValue,
                         reqHeaders: Map[String, String] = null ) :
   CloseableIterator[QueryResultRow] =
     performQuery(url, postRequest _, qrySpec, payload, reqHeaders)
 
   protected def get(url : String,
-                    payload : String = null,
+                    payload : JValue = null,
                   reqHeaders: Map[String, String] = null) : JValue =
     perform(url, getRequest _, payload, reqHeaders)
 
   protected def addHeaders(req: HttpRequestBase, reqHeaders: Map[String, String]) {
+
+    if (useSmile) {
+      req.addHeader(HttpHeaders.Names.CONTENT_TYPE, SmileMediaTypes.APPLICATION_JACKSON_SMILE)
+    }
+
     if (reqHeaders == null) return
     for (key <- reqHeaders.keySet) {
       req.setHeader(key, reqHeaders(key))
@@ -191,7 +225,7 @@ abstract class DruidClient(val host : String,
   def executeQuery(url : String,
                    qry : QuerySpec) : List[QueryResultRow] = {
 
-    val jR = compact(render(Extraction.decompose(qry)))
+    val jR = render(Extraction.decompose(qry))
     val jV = post(url, jR)
 
     jV.extract[List[QueryResultRow]]
@@ -201,7 +235,7 @@ abstract class DruidClient(val host : String,
   @throws(classOf[DruidDataSourceException])
   def executeQueryAsStream(url : String,
                            qry : QuerySpec) : CloseableIterator[QueryResultRow] = {
-    val jR = compact(render(Extraction.decompose(qry)))
+    val jR = render(Extraction.decompose(qry))
     postQuery(url, qry, jR)
   }
 
@@ -221,12 +255,12 @@ abstract class DruidClient(val host : String,
       List(i)
     }
 
-    val jR = pretty(render(
+    val jR = render(
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
         ("intervals" -> ins) ~
         ("analysisTypes" -> List[String]("cardinality")) ~
         ("merge" -> "true")
-    ))
+    )
 
     val jV = post(url, jR) transformField {
       case ("type", x) => ("typ", x)
@@ -254,28 +288,28 @@ object DruidClient {
 
 }
 
-class DruidQueryServerClient(host : String, port : Int)
-  extends DruidClient(host, port) with Logging {
+class DruidQueryServerClient(host : String, port : Int, useSmile : Boolean = false)
+  extends DruidClient(host, port, useSmile) with Logging {
 
-  import org.json4s.JsonDSL._
   import Utils._
+  import org.json4s.JsonDSL._
 
   @transient val url = s"http://$host:$port/druid/v2/?pretty"
 
-  def this(t : (String, Int)) = {
-    this(t._1, t._2)
+  def this(t : (String, Int), useSmile : Boolean) = {
+    this(t._1, t._2, useSmile)
   }
 
-  def this(s : String) = {
-    this(DruidClient.hosPort(s))
+  def this(s : String, useSmile : Boolean = false) = {
+    this(DruidClient.hosPort(s), useSmile)
   }
 
   @throws(classOf[DruidDataSourceException])
   def timeBoundary(dataSource : String) : Interval = {
 
-    val jR = compact(render(
+    val jR = render(
       ( "queryType" -> "timeBoundary") ~ ("dataSource" -> dataSource)
-    ))
+    )
     val jV = post(url, jR)
 
     val sTime : String = (jV \\ "minTime").extract[String]
@@ -298,12 +332,12 @@ class DruidQueryServerClient(host : String, port : Int)
 
     val t = render(("type" -> "none"))
 
-    val jR = compact(render(
+    val jR = render(
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
         ("intervals" -> List(in.toString)) ~
         ("merge" -> "false") ~
         ("toInclude" -> render(("type" -> "none")))
-    ))
+    )
     val jV = post(url, jR) transformField {
       case ("type", x) => ("typ", x)
     }
@@ -323,10 +357,9 @@ class DruidQueryServerClient(host : String, port : Int)
   }
 }
 
-class DruidCoordinatorClient(host : String, port : Int)
-  extends DruidClient(host, port) with Logging {
+class DruidCoordinatorClient(host : String, port : Int, useSmile : Boolean = false)
+  extends DruidClient(host, port, useSmile) with Logging {
 
-  import org.json4s.JsonDSL._
   import Utils._
 
   @transient val urlPrefix = s"http://$host:$port/druid/coordinator/v1"

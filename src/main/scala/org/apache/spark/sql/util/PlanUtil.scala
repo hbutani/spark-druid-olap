@@ -52,6 +52,7 @@ object PlanUtil {
       throw new AnalysisException(s"Cannot execute a DruidQuery on $dsName")
     }
     val dq = new DruidQuery(parse(dqStr).extract[QuerySpec],
+      drInfo.get.options.useSmile(sqlContext),
       usingHist,
       drInfo.get.options.numSegmentsPerHistoricalQuery(sqlContext))
     val dR = DruidRelation(drInfo.get, Some(dq))(sqlContext)

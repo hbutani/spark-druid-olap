@@ -63,6 +63,7 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 queryHistoricalServers : Boolean,
                                 zkQualifyDiscoveryNames : Boolean,
                                 numSegmentsPerHistoricalQuery : Int,
+                                useSmile : Boolean,
                                 numProcessingThreadsPerHistorical : Option[Int] = None) {
 
   def sqlContextOption(nm : String) = s"spark.sparklinedata.druid.option.$nm"
@@ -78,6 +79,13 @@ case class DruidRelationOptions(val maxCardinality : Long,
     sqlContext.getConf(
       sqlContextOption("queryHistoricalServers"),
       queryHistoricalServers.toString
+    ).toBoolean
+  }
+
+  def useSmile(sqlContext : SQLContext) : Boolean = {
+    sqlContext.getConf(
+      sqlContextOption("useSmile"),
+      useSmile.toString
     ).toBoolean
   }
 

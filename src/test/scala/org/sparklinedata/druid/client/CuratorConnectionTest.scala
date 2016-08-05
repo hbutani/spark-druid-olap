@@ -37,7 +37,8 @@ class CuratorConnectionTest extends fixture.FunSuite with
       "/druid",
       false,
       true,
-      Int.MaxValue
+      Int.MaxValue,
+      true
     )
 
     val cc = new CuratorConnection(zkHosts,
