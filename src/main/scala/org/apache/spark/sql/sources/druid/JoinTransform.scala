@@ -151,9 +151,26 @@ case class BushyJoinNode(left: JoinNode,
 trait JoinTransform {
   self: DruidPlanner with PredicateHelper =>
 
+  private object JoinQueryMatch {
+    def unapply(arg : (LogicalPlan, Boolean)): Option[DruidQueryBuilder] = {
+      val lp = arg._1
+      val mustHaveJoin = arg._2
+      val t = if (mustHaveJoin) joinTransformWithDebug else joinGraphTransform
+      t(null, lp).headOption
+    }
+  }
+
+  private object JoinGraphDruidQuery {
+    def unapply(lp: LogicalPlan): Option[DruidQueryBuilder] = (lp, false) match {
+      case JoinQueryMatch(jdqb) => Some(jdqb)
+      case _ => None
+    }
+  }
+
   private object JoinDruidQuery {
-    def unapply(lp: LogicalPlan): Option[DruidQueryBuilder] = {
-      joinPlan(null, lp).headOption
+    def unapply(lp: LogicalPlan): Option[DruidQueryBuilder] = (lp, true) match {
+      case JoinQueryMatch(jdqb) => Some(jdqb)
+      case _ => None
     }
   }
 
@@ -291,7 +308,7 @@ trait JoinTransform {
     leftExpressions,
     rightExpressions,
     otherJoinPredicate,
-    JoinDruidQuery(jdqb),
+    JoinGraphDruidQuery(jdqb),
     cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _))
     )
       ) => {
@@ -310,7 +327,7 @@ trait JoinTransform {
     rightExpressions,
     otherJoinPredicate,
     cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _)),
-    JoinDruidQuery(jdqb)
+    JoinGraphDruidQuery(jdqb)
     )
       ) => {
       translateJoin(rightExpressions,
@@ -327,7 +344,7 @@ trait JoinTransform {
     leftExpressions,
     rightExpressions,
     otherJoinPredicate,
-    JoinDruidQuery(jdqb),
+    JoinGraphDruidQuery(jdqb),
     JoinNode(jN)
     )
       ) => {
@@ -344,7 +361,7 @@ trait JoinTransform {
     rightExpressions,
     otherJoinPredicate,
     JoinNode(jN),
-    JoinDruidQuery(jdqb)
+    JoinGraphDruidQuery(jdqb)
     )
       ) => {
       translateJoin(rightExpressions,
