@@ -30,6 +30,23 @@ import org.sparklinedata.druid.metadata._
 trait ProjectFilterTransfom {
   self: DruidPlanner =>
 
+
+  def addUnpushedAttributes(dqb : DruidQueryBuilder,
+                            e : Expression,
+                            isProjection : Boolean) :
+  Option[DruidQueryBuilder] = {
+    e.references.foldLeft(Some(dqb): Option[DruidQueryBuilder]){(odqb, a) =>
+      val d = odqb.get
+      odqb.flatMap(_.druidColumn(a.name)).map(_ => d)
+    }.map { dqb =>
+      if (isProjection) {
+        dqb.copy(hasUnpushedProjections = true)
+      } else {
+        dqb.copy(hasUnpushedFilters = true)
+      }
+    }
+  }
+
   def translateProjectFilter(dqb1 : Option[DruidQueryBuilder],
                              projectList : Seq[NamedExpression],
                              filters : Seq[Expression],
@@ -51,13 +68,19 @@ trait ProjectFilterTransfom {
        */
       val iCE: IntervalConditionExtractor = new IntervalConditionExtractor(dqb.get)
       val iCE2: SparkIntervalConditionExtractor = new SparkIntervalConditionExtractor(dqb.get)
-      filters.foldLeft(dqb) { (dqB, e) =>
+      var odqb = filters.foldLeft(dqb) { (dqB, e) =>
         dqB.flatMap { b =>
           intervalFilterExpression(b, iCE, iCE2, e).orElse(
-            dimFilterExpression(b, e).map(p => b.filter(p))
+            dimFilterExpression(b, e).map(p => b.filter(p)).orElse(
+              addUnpushedAttributes(b, e, false)
+            )
           )
         }
-      }.debug.map(Seq(_)).getOrElse(Seq())
+      }
+      odqb = odqb.map { d =>
+        d.copy(origProjList = Some(projectList)).copy(origFilter = ExprUtil.and(filters))
+      }
+      odqb.debug.map(Seq(_)).getOrElse(Seq())
     } else Seq()
   }
 
@@ -106,7 +129,7 @@ trait ProjectFilterTransfom {
       for (dqbc <- projectExpression(dqb, ar, joinAttrs, ignoreProjectList))
         yield dqbc.addAlias(nm, nm1)
     }
-    case _ => None
+    case _ => addUnpushedAttributes(dqb, pe, true)
   }
 
   def intervalFilterExpression(dqb: DruidQueryBuilder,

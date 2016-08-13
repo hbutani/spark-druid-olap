@@ -173,7 +173,7 @@ trait AggregateTransform {
     AggregateMatch((agg, gEs, aEs, projectList, expandOp, projections, child))) => {
       plan(dqb, child).flatMap { dqb =>
 
-        val dqb1 =Some(dqb)
+        val dqb1 = if (dqb.hasUnpushedExpressions) None else Some(dqb)
 
         /*
          * For each Expand projection.
@@ -312,9 +312,13 @@ trait AggregateTransform {
     }
     case (dqb, agg@Aggregate(gEs, aEs, child)) => {
       plan(dqb, child).flatMap { dqb =>
-        transformSingleGrouping(dqb,
-          agg,
-          GroupingInfo(gEs, gEs, aEs, Seq(), Map()))
+        if ( dqb.hasUnpushedExpressions ) {
+          None
+        } else {
+          transformSingleGrouping(dqb,
+            agg,
+            GroupingInfo(gEs, gEs, aEs, Seq(), Map()))
+        }
       }
     }
     case _ => Seq()

@@ -21,7 +21,7 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project => LProject}
-import org.apache.spark.sql.execution.{PhysicalRDD, Project, SparkPlan, Union}
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid._
@@ -36,13 +36,16 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
 
       val p: Seq[SparkPlan] = for (dqb <- planner.plan(null, l)
       ) yield {
-        if (dqb.aggregateOper.isDefined ) {
+        if (dqb.aggregateOper.isDefined) {
           aggregatePlan(dqb)
-        } else if (dqb.drInfo.options.nonAggQueryHandling !=
-          NonAggregateQueryHandling.PUSH_NONE) {
-          selectPlan(dqb, l)
         } else {
-          null
+          dqb.drInfo.options.nonAggQueryHandling match {
+            case NonAggregateQueryHandling.PUSH_FILTERS if dqb.filterSpec.isDefined =>
+              selectPlan(dqb, l)
+            case NonAggregateQueryHandling.PUSH_PROJECT_AND_FILTERS =>
+              selectPlan(dqb, l)
+            case _ => null
+          }
         }
       }
 
@@ -102,9 +105,18 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
     )
 
     val (queryHistorical : Boolean, numSegsPerQuery : Int) =
-      (dqb.drInfo.options.queryHistoricalServers(planner.sqlContext),
-        dqb.drInfo.options.numSegmentsPerHistoricalQuery(planner.sqlContext)
+      if (planner.sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED)) {
+        val dqc = DruidQueryCostModel.computeMethod(
+          planner.sqlContext,
+          dqb.drInfo,
+          qs
         )
+        (dqc.queryHistorical, dqc.numSegmentsPerQuery)
+      } else {
+        (dqb.drInfo.options.queryHistoricalServers(planner.sqlContext),
+          dqb.drInfo.options.numSegmentsPerHistoricalQuery(planner.sqlContext)
+          )
+      }
 
     /*
      * 5. Setup DruidRelation
@@ -116,14 +128,32 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
       intervals,
       Some(druidOpSchema.operatorDruidAttributes))
 
+    def addFilters(druidPhysicalOp : SparkPlan) : SparkPlan = {
+      dqb1.hasUnpushedFilters match {
+        case true if  dqb1.origFilter.isDefined => {
+          val druidPushDownExprMap = druidOpSchema.pushedDownExprToDruidAttr
+          val f = ExprUtil.transformReplace(dqb1.origFilter.get, {
+            case ne: AttributeReference if druidPushDownExprMap.contains(ne) &&
+              druidPushDownExprMap(ne).dataType != ne.dataType => {
+              val dA = druidPushDownExprMap(ne)
+              Cast(
+                AttributeReference(dA.name, dA.dataType)(dA.exprId),
+                ne.dataType)
+            }
+          }
+          )
+          Filter(f, druidPhysicalOp)
+        }
+        case _ => druidPhysicalOp
+      }
+    }
+
     buildPlan(
       dqb1,
       druidOpSchema,
       dq,
       planner,
-      {druidPhysicalOp =>
-        druidPhysicalOp
-      },
+      addFilters _,
       {(dqb, druidOpSchema) =>
         buildProjectionList(projectList, druidOpSchema)
       }

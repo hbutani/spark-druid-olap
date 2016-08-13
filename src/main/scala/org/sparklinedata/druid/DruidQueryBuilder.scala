@@ -18,11 +18,13 @@
 package org.sparklinedata.druid
 
 import java.util.concurrent.atomic.AtomicLong
+
 import scala.collection.mutable.{Map => MMap}
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.{Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.types.DataType
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidRelationInfo}
+
 import scala.collection.mutable
 
 /**
@@ -66,7 +68,14 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
                              avgExpressions : Map[Expression, (String, String)] = Map(),
                              aggExprToLiteralExpr: Map[Expression, Expression] = Map(),
                              aggregateOper: Option[Aggregate] = None,
-                             curId: AtomicLong = new AtomicLong(-1)) {
+                             curId: AtomicLong = new AtomicLong(-1),
+                             origProjList : Option[Seq[NamedExpression]] = None,
+                             origFilter : Option[Expression] = None,
+                             hasUnpushedProjections : Boolean = false,
+                             hasUnpushedFilters : Boolean = false) {
+
+  def hasUnpushedExpressions = hasUnpushedProjections || hasUnpushedFilters
+
   def dimension(d: DimensionSpec) = {
     this.copy(dimensions = (dimensions :+ d))
   }

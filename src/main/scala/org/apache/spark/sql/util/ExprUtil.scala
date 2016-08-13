@@ -362,4 +362,11 @@ object ExprUtil {
       }
     ne
   }
+
+  def and(exprs : Seq[Expression]) : Option[Expression] = exprs.size match {
+    case 0 => None
+    case 1 => exprs.headOption
+    case _ => Some(exprs.tail.fold(exprs.head)(And(_,_)))
+  }
+
 }
