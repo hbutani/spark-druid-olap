@@ -69,6 +69,38 @@ class SelectQueryTest extends BaseTest with BeforeAndAfterAll with Logging {
     true
   )
 
+  test("projectFilterExpressions",
+    "select concat(l_returnflag, ' Flag'), l_linestatus, " +
+      "l_extendedprice as s, ps_supplycost as m, ps_availqty as a," +
+      "o_orderkey/100, o_orderkey," +
+      " sin(o_orderkey/100) > sin(10000) " +
+      "from orderLineItemPartSupplier_select " +
+      "where sin(o_orderkey/100) > sin(10000)",
+    1,
+    true,
+    true
+  )
+
+  test("withAliases",
+    """
+       select concat(f, ' Flag'), s,
+      ep as s, ps_supplycost as m, ps_availqty as a,
+      sin(okey/100) > sin(10000), okey
+      from (
+           select l_returnflag as f, l_linestatus as s,
+                  l_extendedprice as ep, ps_supplycost,
+                  ps_availqty,
+                  o_orderkey as okey
+           from orderLineItemPartSupplier_select
+           where o_orderkey > 12000
+           ) as t
+      where sin(okey/100) > sin(10000)
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
   /*
    * Tests:
    *  - basic project

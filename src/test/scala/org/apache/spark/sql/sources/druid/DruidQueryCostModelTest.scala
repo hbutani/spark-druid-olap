@@ -20,7 +20,7 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.Logging
 import org.joda.time.{DateTime, Period}
 import org.scalatest.{BeforeAndAfterAll, fixture}
-import org.sparklinedata.druid.{GroupByQuerySpec, QuerySpec}
+import org.sparklinedata.druid.{GroupByQuerySpec, QuerySpec, SelectSpecWithIntervals}
 
 import scala.language.implicitConversions
 
@@ -149,6 +149,14 @@ class DruidQueryCostModelTest extends fixture.FunSuite with
 
     // distinct values estimate = 10000
     DruidQueryCostModel.compute(costScenario.copy(dimsNDVEstimate = 10000))
+
+    // distinct values estimate = 4611686018427387904L
+    DruidQueryCostModel.compute(costScenario.copy(dimsNDVEstimate = 4611686018427387904L))
+
+    DruidQueryCostModel.compute(
+      costScenario.copy(dimsNDVEstimate = 4611686018427387904L).
+        copy(querySpecClass = classOf[SelectSpecWithIntervals]))
+
   }
 
 

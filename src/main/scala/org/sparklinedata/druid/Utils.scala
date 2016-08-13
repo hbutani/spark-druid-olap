@@ -18,7 +18,7 @@
 package org.sparklinedata.druid
 
 import org.apache.spark.Logging
-import org.joda.time.DateTimeZone
+import org.joda.time.{DateTimeZone, Interval}
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
@@ -77,7 +77,13 @@ object Utils extends Logging {
         classOf[EqualityCondition],
         classOf[LookUpMap],
         classOf[InExtractionFnSpec],
-        classOf[ExtractionFilterSpec]
+        classOf[ExtractionFilterSpec],
+        classOf[SearchQuerySpec],
+        classOf[SearchQuerySpecWithSegIntervals],
+        classOf[SelectSpecWithIntervals],
+        classOf[SelectSpecWithSegmentIntervals],
+        classOf[PeriodGranularity],
+        classOf[DurationGranularity]
       )
     )
   ) +
@@ -122,6 +128,12 @@ object Utils extends Logging {
   def permute(s: String): String = StringPermute.permute(s)
 
   def defaultTZ : String = DateTimeZone.getDefault.getID
+
+  def intervalsMillis(intervals : List[Interval]) : Long = {
+    intervals.foldLeft(0L) {
+      case (t, i) => t + (i.getEndMillis - i.getStartMillis)
+    }
+  }
 }
 
 /**

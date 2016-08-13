@@ -847,6 +847,7 @@ abstract class SelectSpec extends QuerySpec {
   override def mapSparkColNameToDruidColName(druidRelationInfo: DruidRelationInfo) :
   Map[String, String] =
     druidRelationInfo.sourceToDruidMapping.mapValues(_.name)
+
 }
 
 case class SelectSpecWithIntervals(queryType: String,

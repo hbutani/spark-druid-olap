@@ -20,6 +20,7 @@ package org.sparklinedata.druid.metadata
 import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types._
+import org.sparklinedata.druid.DruidQueryGranularity
 
 import scala.collection.mutable.{Map => MMap}
 
@@ -71,8 +72,10 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 zkQualifyDiscoveryNames : Boolean,
                                 numSegmentsPerHistoricalQuery : Int,
                                 useSmile : Boolean,
-                                numProcessingThreadsPerHistorical : Option[Int] = None,
-                                nonAggQueryHandling : NonAggregateQueryHandling.Value) {
+                                nonAggQueryHandling : NonAggregateQueryHandling.Value,
+                                queryGranularity: DruidQueryGranularity,
+                                numProcessingThreadsPerHistorical : Option[Int] = None
+                                ) {
 
   def sqlContextOption(nm : String) = s"spark.sparklinedata.druid.option.$nm"
 
