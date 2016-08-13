@@ -267,11 +267,7 @@ case class CostInput[T <: QuerySpec](
 
 object DruidQueryCostModel extends Logging {
 
-  def intervalsMillis(intervals : List[Interval]) : Long = {
-    intervals.foldLeft(0L) {
-      case (t, i) => t + (i.getEndMillis - i.getStartMillis)
-    }
-  }
+  def intervalsMillis(intervals : List[Interval]) : Long = Utils.intervalsMillis(intervals)
 
   def intervalNDVEstimate(
                          intervalMillis : Long,
@@ -279,9 +275,14 @@ object DruidQueryCostModel extends Logging {
                          ndvForIndexEstimate : Long,
                          queryIntervalRatioScaleFactor : Double
                          ) : Long = {
-    val intervalRatio : Double = Math.min(intervalMillis/totalIntervalMillis, 1.0)
-    val scaledRatio = Math.max(queryIntervalRatioScaleFactor * intervalRatio * 10.0, 10.0)
-    Math.round(ndvForIndexEstimate * Math.log10(scaledRatio))
+    val intervalRatio : Double = Math.min(intervalMillis.toDouble/totalIntervalMillis.toDouble, 1.0)
+    var scaledRatio = Math.min(queryIntervalRatioScaleFactor * intervalRatio * 10.0, 10.0)
+    if ( scaledRatio < 1.0 ) {
+      scaledRatio = queryIntervalRatioScaleFactor * intervalRatio
+    } else {
+      scaledRatio = Math.log10(scaledRatio)
+    }
+    Math.round(ndvForIndexEstimate * scaledRatio)
   }
 
   private[druid] def compute[T <: QuerySpec](cI : CostInput[T]) : DruidQueryMethod = {
@@ -303,11 +304,15 @@ object DruidQueryCostModel extends Logging {
       queryIntervalRatioScaleFactor
     )
 
-    val segmentOutputSizeEstimate = intervalNDVEstimate(segIntervalMillis,
-      indexIntervalMillis,
-      dimsNDVEstimate,
-      queryIntervalRatioScaleFactor
-    )
+    val segmentOutputSizeEstimate = querySpecClass match {
+      case qC if classOf[SelectSpec].isAssignableFrom(qC) =>
+        queryOutputSizeEstimate/numSegmentsProcessed
+      case _ => intervalNDVEstimate(segIntervalMillis,
+        indexIntervalMillis,
+        dimsNDVEstimate,
+        queryIntervalRatioScaleFactor
+      )
+    }
 
     val numSparkCores : Long = {
       numSparkExecutors * sparkCoresPerExecutor
@@ -318,10 +323,11 @@ object DruidQueryCostModel extends Logging {
     val parallelismPerWave = Math.min(numHistoricalThreads, numSparkCores)
 
     def estimateNumWaves(numSegsPerQuery : Long,
-                         parallelism : Long = parallelismPerWave) : Long =
-      Math.round(
-        (numSegmentsProcessed/numSegsPerQuery)/ parallelism + 0.5
-      )
+                         parallelism : Long = parallelismPerWave) : Long = {
+      var d = numSegmentsProcessed.toDouble / numSegsPerQuery.toDouble
+      d = d/ parallelism
+      Math.round(d + 0.5)
+    }
 
     def brokerQueryCost : DruidQueryCost = {
       val numWaves: Long = estimateNumWaves(1, numHistoricalThreads)
@@ -331,7 +337,7 @@ object DruidQueryCostModel extends Logging {
       val numMerges = 2 * (numSegmentsProcessed - 1)
 
       val brokertMergeCost : Double =
-        (Math.max(numMerges / numProcessingThreadsPerHistorical,1.0))  *
+        (Math.max(numMerges.toDouble / numProcessingThreadsPerHistorical.toDouble,1.0))  *
           segmentOutputSizeEstimate * brokerMergeCostPerRow
       val segmentOutputTransportCost = queryOutputSizeEstimate *
         (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
@@ -339,7 +345,7 @@ object DruidQueryCostModel extends Logging {
         /*
          * SearchQuerySpecs cannot be run against broker.
          */
-        if ( classOf[SearchQuerySpec].isAssignableFrom(cI.querySpecClass)) {
+        if ( classOf[SelectSpec].isAssignableFrom(cI.querySpecClass)) {
           Double.MaxValue
         } else {
           numWaves * processingCostPerHist + segmentOutputTransportCost + brokertMergeCost
@@ -465,7 +471,6 @@ object DruidQueryCostModel extends Logging {
     */
   def estimateNDV(qs : QuerySpec,
                   drInfo : DruidRelationInfo) : Long = {
-
     val m : MMap[String, Long] = MHashMap()
 
     def applyFilterSelectivity(f : FilterSpec) : Unit = f match {
@@ -476,10 +481,28 @@ object DruidQueryCostModel extends Logging {
       case _ => ()
     }
 
-    qs.dimensionSpecs.foreach { d =>
-      m(d.dimension) =
-        drInfo.druidDS.columns(d.dimension).cardinality
+    val timeTicks = drInfo.options.queryGranularity.ndv(drInfo.druidDS.intervals)
+
+    def populateNDVMap(columns : Iterable[DruidColumn]) : Unit = {
+      columns.foreach { dC =>
+        m(dC.name) = dC match {
+          case t: DruidTimeDimension => timeTicks
+          case dC => dC.cardinality
+        }
+      }
     }
+
+    val columns = qs match {
+      case s : SelectSpec => {
+        drInfo.druidDS.columns.values
+      }
+      case a => {
+        a.dimensionSpecs.map(ds => drInfo.druidDS.columns(ds.dimension))
+      }
+    }
+
+    populateNDVMap(columns)
+
     if ( qs.filter.isDefined) {
       applyFilterSelectivity(qs.filter.get)
     }
