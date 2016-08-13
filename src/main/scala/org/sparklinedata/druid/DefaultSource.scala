@@ -133,6 +133,9 @@ class DefaultSource extends RelationProvider with Logging {
         getOrElse(DEFAULT_NON_AGG_QUERY_HANDLING)
     )
 
+    val queryGranularity : DruidQueryGranularity =
+      DruidQueryGranularity(parameters.get(QUERY_GRANULARITY).getOrElse(DEFAULT_QUERY_GRANULARITY))
+
     val options = DruidRelationOptions(
       maxCardinality,
       cardinalityPerDruidQuery,
@@ -146,8 +149,10 @@ class DefaultSource extends RelationProvider with Logging {
       zkQualifyDiscoveryNames,
       numSegmentsPerHistoricalQuery,
       useSmile,
-      numProcessingThreadsPerHistorical,
-      nonAggregateQueryHandling
+      nonAggregateQueryHandling,
+      queryGranularity,
+      numProcessingThreadsPerHistorical
+
     )
 
 
@@ -267,5 +272,8 @@ object DefaultSource {
 
   val NON_AGG_QUERY_HANDLING = "nonAggregateQueryHandling"
   val DEFAULT_NON_AGG_QUERY_HANDLING = NonAggregateQueryHandling.PUSH_NONE.toString
+
+  val QUERY_GRANULARITY = "queryGranularity"
+  val DEFAULT_QUERY_GRANULARITY = "none"
 
 }
