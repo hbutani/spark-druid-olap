@@ -17,8 +17,10 @@
 
 package org.sparklinedata.druid.metadata
 
-import scala.language.implicitConversions
+import org.apache.spark.sql.hive.thriftserver.sparklinedata.HiveThriftServer2
+
 import scala.collection.immutable.Queue
+import scala.language.implicitConversions
 
 case class DruidQueryExecutionView(
                          stageId : Int,
@@ -30,7 +32,8 @@ case class DruidQueryExecutionView(
                          druidExecTime : Long,
                          queryExecTime : Long,
                          numRows : Int,
-                         druidQuery : String
+                         druidQuery : String,
+                         sqlStmt: Option[String] = None
                          )
 
 object DruidQueryHistory {
@@ -41,6 +44,7 @@ object DruidQueryHistory {
    */
 
   lazy val maxSize = System.getProperty("sparkline.queryhistory.maxsize", "500").toInt
+
 
   class FiniteQueue[A](q: Queue[A]) {
     def enqueueFinite[B >: A](elem: B): Queue[B] = {
@@ -55,7 +59,9 @@ object DruidQueryHistory {
   private var history : Queue[DruidQueryExecutionView] = Queue[DruidQueryExecutionView]()
 
   def add(dq : DruidQueryExecutionView) : Unit = synchronized {
-    history = history.enqueueFinite(dq)
+    history = history.enqueueFinite(
+      dq.copy(sqlStmt = HiveThriftServer2.getSqlStmt(dq.stageId))
+    )
   }
 
   def getHistory : List[DruidQueryExecutionView] = synchronized {

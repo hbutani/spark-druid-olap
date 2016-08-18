@@ -36,7 +36,7 @@ private[ui] class DruidQueriesPage(parent: DruidQueriesTab) extends WebUIPage(""
     val table = if (numStatement > 0) {
       val headerRow = Seq("stageId", "partitionId", "taskAttemptId", "druidQueryServer",
         "druidSegIntervals", "startTime", "druidExecTime", "queryExecTime", "numRows",
-        "druidQuery")
+        "druidQuery", "sql")
       val druidContent = DruidQueryHistory.getHistory
       def generateDataRow(info: DruidQueryExecutionView): Seq[Node] = {
         var interval = ""
@@ -58,6 +58,7 @@ private[ui] class DruidQueriesPage(parent: DruidQueriesTab) extends WebUIPage(""
           <td>{info.queryExecTime}</td>
           <td>{info.numRows}</td>
           <td>{info.druidQuery}</td>
+          <td>{info.sqlStmt.getOrElse("none")}</td>
         </tr>
       }
       Some(UIUtils.listingTable(headerRow, generateDataRow,

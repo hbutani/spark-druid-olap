@@ -19,12 +19,15 @@ package org.apache.spark.sql.hive.thriftserver.sparklinedata
 
 import java.io.PrintStream
 
-import org.apache.hive.service.server.HiveServerServerOptionsProcessor
-import org.apache.spark.scheduler.StatsReportListener
+import org.apache.hive.service.server.{HiveServer2, HiveServerServerOptionsProcessor}
+import org.apache.spark.scheduler.{SparkListenerJobStart, StatsReportListener}
+import org.apache.spark.sql.SQLConf
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
 import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
+import org.apache.spark.sql.hive.thriftserver.HiveThriftServer2.HiveThriftServer2Listener
 import org.apache.spark.sql.hive.thriftserver.sparklinedata.ui.DruidQueriesTab
+import org.apache.spark.sql.hive.thriftserver.ui.ThriftServerTab
 import org.apache.spark.sql.hive.thriftserver.{SparkSQLCLIDriver, SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
 import org.apache.spark.sql.planner.logical.DruidLogicalOptimizer
 import org.apache.spark.sql.sources.druid.DruidPlanner
@@ -33,6 +36,7 @@ import org.apache.spark.{Logging, SparkConf, SparkContext}
 import org.sparklinedata.spark.dateTime.Functions
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 /**
   * A wrapper for spark's [[org.apache.spark.sql.hive.thriftserver.HiveThriftServer2]].
@@ -40,6 +44,8 @@ import scala.collection.JavaConverters._
   * [[org.apache.spark.sql.hive.HiveContext]].
   */
 object HiveThriftServer2 extends Logging {
+  def hs2Listener: HS2Listener =
+    RealHiveThriftServer2.listener.asInstanceOf[HS2Listener]
 
   def main(args: Array[String]) {
     val optionsProcessor = new HiveServerServerOptionsProcessor("HiveThriftServer2")
@@ -71,13 +77,27 @@ object HiveThriftServer2 extends Logging {
   }
 
   def startWithContext(sqlContext: HiveContext): Unit = {
-    RealHiveThriftServer2.startWithContext(sqlContext)
-
-     if (sqlContext.sparkContext.getConf.getBoolean("spark.ui.enabled", true)) {
+    /*
+     * RealHiveThriftServer2.startWithContext copied here, so we can register
+     * our listener.
+     */
+    val server = new RealHiveThriftServer2(sqlContext)
+    server.init(sqlContext.hiveconf)
+    server.start()
+    RealHiveThriftServer2.listener =
+      new HS2Listener(server, sqlContext.conf)
+    sqlContext.sparkContext.addSparkListener(hs2Listener)
+    RealHiveThriftServer2.uiTab =
+      if (sqlContext.sparkContext.getConf.getBoolean("spark.ui.enabled", true)) {
         Some(new DruidQueriesTab(sqlContext.sparkContext))
-    } else {
-      None
-    }
+        Some(new ThriftServerTab(sqlContext.sparkContext))
+      } else {
+        None
+      }
+  }
+
+  def getSqlStmt(stageId: Int): Option[String] = {
+    if (hs2Listener != null) hs2Listener.getSqlStmt(stageId) else None
   }
 }
 
@@ -120,5 +140,69 @@ object SparklineSQLEnv extends Logging {
         }
       }
     }
+  }
+}
+
+/**
+  * A inner sparkListener called in sc.stop to clean up the HiveThriftServer2.
+  * Override default Listener to maintain mapping between EID, GID & STGID.
+  */
+private[thriftserver] class HS2Listener(override val server: HiveServer2,
+                                        override val conf: SQLConf)
+  extends HiveThriftServer2Listener(server, conf) {
+  private val execIdToGIDStmt = new mutable.LinkedHashMap[String, (String, String)]
+  private val grpIdToExecId = new mutable.LinkedHashMap[String, String]
+  private val execIdToStageIDs = new mutable.LinkedHashMap[String, Seq[Int]]
+  private val stageIdToexecID = new mutable.LinkedHashMap[Int, String]
+
+  override def onJobStart(jobStart: SparkListenerJobStart): Unit = synchronized {
+    super.onJobStart(jobStart)
+    for {
+      props <- Option(jobStart.properties)
+      groupId <- Option(props.getProperty(SparkContext.SPARK_JOB_GROUP_ID))
+      eid <- grpIdToExecId.get(groupId)} {
+      for (stgid <- jobStart.stageIds)
+        stageIdToexecID += stgid -> eid
+      execIdToStageIDs += eid -> jobStart.stageIds
+    }
+  }
+
+  override def onStatementStart(
+                                 id: String,
+                                 sessionId: String,
+                                 statement: String,
+                                 groupId: String,
+                                 userName: String = "UNKNOWN"): Unit = synchronized {
+    super.onStatementStart(id, sessionId, statement, groupId, userName)
+    execIdToGIDStmt += id ->(groupId, statement)
+    grpIdToExecId += groupId -> id
+  }
+
+  override def onStatementError(id: String, errorMessage: String, errorTrace: String): Unit = {
+    synchronized {
+      cleanupStatement(id)
+      super.onStatementError(id, errorMessage, errorTrace)
+    }
+  }
+
+  override def onStatementFinish(id: String): Unit = synchronized {
+    cleanupStatement(id)
+    super.onStatementFinish(id)
+  }
+
+  def cleanupStatement(id: String): Unit = synchronized {
+    for (stgIds <- execIdToStageIDs.get(id)) {
+      stageIdToexecID --= (stgIds)
+    }
+    execIdToStageIDs -= (id)
+    for ((gid, _) <- execIdToGIDStmt.get(id)) {
+      grpIdToExecId -= (gid)
+    }
+    execIdToGIDStmt -= (id)
+  }
+
+  def getSqlStmt(stgId: Int): Option[String] = synchronized {
+    for (execId <- stageIdToexecID.get(stgId); (_, stmt) <- execIdToGIDStmt.get(execId)) yield
+      stmt
   }
 }
