@@ -846,7 +846,11 @@ abstract class SelectSpec extends QuerySpec {
 
   override def mapSparkColNameToDruidColName(druidRelationInfo: DruidRelationInfo) :
   Map[String, String] =
-    druidRelationInfo.sourceToDruidMapping.mapValues(_.name)
+    druidRelationInfo.sourceToDruidMapping.mapValues{
+      case dc if dc.name == DruidDataSource.TIME_COLUMN_NAME =>
+        DruidDataSource.EVENT_TIMESTAMP_KEY_NAME
+      case dc => dc.name
+    }
 
 }
 

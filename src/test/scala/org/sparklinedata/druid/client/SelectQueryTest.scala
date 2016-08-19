@@ -21,7 +21,7 @@ import org.apache.spark.Logging
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.scalatest.BeforeAndAfterAll
 
-class SelectQueryTest extends BaseTest with BeforeAndAfterAll with Logging {
+class SelectQueryTest extends StarSchemaBaseTest with BeforeAndAfterAll with Logging {
 
   override def beforeAll() = {
     super.beforeAll()
@@ -47,6 +47,21 @@ class SelectQueryTest extends BaseTest with BeforeAndAfterAll with Logging {
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema')""".stripMargin
     sql(cTOlap)
+
+    sql(
+      s"""CREATE TABLE if not exists lineitem_select
+      USING org.sparklinedata.druid
+      OPTIONS (sourceDataframe "lineItemBase",
+      timeDimensionColumn "l_shipdate",
+      druidDatasource "tpch",
+      druidHost "localhost",
+      zkQualifyDiscoveryNames "true",
+      columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
+      nonAggregateQueryHandling "push_project_and_filters",
+      functionalDependencies '$functionalDependencies',
+      starSchema '${starSchema.replaceAll("lineitem", "lineitem_select")}')""".stripMargin
+    )
   }
 
   test("basicSelect",
@@ -101,16 +116,128 @@ class SelectQueryTest extends BaseTest with BeforeAndAfterAll with Logging {
     true
   )
 
-  /*
-   * Tests:
-   *  - basic project
-   *  - project expression1 : attr + literals
-   *  - project expression 2: multi attr expr
-   *  - filter
-   *  - filter column not projected
-   *  - single join
-   *  - multi dimension join
-   *  - complex filters
-   */
+  test("columnInFilterOnly",
+    """
+      |select concat(l_returnflag , ' Flag'), l_linestatus
+      |from orderLineItemPartSupplier_select
+      |where sin(o_orderkey/100) > sin(10000) and
+      |      l_shipdate <= date '1993-02-01'
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
+  test("aggOnTop",
+    """
+      |select concat(l_returnflag , ' Flag'), l_linestatus, avg(ps_availqty)
+      |from orderLineItemPartSupplier_select
+      |where sin(o_orderkey/100) > sin(10000) and
+      |      l_shipdate <= date '1993-02-01'
+      |group by concat(l_returnflag , ' Flag'), l_linestatus
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
+  test("aggOfLShipDateOnTop",
+    """
+      |select lyear, l_linestatus, avg(ps_availqty)
+      |from (
+      |select year(cast(l_shipdate as TIMESTAMP)) as lyear, l_linestatus, ps_availqty
+      |from orderLineItemPartSupplier_select
+      |where sin(o_orderkey/100) > sin(10000) and
+      |      l_shipdate <= date '1993-02-01'
+      |) q1
+      |group by lyear, l_linestatus
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
+  test("joinDruidSelectAndDruidGBy",
+    """
+      |select lyear, q1.l_linestatus, q2.l_linestatus
+      |from (
+      |select distinct year(cast(l_shipdate as TIMESTAMP)) as lyear, l_linestatus
+      |from orderLineItemPartSupplier_select
+      |where sin(o_orderkey/100) > sin(10000) and
+      |      l_shipdate <= date '1993-02-01'
+      |) q1 right outer join
+      |(select distinct l_linestatus
+      |from orderLineItemPartSupplier_select) q2 on q1.l_linestatus = q2.l_linestatus
+    """.stripMargin,
+    2,
+    true,
+    true
+  )
+
+  test("2tableJoin",
+    "select  l_linestatus, ps_availqty " +
+      "from lineitem_select li join partsupp ps on  li.l_suppkey = ps.ps_suppkey " +
+      "and li.l_partkey = ps.ps_partkey ",
+    1,
+    true,
+    true
+  )
+
+  test("3tableJoin",
+    """
+      |select s_name, ps_availqty
+      |from partsupp ps join supplier s on ps.ps_suppkey = s.s_suppkey
+      |     join lineitem_select li on li.l_suppkey = ps.ps_suppkey and
+      |        li.l_partkey = ps.ps_partkey
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
+  test("3tableJoinFilter",
+    """
+      |select s_name, ps_availqty
+      |from partsupp ps join supplier s on ps.ps_suppkey = s.s_suppkey
+      |     join lineitem_select li on li.l_suppkey = ps.ps_suppkey and
+      |        li.l_partkey = ps.ps_partkey
+      |where sin(ps_partkey/100) > sin(10000) and
+      |      l_shipdate <= date '1993-02-01'
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
+  test("3tableJoinPushedFilterAggOnTop",
+    """
+      |select s_name, avg(ps_availqty)
+      |from partsupp ps join supplier s on ps.ps_suppkey = s.s_suppkey
+      |     join lineitem_select li on li.l_suppkey = ps.ps_suppkey and
+      |        li.l_partkey = ps.ps_partkey
+      |where sin(ps_partkey/100) > sin(10000) and
+      |      ps_partkey > 10 and
+      |      l_shipdate <= date '1993-02-01'
+      |group by s_name
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
+  test("3tableJoinFilterAggOnTop",
+    """
+      |select s_name, avg(ps_availqty)
+      |from partsupp ps join supplier s on ps.ps_suppkey = s.s_suppkey
+      |     join lineitem_select li on li.l_suppkey = ps.ps_suppkey and
+      |        li.l_partkey = ps.ps_partkey
+      |where sin(ps_partkey/100) > sin(10000) and
+      |      l_shipdate <= date '1993-02-01'
+      |group by s_name
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
 
 }
