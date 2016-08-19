@@ -127,6 +127,8 @@ case class DruidDataSource(name : String,
 object DruidDataSource {
 
   val TIME_COLUMN_NAME = "__time"
+  val EVENT_TIMESTAMP_KEY_NAME = "timestamp"
+
 
   def apply(dataSource : String, mr : MetadataResponse,
              is : List[Interval]) : DruidDataSource = {

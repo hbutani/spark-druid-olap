@@ -25,8 +25,9 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.{DruidDataType, NonAggregateQueryHandling}
+import org.sparklinedata.druid.metadata._
 import org.sparklinedata.druid.query.QuerySpecTransforms
+import scala.collection.mutable.{Map => MMap}
 
 private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
   with PredicateHelper with DruidPlannerHelper with Logging {
@@ -67,6 +68,44 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
     var dqb1 = dqb
 
     /*
+     * Add all projectList attributeRefs to DQB; this may have already happened.
+     * But in a JoinTree the projectLists are ignored during Join Transform,
+     * projections are handled either by the AggregateTransform or they are
+     * handled here.
+     */
+    val attrRefs = for(
+      p <- projectList ;
+      a <- p.references
+    ) yield a
+
+    val odqb = attrRefs.foldLeft(Some(dqb1):Option[DruidQueryBuilder]){(dqb, ar) =>
+      dqb.flatMap(dqb => dqb.druidColumn(ar.name).map(_ => dqb))
+    }
+
+    if ( !odqb.isDefined ) {
+      return null
+    } else {
+      dqb1 = odqb.get
+    }
+
+    /*
+     * Druid doesn't allow '__time' to be referenced as a dimension in the SelectQuery dim list.
+     * But it does return the timestamp with each ResultRow, so replace '__time'
+     * with the key 'timestamp'. Also the timestamp is returned as a iso format String
+     * and not an epoch.
+     */
+    val replaceTimeReferencedDruidColumns = dqb1.referencedDruidColumns.mapValues {
+      case dtc@DruidTimeDimension(_, _, sz) => DruidDimension(
+        DruidDataSource.EVENT_TIMESTAMP_KEY_NAME,
+        DruidDataType.String,
+        sz,
+        dtc.cardinality)
+      case dc => dc
+    }
+
+    dqb1 = dqb1.copy(referencedDruidColumns = MMap(replaceTimeReferencedDruidColumns.toSeq : _*))
+
+    /*
      * 1. Setup the dqb outputAttribute list by adding every AttributeRef
       * from the projectionList
      */
@@ -79,9 +118,40 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
         dqb1.outputAttribute(a.name, a, a.dataType, DruidDataType.sparkDataType(dc.dataType), null)
     }
 
+    /*
+     * add attributes for unpushed filters
+     */
+    for(
+      of <- dqb1.origFilter ;
+      a <- of.references;
+      dc <- dqb1.referencedDruidColumns.get(a.name)
+    ) {
+      dqb1 =
+        dqb1.outputAttribute(a.name, a, a.dataType, DruidDataType.sparkDataType(dc.dataType), null)
+    }
+
     val druidOpSchema = new DruidOperatorSchema(dqb1)
 
-    val (dims, metrics) = dqb1.referencedDruidColumns.values.partition(_.isDimension())
+    var (dims, metrics) = dqb1.referencedDruidColumns.values.partition(_.isDimension())
+
+    /*
+     * Remove 'timestamp' from the dimension list, this is returned by druid with every ResultRow.
+     */
+    dims = dims.filter(_.name != DruidDataSource.EVENT_TIMESTAMP_KEY_NAME)
+
+    /*
+     * If dims or metrics are empty, arbitararily pick 1 dim and metric.
+     * otherwise Druid interprets an empty list as having
+     * to return all dimensions/metrics.
+     */
+
+    if (dims.isEmpty ) {
+      dims = Seq(dqb1.drInfo.druidDS.dimensions.head)
+    }
+
+    if (metrics.isEmpty ) {
+      metrics = Seq(dqb1.drInfo.druidDS.metrics.values.head)
+    }
 
     /*
      * 2. Interval is either in the SQL, or use the entire datasource interval

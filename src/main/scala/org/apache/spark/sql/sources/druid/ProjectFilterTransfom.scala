@@ -78,7 +78,10 @@ trait ProjectFilterTransfom {
         }
       }
       odqb = odqb.map { d =>
-        d.copy(origProjList = Some(projectList)).copy(origFilter = ExprUtil.and(filters))
+        d.copy(origProjList = d.origProjList.map(_ ++ projectList).orElse(Some(projectList))).
+          copy(origFilter = d.origFilter.flatMap(o => ExprUtil.and(o +: filters)).
+            orElse(ExprUtil.and(filters))
+          )
       }
       odqb.debug.map(Seq(_)).getOrElse(Seq())
     } else Seq()
