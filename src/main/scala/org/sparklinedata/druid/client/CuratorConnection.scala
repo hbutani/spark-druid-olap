@@ -23,25 +23,31 @@ import java.util.concurrent.ExecutorService
 import org.apache.curator.framework.api.CompressionProvider
 import org.apache.curator.framework.imps.GzipCompressionProvider
 import org.apache.curator.framework.recipes.cache.PathChildrenCache.StartMode
-import org.apache.curator.framework.recipes.cache.{PathChildrenCache, PathChildrenCacheEvent, PathChildrenCacheListener}
+import org.apache.curator.framework.recipes.cache.{ChildData, PathChildrenCache, PathChildrenCacheEvent, PathChildrenCacheListener}
 import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.BoundedExponentialBackoffRetry
 import org.apache.curator.utils.ZKPaths
+import org.apache.spark.Logging
 import org.apache.spark.util.SparklineThreadUtils
 import org.sparklinedata.druid.{DruidDataSourceException, Utils}
 import org.sparklinedata.druid.metadata._
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 
+import scala.collection.mutable.{Map => MMap}
 import scala.util.Try
 
 class CuratorConnection(val zkHosts : String,
                         val options : DruidRelationOptions,
                         val cache : DruidMetadataCache,
-                        execSvc : ExecutorService) {
+                        execSvc : ExecutorService) extends Logging {
+
+  val serverSegmentsCache : MMap[String, PathChildrenCache] = MMap()
+  val serverSegmentCacheLock = new Object
 
   val discoveryPath = ZKPaths.makePath(options.zkDruidPath, "discovery")
   val announcementPath = ZKPaths.makePath(options.zkDruidPath, "announcements")
+  val serverSegmentsPath = ZKPaths.makePath(options.zkDruidPath, "segments")
 
   val framework: CuratorFramework = CuratorFrameworkFactory.builder.connectString(
     zkHosts).
@@ -51,9 +57,17 @@ class CuratorConnection(val zkHosts : String,
       new PotentiallyGzippedCompressionProvider(options.zkEnableCompression)
     ).build
 
-  val childrenCache : PathChildrenCache = new PathChildrenCache(
+  val announcementsCache : PathChildrenCache = new PathChildrenCache(
     framework,
     announcementPath,
+    true,
+    true,
+    execSvc
+  )
+
+  val serverSegmentsPathCache : PathChildrenCache = new PathChildrenCache(
+    framework,
+    serverSegmentsPath,
     true,
     true,
     execSvc
@@ -70,13 +84,69 @@ class CuratorConnection(val zkHosts : String,
     }
   }
 
-  childrenCache.getListenable.addListener(listener)
+  val serverSegmentsListener = new PathChildrenCacheListener {
+    override def childEvent(client: CuratorFramework, event: PathChildrenCacheEvent): Unit = {
+      event.getType match {
+        case PathChildrenCacheEvent.Type.CHILD_ADDED => {
+          serverSegmentCacheLock.synchronized {
+            val child: ChildData = event.getData
+            val key = getServerKey(event)
+            if (serverSegmentsCache.contains(key)) {
+              log.error(
+                "New node[%s] but there was already one.  That's not good, ignoring new one.",
+                child.getPath
+              )
+            } else {
+              val segmentsPath: String = String.format("%s/%s", serverSegmentsPath, key)
+              val segmentsCache: PathChildrenCache = new PathChildrenCache(
+                framework,
+                segmentsPath,
+                true,
+                true,
+                execSvc
+              )
+              segmentsCache.getListenable.addListener(listener)
+              serverSegmentsCache(key) = segmentsCache
+              log.debug("Starting inventory cache for %s, inventoryPath %s", key, segmentsPath)
+              segmentsCache.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT)
+            }
+          }
+        }
+        case PathChildrenCacheEvent.Type.CHILD_REMOVED => {
+          serverSegmentCacheLock.synchronized {
+            val child: ChildData = event.getData
+            val key = getServerKey(event)
+            val segmentsCache: Option[PathChildrenCache] = serverSegmentsCache.remove(key)
+            if (segmentsCache.isDefined) {
+              log.debug("Closing inventory cache for %s. Also removing listeners.", key)
+              segmentsCache.get.getListenable.clear()
+              segmentsCache.get.close()
+            } else log.warn("Container[%s] removed that wasn't a container!?", child.getPath)
+          }
+        }
+        case _ => ()
+      }
+    }
+  }
+
+  announcementsCache.getListenable.addListener(listener)
+  serverSegmentsPathCache.getListenable.addListener(serverSegmentsListener)
 
   framework.start()
-  childrenCache.start(StartMode.BUILD_INITIAL_CACHE)
+  announcementsCache.start(StartMode.BUILD_INITIAL_CACHE)
+  serverSegmentsPathCache.start(StartMode.POST_INITIALIZED_EVENT)
 
   SparklineThreadUtils.addShutdownHook {() =>
-    Try {childrenCache.close()}
+    Try {announcementsCache.close()}
+    Try {serverSegmentsPathCache.close()}
+    Try {
+      serverSegmentCacheLock.synchronized {
+        serverSegmentsCache.values.foreach { inventoryCache =>
+          inventoryCache.getListenable.clear()
+          inventoryCache.close()
+        }
+      }
+    }
     Try {framework.close()}
   }
 
@@ -130,6 +200,30 @@ class CuratorConnection(val zkHosts : String,
 
   def getCoordinator : String = {
     getService("coordinator")
+  }
+
+  private def getServerKey(event: PathChildrenCacheEvent) : String = {
+    val child: ChildData = event.getData
+
+    val data: Array[Byte] = getZkDataForNode(child.getPath)
+    if (data == null) {
+      log.info("Ignoring event: Type - %s , Path - %s , Version - %s",
+        Array(event.getType, child.getPath, child.getStat.getVersion))
+      null
+    } else {
+      ZKPaths.getNodeFromPath(child.getPath)
+    }
+  }
+
+  private def getZkDataForNode(path: String): Array[Byte] = {
+    try {
+      framework.getData.decompressed.forPath(path)
+    } catch {
+      case ex: Exception => {
+        log.warn(s"Exception while getting data for node $path", ex)
+        null
+      }
+    }
   }
 
 }

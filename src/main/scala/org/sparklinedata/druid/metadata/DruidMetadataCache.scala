@@ -204,6 +204,26 @@ trait DruidRelationInfoCache {
       options)
     dr
   }
+
+  def druidRelation(sQLContext: SQLContext,
+                    registeredInfo : DruidRelationInfo) : DruidRelationInfo = {
+
+    import registeredInfo._
+
+    val druidDS = getDataSourceInfo(
+      fullName,
+      options)._2
+
+    DruidRelationInfo(fullName,
+      sourceDFName,
+      timeDimensionCol,
+      druidDS,
+      sourceToDruidMapping,
+      fd,
+      starSchema,
+      options)
+
+  }
 }
 
 case class HistoricalServerAssignment(server: HistoricalServerInfo,
@@ -212,8 +232,19 @@ case class HistoricalServerAssignment(server: HistoricalServerInfo,
 object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache {
 
   private[metadata] val cache: MMap[String, DruidClusterInfo] = MMap()
+  private val curatorConnections : MMap[String, CuratorConnection] = MMap()
   val thrdPool = SparklineThreadUtils.newDaemonCachedThreadPool("druidMD", 5)
   implicit val ec = ExecutionContext.fromExecutor(thrdPool)
+
+  private def curatorConnection(host : String,
+                                options: DruidRelationOptions) : CuratorConnection = {
+    curatorConnections.getOrElse(host, {
+      val cc = new CuratorConnection(host, options, this, this.thrdPool)
+      curatorConnections(host) = cc
+      cc
+    }
+    )
+  }
 
   def getDruidClusterInfo(dRName: DruidRelationName,
                           options: DruidRelationOptions): DruidClusterInfo = {
@@ -222,7 +253,7 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
         cache(dRName.druidHost)
       } else {
         val host = dRName.druidHost
-        val cc = new CuratorConnection(host, options, this, this.thrdPool)
+        val cc = curatorConnection(host, options)
         val svr = cc.getCoordinator
         val dc = new DruidCoordinatorClient(svr)
         val ss = dc.serverStatus
@@ -274,6 +305,8 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
 
   def clearCache: Unit = cache.synchronized(cache.clear())
 
-  def clearCache(host: String): Unit = clearCache
+  def clearCache(host: String): Unit = cache.synchronized {
+    cache.remove(host)
+  }
 
 }
