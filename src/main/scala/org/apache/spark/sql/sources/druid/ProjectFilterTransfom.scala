@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.sources.druid
 
+import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
@@ -64,7 +65,11 @@ trait ProjectFilterTransfom {
   val druidRelationTransform: DruidTransform = {
     case (_, PhysicalOperation(projectList, filters,
     l@LogicalRelation(d@DruidRelation(info, None), _))) => {
-      val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
+      val actualInfo = DruidMetadataCache.druidRelation(
+        sqlContext,
+        info
+      )
+      val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(actualInfo))
       translateProjectFilter(dqb,
         projectList,
         ExprUtil.simplifyPreds(dqb.get, filters))
