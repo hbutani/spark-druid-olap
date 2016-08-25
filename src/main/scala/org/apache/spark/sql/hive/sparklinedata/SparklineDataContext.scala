@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.hive.sparklinedata
 
+import java.util.Properties
+
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
@@ -48,6 +50,24 @@ class SparklineDataContext(
     execHive,
     metaHive,
     isRootContext) with Logging {
+
+  {
+    /* Follow same procedure as SQLContext to add sparkline properties
+     * to SQLContext.conf
+     *
+     */
+    import scala.collection.JavaConverters._
+    val properties = new Properties
+    sparkContext.getConf.getAll.foreach {
+      case (key, value) if key.startsWith("spark.sparklinedata") =>
+        properties.setProperty(key, value)
+      case _ =>
+    }
+    conf.setConf(properties)
+    properties.asScala.foreach {
+      case (key, value) => setConf(key, value)
+    }
+  }
 
   DruidPlanner(this)
 
