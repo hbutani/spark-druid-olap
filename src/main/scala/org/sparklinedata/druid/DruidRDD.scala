@@ -26,16 +26,18 @@ import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.sources.druid.DruidQueryCostModel
+import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryCostModel}
 import org.apache.spark.sql.sparklinedata.execution.metrics.DruidQueryExecutionMetric
 import org.joda.time.Interval
-import org.sparklinedata.druid.client.{DruidQueryServerClient, QueryResultRow}
+import org.sparklinedata.druid.client.{ConnectionManager, DruidQueryServerClient, QueryResultRow}
+
 import org.sparklinedata.druid.metadata._
 
 import scala.util.Random
 
 abstract class DruidPartition extends Partition {
-  def queryClient(useSmile : Boolean) : DruidQueryServerClient
+  def queryClient(useSmile : Boolean,
+                  httpMaxPerRoute : Int, httpMaxTotal : Int) : DruidQueryServerClient
   def intervals : List[Interval]
   def segIntervals : List[(DruidSegmentInfo, Interval)]
 
@@ -52,8 +54,11 @@ class HistoricalPartition(idx: Int, hs : HistoricalServerAssignment) extends Dru
   val index: Int = idx
   val hsName = hs.server.host
 
-  def queryClient(useSmile : Boolean) : DruidQueryServerClient =
+  def queryClient(useSmile : Boolean,
+                  httpMaxPerRoute : Int, httpMaxTotal : Int) : DruidQueryServerClient = {
+    ConnectionManager.init(httpMaxPerRoute, httpMaxTotal)
     new DruidQueryServerClient(hsName, useSmile)
+  }
 
   val intervals : List[Interval] = hs.segmentIntervals.map(_._2)
 
@@ -64,8 +69,12 @@ class BrokerPartition(idx: Int,
                       val broker : String,
                       val i : Interval) extends DruidPartition {
   override def index: Int = idx
-  def queryClient(useSmile : Boolean)  : DruidQueryServerClient =
+  def queryClient(useSmile : Boolean,
+                  httpMaxPerRoute : Int, httpMaxTotal : Int)  : DruidQueryServerClient = {
+    ConnectionManager.init(httpMaxPerRoute, httpMaxTotal)
     new DruidQueryServerClient(broker, useSmile)
+  }
+
   def intervals : List[Interval] = List(i)
 
   def segIntervals : List[(DruidSegmentInfo, Interval)] = null
@@ -84,6 +93,12 @@ class DruidRDD(sqlContext: SQLContext,
   val drFullName = drInfo.fullName
   val drDSIntervals = drInfo.druidDS.intervals
   val ndvEstimate = DruidQueryCostModel.estimateNDV(dQuery.q, drInfo)
+  val (httpMaxPerRoute, httpMaxTotal) = (
+    DruidPlanner.getConfValue(sqlContext,
+      DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS_PER_ROUTE),
+    DruidPlanner.getConfValue(sqlContext,
+      DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS)
+    )
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
@@ -91,7 +106,7 @@ class DruidRDD(sqlContext: SQLContext,
     val p = split.asInstanceOf[DruidPartition]
     val mQry = p.setIntervalsOnQuerySpec(dQuery.q)
     Utils.logQuery(mQry)
-    val client = p.queryClient(useSmile)
+    val client = p.queryClient(useSmile, httpMaxPerRoute, httpMaxTotal)
 
     val qrySTime = System.currentTimeMillis()
     val qrySTimeStr = s"${new java.util.Date()}"

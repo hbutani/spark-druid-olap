@@ -42,20 +42,32 @@ import scala.collection.mutable.{Map => MMap}
 import scala.util.Try
 
 object ConnectionManager {
-  val pool = {
+
+  @volatile private var  initialized : Boolean = false
+
+  lazy val pool = {
     val p = new PoolingHttpClientConnectionManager
     p.setMaxTotal(40)
     p.setDefaultMaxPerRoute(8)
     p
   }
 
-  // Todo execute this in each Executor process
-  // for now each Executor gets the built-in values.
   def init(sqlContext : SQLContext): Unit = {
-    pool.setMaxTotal(DruidPlanner.getConfValue(sqlContext,
-      DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS))
-    pool.setDefaultMaxPerRoute(DruidPlanner.getConfValue(sqlContext,
-      DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS_PER_ROUTE))
+    if (!initialized ) {
+      init(DruidPlanner.getConfValue(sqlContext,
+        DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS_PER_ROUTE),
+        DruidPlanner.getConfValue(sqlContext,
+          DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS))
+      initialized = true
+    }
+  }
+
+  def init(maxPerRoute : Int, maxTotal : Int): Unit = {
+    if (!initialized ) {
+      pool.setMaxTotal(maxTotal)
+      pool.setDefaultMaxPerRoute(maxPerRoute)
+      initialized = true
+    }
   }
 }
 
@@ -75,7 +87,12 @@ abstract class DruidClient(val host : String,
   }
 
   protected def httpClient: CloseableHttpClient = {
-    HttpClients.custom.setConnectionManager(ConnectionManager.pool).build
+    val sTime = System.currentTimeMillis()
+    val r = HttpClients.custom.setConnectionManager(ConnectionManager.pool).build
+    val eTime = System.currentTimeMillis()
+    log.debug("Time to get httpClient: {}",  eTime - sTime)
+    log.debug(s"Pool Stats: {}",  ConnectionManager.pool.getTotalStats)
+    r
   }
 
   protected def release(resp: CloseableHttpResponse) : Unit = {
@@ -153,6 +170,10 @@ abstract class DruidClient(val host : String,
                            reqHeaders: Map[String, String]) : CloseableIterator[QueryResultRow] =  {
     var resp: CloseableHttpResponse = null
 
+    val enterTime = System.currentTimeMillis()
+    var beforeExecTime : Long = 0L
+    var afterExecTime : Long = 0L
+
     val it: Try[CloseableIterator[QueryResultRow]] = for {
       r <- Try {
         val req: CloseableHttpClient = httpClient
@@ -168,7 +189,9 @@ abstract class DruidClient(val host : String,
           request.asInstanceOf[HttpEntityEnclosingRequestBase].setEntity(input)
         }
         addHeaders(request, reqHeaders)
+        beforeExecTime = System.currentTimeMillis()
         resp = req.execute(request)
+        afterExecTime = System.currentTimeMillis()
         resp
       }
       it <- Try {
@@ -183,6 +206,13 @@ abstract class DruidClient(val host : String,
         }
       }
     } yield it
+    val afterItrBuildTime = System.currentTimeMillis()
+    log.debug("{}: beforeExecTime={}, execTime={}, itrBuildTime={}",
+      url,
+      (beforeExecTime - enterTime).toString,
+      (afterExecTime - beforeExecTime).toString,
+      (afterItrBuildTime - afterExecTime).toString
+    )
     it.getOrElse {
       release(resp)
       it.failed.get match {
