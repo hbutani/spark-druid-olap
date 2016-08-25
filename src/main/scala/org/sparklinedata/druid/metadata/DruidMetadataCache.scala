@@ -292,10 +292,11 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
   def assignHistoricalServers(dRName: DruidRelationName,
                               options: DruidRelationOptions,
                               intervals: List[Interval]): List[HistoricalServerAssignment] = {
-    getDataSourceInfo(dRName, options)
-    getDruidClusterInfo(dRName, options
-    ).historicalServers(dRName, intervals)
-
+    val cInfo = cache.synchronized {
+      getDataSourceInfo(dRName, options)
+      getDruidClusterInfo(dRName, options).copy()
+    }
+    cInfo.historicalServers(dRName, intervals)
   }
 
   def register(dRName: DruidRelationName,
