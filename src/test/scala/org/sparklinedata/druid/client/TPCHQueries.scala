@@ -55,7 +55,8 @@ object TPCHQueries {
         List(new FieldAccessPostAggregationSpec("l_discount"),
           new FieldAccessPostAggregationSpec("count")), None)
     )),
-    List("1993-01-01T00:00:00.000/1998-09-01T00:00:00.000")
+    List("1993-01-01T00:00:00.000/1998-09-01T00:00:00.000"),
+    None
   )
 
   val q1MonthGrain = new GroupByQuerySpec("tpch",
@@ -99,7 +100,8 @@ object TPCHQueries {
         List(new FieldAccessPostAggregationSpec("l_discount"),
           new FieldAccessPostAggregationSpec("count")), None)
     )),
-    List("1993-01-01T00:00:00.000/1993-03-01T00:00:00.000")
+    List("1993-01-01T00:00:00.000/1993-03-01T00:00:00.000"),
+    None
   )
 
   val q3 = new GroupByQuerySpec("tpch",
@@ -129,7 +131,8 @@ object TPCHQueries {
         List(new FieldAccessPostAggregationSpec("l_extendedprice"),
           new FieldAccessPostAggregationSpec("l_discount")), None)
     )),
-    List("1995-03-15T00:00:00.000/1998-09-01T00:00:00.000")
+    List("1995-03-15T00:00:00.000/1998-09-01T00:00:00.000"),
+    None
   )
 
 

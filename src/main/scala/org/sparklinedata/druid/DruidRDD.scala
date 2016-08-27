@@ -63,6 +63,14 @@ class HistoricalPartition(idx: Int, hs : HistoricalServerAssignment) extends Dru
   val intervals : List[Interval] = hs.segmentIntervals.map(_._2)
 
   val segIntervals : List[(DruidSegmentInfo, Interval)] = hs.segmentIntervals
+
+  override def setIntervalsOnQuerySpec(q : QuerySpec) : QuerySpec = {
+    val r = super.setIntervalsOnQuerySpec(q)
+    if (r.context.isDefined) {
+      r.context.get.queryId = s"${r.context.get.queryId}-${index}"
+    }
+    r
+  }
 }
 
 class BrokerPartition(idx: Int,

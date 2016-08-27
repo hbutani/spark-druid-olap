@@ -56,7 +56,12 @@ with PredicateHelper with DruidPlannerHelper with Logging {
           dqb.filterSpec,
           dqb.aggregations,
           dqb.postAggregations,
-          intervals.map(_.toString)
+          intervals.map(_.toString),
+          Some(
+            QuerySpecContext(
+              s"query-${System.nanoTime()}"
+            )
+          )
         )
 
         /*

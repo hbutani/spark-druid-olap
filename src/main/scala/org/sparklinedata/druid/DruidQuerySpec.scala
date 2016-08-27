@@ -481,7 +481,20 @@ case class SortSearchQuerySpec(
                                 `type` : String
                               )
 
-// TODO: look into exposing ContextSpec
+case class QuerySpecContext(
+                             var queryId : String,
+                           timeout : Option[Long] = None,
+                           priority : Option[Int] = None,
+                             useCache : Option[Boolean] = None,
+                             populateCache : Option[Boolean] = None,
+                             bySegment : Option[Boolean] = None,
+                             chunkPeriod : Option[String] = None,
+                             minTopNThreshold : Option[Int] = None,
+                             maxResults : Option[Int] = None,
+                             maxIntermediateRows : Option[Int] = None,
+                             groupByIsSingleThreaded : Option[Boolean] = None
+                           )
+
 sealed trait QuerySpec {
   self : Product =>
   val queryType: String
@@ -498,6 +511,8 @@ sealed trait QuerySpec {
   def filter : Option[FilterSpec]
 
   def setFilter(fSpec : FilterSpec) : QuerySpec
+
+  def context : Option[QuerySpecContext]
 
   def apply(useSmile : Boolean,
             is : InputStream,
@@ -516,7 +531,8 @@ case class GroupByQuerySpec(
                              val filter: Option[FilterSpec],
                              override val aggregations: List[AggregationSpec],
                              override val postAggregations: Option[List[PostAggregationSpec]],
-                             val intervals: List[String]
+                             val intervals: List[String],
+                             override val context : Option[QuerySpecContext]
                              ) extends QuerySpec {
   def this(dataSource: String,
            dimensions: List[DimensionSpec],
@@ -526,9 +542,10 @@ case class GroupByQuerySpec(
            filter: Option[FilterSpec],
            aggregations: List[AggregationSpec],
            postAggregations: Option[List[PostAggregationSpec]],
-           intervals: List[String]) = this("groupBy",
+           intervals: List[String],
+           context : Option[QuerySpecContext]) = this("groupBy",
     dataSource, dimensions, limitSpec, having, granularity, filter,
-    aggregations, postAggregations, intervals)
+    aggregations, postAggregations, intervals, context)
 
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
   def intervalList: List[String] = intervals
@@ -544,7 +561,8 @@ case class GroupByQuerySpec(
       filter,
       aggregations,
       postAggregations,
-      null
+      null,
+      context
     ).setSegIntervals(segIns)
 
   def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
@@ -560,7 +578,8 @@ case class GroupByQuerySpecWithSegIntervals(
                              val filter: Option[FilterSpec],
                              override val aggregations: List[AggregationSpec],
                              override val postAggregations: Option[List[PostAggregationSpec]],
-                             val intervals: SegmentIntervals
+                             val intervals: SegmentIntervals,
+                             override val context : Option[QuerySpecContext]
                            ) extends QuerySpec {
 
   override def intervalList: List[String] = intervals.segments.map(_.itvl)
@@ -580,15 +599,17 @@ case class TimeSeriesQuerySpec(
                                 val granularity: Either[String,GranularitySpec],
                                 val filter: Option[FilterSpec],
                                 override val aggregations: List[AggregationSpec],
-                                override val postAggregations: Option[List[PostAggregationSpec]]
+                                override val postAggregations: Option[List[PostAggregationSpec]],
+                                override val context : Option[QuerySpecContext]
                                 ) extends QuerySpec {
   def this(dataSource: String,
            intervals: List[String],
            granularity: Either[String,GranularitySpec],
            filters: Option[FilterSpec],
            aggregations: List[AggregationSpec],
-           postAggregations: Option[List[PostAggregationSpec]]) = this("timeseries",
-    dataSource, intervals, granularity, filters, aggregations, postAggregations)
+           postAggregations: Option[List[PostAggregationSpec]],
+           context : Option[QuerySpecContext]) = this("timeseries",
+    dataSource, intervals, granularity, filters, aggregations, postAggregations, context)
 
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
   def intervalList: List[String] = intervals
@@ -601,7 +622,8 @@ case class TimeSeriesQuerySpec(
       filter,
       aggregations,
       postAggregations,
-      null
+      null,
+      context
     ).setSegIntervals(segIns)
 
   def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
@@ -615,7 +637,8 @@ case class TimeSeriesQuerySpecWithSegIntervals(
                                              override val aggregations: List[AggregationSpec],
                                              override val postAggregations:
                                              Option[List[PostAggregationSpec]],
-                                             val intervals: SegmentIntervals
+                                             val intervals: SegmentIntervals,
+                                             override val context : Option[QuerySpecContext]
                                            ) extends QuerySpec {
 
   override def intervalList: List[String] = intervals.segments.map(_.itvl)
@@ -638,7 +661,8 @@ case class TopNQuerySpec(
                           override val postAggregations: Option[List[PostAggregationSpec]],
                           val dimension: DimensionSpec,
                           val threshold: Int,
-                          val metric: TopNMetricSpec
+                          val metric: TopNMetricSpec,
+                          override val context : Option[QuerySpecContext]
                           ) extends QuerySpec {
   def this(dataSource: String,
            intervals: List[String],
@@ -648,9 +672,10 @@ case class TopNQuerySpec(
            postAggregations: Option[List[PostAggregationSpec]],
            dimension: DimensionSpec,
            threshold: Int,
-           metric: TopNMetricSpec) = this("topN", dataSource,
+           metric: TopNMetricSpec,
+           context : Option[QuerySpecContext]) = this("topN", dataSource,
     intervals, granularity, filter, aggregations,
-    postAggregations, dimension, threshold, metric)
+    postAggregations, dimension, threshold, metric, context)
 
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
   def intervalList: List[String] = intervals
@@ -671,7 +696,8 @@ case class SearchQuerySpec(
                             val searchDimensions : List[String],
                             val query : SearchQueryQuerySpec,
                             val limit : Int,
-                            val sort : Option[SortSearchQuerySpec]
+                            val sort : Option[SortSearchQuerySpec],
+                            override val context : Option[QuerySpecContext]
                           ) extends QuerySpec {
 
   def this(dataSource: String,
@@ -681,9 +707,10 @@ case class SearchQuerySpec(
            searchDimensions : List[String],
            query : SearchQueryQuerySpec,
            limit : Int,
-           sort : Option[SortSearchQuerySpec] = None
+           sort : Option[SortSearchQuerySpec],
+           context : Option[QuerySpecContext]
   ) = this("search", dataSource, intervals, granularity,
-    filter, searchDimensions, query, limit, sort)
+    filter, searchDimensions, query, limit, sort, context)
 
   override def intervalList: List[String] = intervals
 
@@ -697,7 +724,8 @@ case class SearchQuerySpec(
       searchDimensions,
       query,
       limit,
-      sort
+      sort,
+      context
     ).setSegIntervals(segIns)
 
   override def setIntervals(ins: List[Interval]): QuerySpec =
@@ -725,7 +753,8 @@ case class SearchQuerySpecWithSegIntervals(
                             val searchDimensions : List[String],
                             val query : SearchQueryQuerySpec,
                             val limit : Int,
-                            val sort : Option[SortSearchQuerySpec]
+                            val sort : Option[SortSearchQuerySpec],
+                            override val context : Option[QuerySpecContext]
                           ) extends QuerySpec {
 
   def this(dataSource: String,
@@ -735,9 +764,11 @@ case class SearchQuerySpecWithSegIntervals(
            searchDimensions : List[String],
            query : SearchQueryQuerySpec,
            limit : Int,
-           sort : Option[SortSearchQuerySpec] = None
+           sort : Option[SortSearchQuerySpec] = None,
+           context : Option[QuerySpecContext]
           ) =
-    this("search", dataSource, intervals, granularity, filter, searchDimensions, query, limit, sort)
+    this("search", dataSource, intervals, granularity,
+      filter, searchDimensions, query, limit, sort, context)
 
   override def intervalList: List[String] = intervals.segments.map(_.itvl)
 

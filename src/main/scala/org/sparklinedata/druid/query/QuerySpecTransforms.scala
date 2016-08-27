@@ -125,7 +125,8 @@ object AllGroupingGroupByQuerySpecToTimeSeriesSpec extends Transform {
           Left("all"),
           gbSpec.filter,
           gbSpec.aggregations,
-          gbSpec.postAggregations
+          gbSpec.postAggregations,
+          gbSpec.context
         )
       case _ => qSpec
     }
@@ -178,7 +179,8 @@ object SearchQuerySpecTransform extends Transform {
     filter,
     List(),
     None,
-    intervals
+    intervals,
+    context
     ) if dName == oName &&
       QueryIntervals.queryForEntireDataSourceInterval(drInfo, qSpec) =>
       new SearchQuerySpec(
@@ -188,7 +190,9 @@ object SearchQuerySpecTransform extends Transform {
         filter,
         List(dName),
         new InsensitiveContainsSearchQuerySpec(),
-        Integer.MAX_VALUE
+        Integer.MAX_VALUE,
+        None,
+        context
       )
     case GroupByQuerySpec(_, ds,
     List(DefaultDimensionSpec(_, dName, oName)),
@@ -198,7 +202,8 @@ object SearchQuerySpecTransform extends Transform {
     filter,
     List(),
     None,
-    intervals
+    intervals,
+    context
     ) if dName == oName && dName == ordName &&
       QueryIntervals.queryForEntireDataSourceInterval(drInfo, qSpec) =>
       new SearchQuerySpec(
@@ -209,7 +214,8 @@ object SearchQuerySpecTransform extends Transform {
         List(dName),
         new InsensitiveContainsSearchQuerySpec(),
         limValue,
-        Some(SortSearchQuerySpec("lexicographic"))
+        Some(SortSearchQuerySpec("lexicographic")),
+        context
       )
     case _ => qSpec
   }
