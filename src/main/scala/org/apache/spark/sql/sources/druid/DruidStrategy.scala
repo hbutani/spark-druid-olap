@@ -171,7 +171,13 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
           DruidPlanner.DRUID_SELECT_QUERY_PAGESIZE)
       ),
       intervals.map(_.toString),
-      false
+      false,
+      "all",
+      Some(
+        QuerySpecContext(
+          s"query-${System.nanoTime()}"
+        )
+      )
     )
 
     val (queryHistorical : Boolean, numSegsPerQuery : Int) =
@@ -250,7 +256,12 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
       dqb.filterSpec,
       dqb.aggregations,
       dqb.postAggregations,
-      intervals.map(_.toString)
+      intervals.map(_.toString),
+      Some(
+        QuerySpecContext(
+          s"query-${System.nanoTime()}"
+        )
+      )
     )
 
     /*
