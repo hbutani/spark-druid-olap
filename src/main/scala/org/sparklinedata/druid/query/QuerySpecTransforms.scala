@@ -18,9 +18,10 @@
 package org.sparklinedata.druid.query
 
 import org.apache.spark.Logging
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.sources.druid.DruidQueryCostModel
 import org.sparklinedata.druid._
-import org.sparklinedata.druid.metadata.DruidRelationInfo
+import org.sparklinedata.druid.metadata.{DruidDataType, DruidRelationInfo}
 
 
 abstract class Transform extends Logging {
@@ -30,7 +31,9 @@ abstract class Transform extends Logging {
     if (className endsWith "$") className.dropRight(1) else className
   }
 
-  def apply(drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec
+  def apply(sqlContext : SQLContext,
+            drInfo : DruidRelationInfo,
+            qSpec: QuerySpec): QuerySpec
 }
 
 /**
@@ -48,7 +51,8 @@ abstract class TransformExecutor extends Logging {
 
   protected val batches: Seq[Batch]
 
-  def transform(drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec = {
+  def transform(sqlContext : SQLContext,
+                drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec = {
     var curQSpec = qSpec
 
     batches.foreach { batch =>
@@ -61,7 +65,7 @@ abstract class TransformExecutor extends Logging {
       while (continue) {
         curQSpec = batch.transforms.foldLeft(curQSpec) {
           case (qSpec, transform) =>
-            transform(drInfo, qSpec)
+            transform(sqlContext,drInfo, qSpec)
         }
         iteration += 1
         if (iteration > batch.strategy.maxIterations) {
@@ -97,7 +101,8 @@ abstract class TransformExecutor extends Logging {
 
 object AddCountAggregateForNoMetricsGroupByQuerySpec extends Transform {
 
-  override def apply(drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec =
+  override def apply(sqlContext : SQLContext,
+                     drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec =
     qSpec match {
 
     case gbSpec : GroupByQuerySpec if gbSpec.aggregations.isEmpty =>
@@ -111,7 +116,8 @@ object AddCountAggregateForNoMetricsGroupByQuerySpec extends Transform {
 
 object AllGroupingGroupByQuerySpecToTimeSeriesSpec extends Transform {
 
-  override def apply(drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec =
+  override def apply(sqlContext : SQLContext,
+                     drInfo : DruidRelationInfo, qSpec: QuerySpec): QuerySpec =
     qSpec match {
 
       case gbSpec : GroupByQuerySpec
@@ -157,7 +163,8 @@ object BetweenFilterSpec extends Transform {
     case _ => fSpec
   }
 
-  override def apply(drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = {
+  override def apply(sqlContext : SQLContext,
+                     drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = {
     if (!qSpec.filter.isDefined) {
       qSpec
     } else {
@@ -170,7 +177,8 @@ object BetweenFilterSpec extends Transform {
 
 object SearchQuerySpecTransform extends Transform {
 
-  override def apply(drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = qSpec match {
+  override def apply(sqlContext : SQLContext,
+                     drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = qSpec match {
     case GroupByQuerySpec(_, ds,
     List(DefaultDimensionSpec(_, dName, oName)),
     None,
@@ -221,12 +229,71 @@ object SearchQuerySpecTransform extends Transform {
   }
 }
 
+object TopNQueryTransform extends Transform {
+
+  def topNMetric(drInfo: DruidRelationInfo,
+                 ordColumn : String,
+                 ordDirection : String) : TopNMetricSpec = {
+
+    val dT = drInfo.druidDS.metric(ordColumn).map(_.dataType).getOrElse(DruidDataType.Long)
+
+    (dT, ordDirection.toLowerCase()) match {
+      case (DruidDataType.Long | DruidDataType.Float, "descending") =>
+        new NumericTopNMetricSpec(ordColumn)
+      case (DruidDataType.Long | DruidDataType.Float, "ascending") =>
+        new InvertedTopNMetricSpec(new NumericTopNMetricSpec(ordColumn))
+      case (_, "descending") =>
+        new LexiographicTopNMetricSpec(ordColumn)
+      case (_, "ascending") =>
+        new InvertedTopNMetricSpec(new LexiographicTopNMetricSpec(ordColumn))
+      case _ => new LexiographicTopNMetricSpec(ordColumn)
+    }
+  }
+
+  override def apply(sqlContext : SQLContext,
+                     drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = qSpec match {
+    case _ if !drInfo.options.allowTopN(sqlContext) => qSpec
+    case GroupByQuerySpec(_, _, _,
+    Some(LimitSpec(_, limValue, List(OrderByColumnSpec(ordName, "ascending")))),
+    _, _, _, _, _, _, _
+    ) if limValue >= drInfo.options.topNMaxThreshold(sqlContext) => qSpec
+    case GroupByQuerySpec(_, ds,
+    List(dimSpec@DefaultDimensionSpec(_, dName, oName)),
+    Some(LimitSpec(_, limValue, List(OrderByColumnSpec(ordName, ordDirection)))),
+    None,
+    granularity,
+    filter,
+    aggregations,
+    postAggregations,
+    intervals,
+    context
+    ) if oName != ordName => {
+      var c = context.get
+      c = c.copy(minTopNThreshold = Some(limValue + 1))
+      new TopNQuerySpec(
+        ds,
+        intervals,
+        granularity,
+        filter,
+        aggregations,
+        postAggregations,
+        dimSpec,
+        limValue,
+        topNMetric(drInfo, ordName, ordDirection),
+        Some(c)
+      )
+    }
+    case _ => qSpec
+  }
+}
+
 object QuerySpecTransforms extends TransformExecutor {
 
   override  protected val batches: Seq[Batch] = Seq(
     Batch("dimensionQueries", FixedPoint(100),
       SearchQuerySpecTransform, AddCountAggregateForNoMetricsGroupByQuerySpec, BetweenFilterSpec),
     Batch("timeseries", Once, AllGroupingGroupByQuerySpecToTimeSeriesSpec)
+    // Batch("topN", Once, TopNQueryTransform)
   )
 
 }

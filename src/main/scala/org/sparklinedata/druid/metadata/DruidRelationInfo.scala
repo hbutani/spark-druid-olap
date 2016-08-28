@@ -64,6 +64,8 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 zkQualifyDiscoveryNames : Boolean,
                                 numSegmentsPerHistoricalQuery : Int,
                                 useSmile : Boolean,
+                                allowTopN : Boolean,
+                                topNMaxThreshold : Int,
                                 numProcessingThreadsPerHistorical : Option[Int] = None) {
 
   def sqlContextOption(nm : String) = s"spark.sparklinedata.druid.option.$nm"
@@ -87,6 +89,20 @@ case class DruidRelationOptions(val maxCardinality : Long,
       sqlContextOption("useSmile"),
       useSmile.toString
     ).toBoolean
+  }
+
+  def allowTopN(sqlContext : SQLContext) : Boolean = {
+    sqlContext.getConf(
+      sqlContextOption("allowTopN"),
+      allowTopN.toString
+    ).toBoolean
+  }
+
+  def topNMaxThreshold(sqlContext : SQLContext) : Int = {
+    sqlContext.getConf(
+      sqlContextOption("topNMaxThreshold"),
+      topNMaxThreshold.toString
+    ).toInt
   }
 
 }

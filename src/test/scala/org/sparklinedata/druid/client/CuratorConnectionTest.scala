@@ -18,6 +18,7 @@
 package org.sparklinedata.druid.client
 
 import org.scalatest.{BeforeAndAfterAll, fixture}
+import org.sparklinedata.druid.DefaultSource
 import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationOptions}
 
 class CuratorConnectionTest extends fixture.FunSuite with
@@ -38,7 +39,9 @@ class CuratorConnectionTest extends fixture.FunSuite with
       false,
       true,
       Int.MaxValue,
-      true
+      true,
+      DefaultSource.DEFAULT_ALLOW_TOPN,
+      DefaultSource.DEFAULT_TOPN_MAX_THRESHOLD
     )
 
     val cc = new CuratorConnection(zkHosts,

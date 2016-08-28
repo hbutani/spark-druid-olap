@@ -40,6 +40,7 @@ trait LimitTransfom {
   val limitTransform: DruidTransform = {
     case (dqb, sort@Sort(orderExprs, global, child: Aggregate)) => {
       // TODO: handle Having
+      // TODO: handle order on Avg expression, avg is pushed down as Sum + Count
       val dqbs = plan(dqb, child).map { dqb =>
         val exprToDruidOutput =
           new DruidOperatorSchema(dqb).pushedDownExprToDruidAttr
@@ -56,6 +57,31 @@ trait LimitTransfom {
     }
     case (dqb, sort@Limit(limitExpr, child: Sort)) => {
       val dqbs = plan(dqb, child).map { dqb =>
+        val amt = limitExpr.eval(null).asInstanceOf[Int]
+        dqb.limit(amt)
+      }
+      Utils.sequence(dqbs.toList).getOrElse(Seq())
+    }
+    case (dqb, sort@Limit(limitExpr, Project(projections,
+    child@Sort(_, _, aggChild: Aggregate)))) => {
+
+      /*
+       * ensure everything on Project list is pushed to Druid.
+       */
+      val odqb1 = dqb.map { dqb =>
+        val exprToDruidOutput =
+          new DruidOperatorSchema(dqb).pushedDownExprToDruidAttr
+
+        projections.foldLeft(Some(dqb).asInstanceOf[ODB]) { (dqb, e) =>
+          for (dqb2 <- dqb;
+               ue <- unalias(e, aggChild);
+               doA <- exprToDruidOutput.get(ue) if doA.dataType == ue.dataType)
+            yield dqb2
+        }
+      }
+      val dqb1 = Utils.sequence(odqb1.toList).getOrElse(Seq())
+
+      val dqbs = plan(dqb1, child).map { dqb =>
         val amt = limitExpr.eval(null).asInstanceOf[Int]
         dqb.limit(amt)
       }

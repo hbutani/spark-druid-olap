@@ -67,7 +67,7 @@ with PredicateHelper with DruidPlannerHelper with Logging {
         /*
          * 4. apply QuerySpec transforms
          */
-        qs = QuerySpecTransforms.transform(dqb.drInfo, qs)
+        qs = QuerySpecTransforms.transform(planner.sqlContext, dqb.drInfo, qs)
 
         val (queryHistorical: Boolean, numSegsPerQuery: Int) =
           if (!pAgg.canBeExecutedInHistorical) {
