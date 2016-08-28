@@ -17,6 +17,7 @@
 
 package org.sparklinedata.druid.metadata
 
+import org.apache.spark.Logging
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.util.SparklineThreadUtils
 import org.joda.time.Interval
@@ -229,7 +230,7 @@ trait DruidRelationInfoCache {
 case class HistoricalServerAssignment(server: HistoricalServerInfo,
                                       segmentIntervals: List[(DruidSegmentInfo, Interval)])
 
-object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache {
+object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache with Logging {
 
   private[metadata] val cache: MMap[String, DruidClusterInfo] = MMap()
   private val curatorConnections : MMap[String, CuratorConnection] = MMap()
@@ -260,6 +261,7 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
         val r = dc.serversInfo.filter(_.`type` == "historical")
         val dCI = new DruidClusterInfo(host, cc, ss, MMap[String, DruidDataSourceInfo](), r)
         cache(dCI.host) = dCI
+        log.info(s"loading druid cluster info for ${dRName}")
         dCI
       }
     }
@@ -281,6 +283,7 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
         val i: DruidDataSourceInfo = (r, dds)
         val m = dCI.druidDataSources.asInstanceOf[MMap[String, DruidDataSourceInfo]]
         m(i._1.name) = i
+        log.info(s"loading druid datasource info for ${dRName}")
         i
       }
     }
@@ -307,6 +310,7 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
   def clearCache: Unit = cache.synchronized(cache.clear())
 
   def clearCache(host: String): Unit = cache.synchronized {
+    log.info(s"clearing cache for ${host} at\n ${(new Throwable).getStackTraceString}")
     cache.remove(host)
   }
 
