@@ -18,8 +18,10 @@
 package org.sparklinedata.druid.client
 
 import org.scalatest.{BeforeAndAfterAll, fixture}
+
 import org.sparklinedata.druid.{DruidQueryGranularity, NoneGranularity}
 import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationOptions, NonAggregateQueryHandling}
+import org.sparklinedata.druid.DefaultSource
 
 class CuratorConnectionTest extends fixture.FunSuite with
   fixture.TestDataFixture {
@@ -42,6 +44,8 @@ class CuratorConnectionTest extends fixture.FunSuite with
       true,
       NonAggregateQueryHandling.PUSH_NONE,
       NoneGranularity,
+      DefaultSource.DEFAULT_ALLOW_TOPN,
+      DefaultSource.DEFAULT_TOPN_MAX_THRESHOLD,
       None
     )
 

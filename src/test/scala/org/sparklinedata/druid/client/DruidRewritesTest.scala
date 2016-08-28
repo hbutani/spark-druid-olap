@@ -419,5 +419,27 @@ class DruidRewritesTest extends BaseTest {
     true,
     true)
 
+  test("topN",
+    "select l_returnflag, " +
+      "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a " +
+      "from orderLineItemPartSupplier group by l_returnflag " +
+      "order by max(ps_supplycost) " +
+      "limit 200",
+    1,
+    true,
+    true
+  )
+
+  test("topNDesc",
+    "select l_returnflag, " +
+      "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a " +
+      "from orderLineItemPartSupplier group by l_returnflag " +
+      "order by max(ps_supplycost) desc " +
+      "limit 200",
+    1,
+    true,
+    true
+  )
+
 }
 

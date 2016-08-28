@@ -166,6 +166,21 @@ object DruidPlanner {
     doc = "for druid queries use the smile binary protocol"
   )
 
+  val DRUID_ALLOW_TOPN_QUERIES = booleanConf(
+    "spark.sparklinedata.druid.allowTopN",
+    defaultValue = Some(DefaultSource.DEFAULT_ALLOW_TOPN),
+    doc = "druid TopN queries are approximate in their aggregation and ranking, this " +
+      "flag controls if TopN query rewrites should happen."
+  )
+
+  val DRUID_TOPN_QUERIES_MAX_THRESHOLD = intConf(
+    "spark.sparklinedata.druid.topNMaxThreshold",
+    defaultValue = Some(DefaultSource.DEFAULT_TOPN_MAX_THRESHOLD),
+    doc = "if druid TopN queries are enabled, this property controls the maximum " +
+      "limit for which such rewrites are done. For limits beyond this value the GroupBy query is" +
+      "executed."
+  )
+
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
       case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery

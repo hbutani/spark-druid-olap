@@ -123,6 +123,14 @@ class DefaultSource extends RelationProvider with Logging {
       parameters.get(USE_SMILE).
         getOrElse(DEFAULT_USE_SMILE).toBoolean
 
+    val allowTopN : Boolean =
+      parameters.get(ALLOW_TOPN).
+        getOrElse(DEFAULT_ALLOW_TOPN.toString).toBoolean
+
+    val topNMaxThreshold : Int =
+      parameters.get(TOPN_MAX_THRESHOLD).
+        getOrElse(DEFAULT_TOPN_MAX_THRESHOLD.toString).toInt
+
 
     val numProcessingThreadsPerHistorical =
       parameters.get(NUM_PROCESSING_THREADS_PER_HISTORICAL).map(_.toInt)
@@ -151,8 +159,9 @@ class DefaultSource extends RelationProvider with Logging {
       useSmile,
       nonAggregateQueryHandling,
       queryGranularity,
+      allowTopN,
+      topNMaxThreshold,
       numProcessingThreadsPerHistorical
-
     )
 
 
@@ -275,5 +284,11 @@ object DefaultSource {
 
   val QUERY_GRANULARITY = "queryGranularity"
   val DEFAULT_QUERY_GRANULARITY = "none"
+
+  val ALLOW_TOPN = "allowTopNRewrite"
+  val DEFAULT_ALLOW_TOPN = false
+
+  val TOPN_MAX_THRESHOLD = "topNMaxThreshold"
+  val DEFAULT_TOPN_MAX_THRESHOLD : Int = 100000
 
 }

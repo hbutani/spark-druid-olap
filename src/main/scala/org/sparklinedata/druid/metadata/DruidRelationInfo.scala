@@ -74,6 +74,8 @@ case class DruidRelationOptions(val maxCardinality : Long,
                                 useSmile : Boolean,
                                 nonAggQueryHandling : NonAggregateQueryHandling.Value,
                                 queryGranularity: DruidQueryGranularity,
+                                allowTopN : Boolean,
+                                topNMaxThreshold : Int,
                                 numProcessingThreadsPerHistorical : Option[Int] = None
                                 ) {
 
@@ -98,6 +100,20 @@ case class DruidRelationOptions(val maxCardinality : Long,
       sqlContextOption("useSmile"),
       useSmile.toString
     ).toBoolean
+  }
+
+  def allowTopN(sqlContext : SQLContext) : Boolean = {
+    sqlContext.getConf(
+      sqlContextOption("allowTopN"),
+      allowTopN.toString
+    ).toBoolean
+  }
+
+  def topNMaxThreshold(sqlContext : SQLContext) : Int = {
+    sqlContext.getConf(
+      sqlContextOption("topNMaxThreshold"),
+      topNMaxThreshold.toString
+    ).toInt
   }
 
 }

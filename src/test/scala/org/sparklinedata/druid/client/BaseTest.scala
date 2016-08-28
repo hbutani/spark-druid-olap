@@ -203,6 +203,7 @@ abstract class BaseTest extends fixture.FunSuite with
       zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
       numProcessingThreadsPerHistorical '1',
+      allowTopNRewrite "true",
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema')""".stripMargin
 

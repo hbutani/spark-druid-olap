@@ -424,12 +424,16 @@ sealed trait TopNMetricSpec {
 case class NumericTopNMetricSpec(
                                   val `type`: String,
                                   val metric: String
-                                  ) extends TopNMetricSpec
+                                  ) extends TopNMetricSpec {
+  def this(metric: String) = this("numeric", metric)
+}
 
 case class LexiographicTopNMetricSpec(
                                        val `type`: String,
                                        val previousStop: String
-                                       ) extends TopNMetricSpec
+                                       ) extends TopNMetricSpec {
+  def this(previousStop: String) = this("lexicographic", previousStop)
+}
 
 case class AlphaNumericTopNMetricSpec(
                                        val `type`: String,
@@ -439,7 +443,9 @@ case class AlphaNumericTopNMetricSpec(
 case class InvertedTopNMetricSpec(
                                    val `type`: String,
                                    val metric: TopNMetricSpec
-                                   ) extends TopNMetricSpec
+                                   ) extends TopNMetricSpec {
+  def this(metric: TopNMetricSpec) = this("inverted", metric)
+}
 
 
 case class SegmentInterval(itvl : String,
@@ -728,7 +734,59 @@ case class TopNQuerySpec(
   def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
   def intervalList: List[String] = intervals
 
-  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec = ???
+  def setSegIntervals(segIns : List[(DruidSegmentInfo, Interval)]) : QuerySpec =
+    TopNQuerySpecWithSegIntervals(
+      queryType,
+      dataSource,
+      null,
+      granularity,
+      filter,
+      aggregations,
+      postAggregations,
+      dimension,
+      threshold,
+      metric,
+      context
+    ).setSegIntervals(segIns)
+
+  def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
+
+  override def dimensions : List[DimensionSpec] =
+    List(dimension)
+}
+
+case class TopNQuerySpecWithSegIntervals(
+                          val queryType: String,
+                          val dataSource: String,
+                          val intervals: SegmentIntervals,
+                          val granularity: Either[String,GranularitySpec],
+                          val filter: Option[FilterSpec],
+                          override val aggregations: List[AggregationSpec],
+                          override val postAggregations: Option[List[PostAggregationSpec]],
+                          val dimension: DimensionSpec,
+                          val threshold: Int,
+                          val metric: TopNMetricSpec,
+                          override val context : Option[QuerySpecContext]
+                        ) extends AggQuerySpec {
+  def this(dataSource: String,
+           intervals: SegmentIntervals,
+           granularity: Either[String,GranularitySpec],
+           filter: Option[FilterSpec],
+           aggregations: List[AggregationSpec],
+           postAggregations: Option[List[PostAggregationSpec]],
+           dimension: DimensionSpec,
+           threshold: Int,
+           metric: TopNMetricSpec,
+           context : Option[QuerySpecContext]) = this("topN", dataSource,
+    intervals, granularity, filter, aggregations,
+    postAggregations, dimension, threshold, metric, context)
+
+  def setIntervals(ins : List[Interval]) = ???
+  def intervalList: List[String] = intervals.segments.map(_.itvl)
+
+  def setSegIntervals(segInAssignments : List[(DruidSegmentInfo, Interval)]) : QuerySpec = {
+    this.copy(intervals = new SegmentIntervals(segInAssignments))
+  }
   def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
 
   override def dimensions : List[DimensionSpec] =
