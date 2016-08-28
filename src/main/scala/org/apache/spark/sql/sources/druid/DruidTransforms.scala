@@ -65,10 +65,16 @@ trait LimitTransfom {
     case (dqb, sort@Limit(limitExpr, Project(projections,
     child@Sort(_, _, aggChild: Aggregate)))) => {
 
+      val odqbs = plan(dqb, child).map { dqb =>
+        val amt = limitExpr.eval(null).asInstanceOf[Int]
+        dqb.limit(amt)
+      }
+      val dqbs = Utils.sequence(odqbs.toList).getOrElse(Seq())
+
       /*
        * ensure everything on Project list is pushed to Druid.
        */
-      val odqb1 = dqb.map { dqb =>
+      val odqbs1 = dqbs.map { dqb =>
         val exprToDruidOutput =
           new DruidOperatorSchema(dqb).pushedDownExprToDruidAttr
 
@@ -79,13 +85,7 @@ trait LimitTransfom {
             yield dqb2
         }
       }
-      val dqb1 = Utils.sequence(odqb1.toList).getOrElse(Seq())
-
-      val dqbs = plan(dqb1, child).map { dqb =>
-        val amt = limitExpr.eval(null).asInstanceOf[Int]
-        dqb.limit(amt)
-      }
-      Utils.sequence(dqbs.toList).getOrElse(Seq())
+      Utils.sequence(odqbs1.toList).getOrElse(Seq())
     }
     case _ => Seq()
   }
