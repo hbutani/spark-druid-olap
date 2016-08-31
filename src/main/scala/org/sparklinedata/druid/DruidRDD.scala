@@ -17,21 +17,27 @@
 
 package org.sparklinedata.druid
 
+import org.apache.http.client.methods.{HttpExecutionAware, HttpRequestBase}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRowWithSchema
 import org.apache.spark.sql.catalyst.util.DateTimeUtils.SQLTimestamp
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
+import org.apache.spark.{InterruptibleIterator, Logging, Partition, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryCostModel}
+import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryCostModel, DummyResultIterator}
 import org.apache.spark.sql.sparklinedata.execution.metrics.DruidQueryExecutionMetric
 import org.joda.time.Interval
-import org.sparklinedata.druid.client.{ConnectionManager, DruidQueryServerClient, ResultRow}
-
+import org.sparklinedata.druid.client.{CancellableHolder, ConnectionManager, DruidQueryServerClient, ResultRow}
 import org.sparklinedata.druid.metadata._
+
+import scala.collection._
+import scala.collection.convert.decorateAsScala._
+import java.util.concurrent.ConcurrentHashMap
+
+import org.apache.http.concurrent.Cancellable
 
 import scala.util.Random
 
@@ -88,7 +94,6 @@ class BrokerPartition(idx: Int,
   def segIntervals : List[(DruidSegmentInfo, Interval)] = null
 }
 
-
 class DruidRDD(sqlContext: SQLContext,
                drInfo : DruidRelationInfo,
                 val dQuery : DruidQuery)  extends  RDD[InternalRow](sqlContext.sparkContext, Nil) {
@@ -123,11 +128,35 @@ class DruidRDD(sqlContext: SQLContext,
     val p = split.asInstanceOf[DruidPartition]
     val mQry = p.setIntervalsOnQuerySpec(dQuery.q)
     Utils.logQuery(mQry)
+    /*
+     * Druid Query execution steps:
+     * 1. Register queryId with TaskCancelHandler
+     * 2. Provide the [[org.sparklinedata.druid.client.CancellableHolder]] to the DruidClient,
+     *    so it can relay any [[org.apache.http.concurrent.Cancellable]] resources to
+     *    the holder.
+     * 3. If an error occurs and the holder's ''wasCancelTriggered'' flag is set, a
+     *    DummyResultIterator is returned. By this time the Task has been cancelled by
+     *    the ''Spark Executor'', so it is safe to return an empty iterator.
+     * 4. Always clear this Druid Query from the TaskCancelHandler
+     */
+    val qryId = mQry.context.map(_.queryId).getOrElse(s"q-${System.nanoTime()}")
+    val cancelCallback = TaskCancelHandler.registerQueryId(qryId, context)
     val client = p.queryClient(useSmile, httpMaxPerRoute, httpMaxTotal)
+    client.setCancellableHolder(cancelCallback)
 
     val qrySTime = System.currentTimeMillis()
     val qrySTimeStr = s"${new java.util.Date()}"
-    val dr = mQry.executeQuery(client)
+    var dr : CloseableIterator[ResultRow] = null
+    try {
+      dr = mQry.executeQuery(client)
+    } catch {
+      case _ if cancelCallback.wasCancelTriggered => { dr = new DummyResultIterator() }
+      case e : Throwable => throw e
+    }
+    finally {
+      TaskCancelHandler.clearQueryId(qryId)
+    }
+
     val druidExecTime = (System.currentTimeMillis() - qrySTime)
     var numRows : Int = 0
 
@@ -314,4 +343,76 @@ object DruidValTransform {
     case FloatType => "toFloat"
     case _ => ""
   }
+}
+
+/**
+  * The '''TaskCancel Thread''' tracks the Spark tasks that are executing Druid Queries.
+  * Periodically(currently every 5 secs) it checks if any of the Spark Tasks have been
+  * cancelled and relays this to the current [[org.apache.http.concurrent.Cancellable]] associated
+  * with the [[org.apache.http.client.methods.HttpExecutionAware]] connectio handling the
+  * ''Druid Query''
+  *
+  */
+object TaskCancelHandler extends Logging {
+
+  private val taskMap : concurrent.Map[String, (Cancellable, TaskCancelHolder, TaskContext)] =
+    new ConcurrentHashMap[String, (Cancellable, TaskCancelHolder, TaskContext)]().asScala
+
+  class TaskCancelHolder(val queryId : String,
+                         val taskContext : TaskContext) extends CancellableHolder {
+    def setCancellable(c : Cancellable) : Unit = {
+      log.debug("set cancellable for query {}", queryId)
+      taskMap(queryId) = (c, this, taskContext)
+    }
+    @volatile
+    var wasCancelTriggered : Boolean = false
+  }
+
+
+  def registerQueryId(queryId : String, taskContext : TaskContext) : TaskCancelHolder = {
+    log.debug("register query {}", queryId)
+    new TaskCancelHolder(queryId, taskContext)
+  }
+
+  def clearQueryId(queryId : String) : Unit = taskMap.remove(queryId)
+
+  val secs5 : Long = 5 * 1000
+
+  object cancelCheckThread extends Runnable with Logging {
+
+    def run() : Unit = {
+
+      while(true) {
+        Thread.sleep(secs5)
+        log.debug(s"cancelThread woke up")
+        taskMap.foreach{t =>
+          val (queryId, (req, cancellableHolder, taskContext)) = t
+          log.debug(s"checking task stageid=${taskContext.stageId()}, " +
+            s"partitionId=${taskContext.partitionId()}, " +
+            s"isInterrupted=${taskContext.isInterrupted()}")
+          if (taskContext.isInterrupted()) {
+            try {
+              cancellableHolder.wasCancelTriggered = true
+              req.cancel()
+              log.info("aborted http request for query {}: {}", Array[Any](queryId, req))
+            } catch {
+              case e : Throwable => log.warn("failed to abort http request: {}", req)
+            }
+          }
+
+        }
+      }
+
+    }
+
+  }
+
+  {
+    val t = new Thread(cancelCheckThread)
+    t.setName("DruidRDD-TaskCancelCheckThread")
+    t.setDaemon(true)
+    t.start()
+  }
+
+
 }

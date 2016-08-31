@@ -24,6 +24,7 @@ import org.apache.commons.io.IOUtils
 import org.apache.commons.lang.exception.ExceptionUtils
 import org.apache.http.HttpEntity
 import org.apache.http.client.methods._
+import org.apache.http.concurrent.Cancellable
 import org.apache.http.entity.{ByteArrayEntity, ContentType, StringEntity}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
@@ -71,9 +72,65 @@ object ConnectionManager {
   }
 }
 
+/**
+  * A mechanism to relay [[org.apache.http.concurrent.Cancellable]] resources
+  * associated with the '''http connection''' of a ''DruidClient''. This is
+  * used by the [[org.sparklinedata.druid.TaskCancelHandler]] to capture the
+  * association between '''Spark Tasks''' and ''Cancellable'' resources.
+  */
+trait CancellableHolder {
+  def setCancellable(c : Cancellable)
+}
+
+/**
+  * A mixin trait that relays [[org.apache.http.concurrent.Cancellable]] resources
+  * to a [[org.sparklinedata.druid.client.CancellableHolder]]
+  */
+trait DruidClientHttpExecutionAware extends HttpExecutionAware {
+
+  val ch : CancellableHolder
+
+  abstract override def isAborted = super.isAborted
+
+  abstract override def setCancellable(cancellable: Cancellable) = {
+    if ( ch != null ) {
+      ch.setCancellable(cancellable)
+    }
+    super.setCancellable(cancellable)
+  }
+
+}
+
+/**
+  * Configure HttpPost to have the [[org.sparklinedata.druid.client.DruidClientHttpExecutionAware]]
+  * trait, so that [[org.apache.http.concurrent.Cancellable]] resources are relayed to the
+  * registered holder.
+
+  */
+class DruidHttpPost(url : String,
+                    val ch : CancellableHolder)
+  extends HttpPost(url) with DruidClientHttpExecutionAware
+
+/**
+  * Configure HttpGet to have the [[org.sparklinedata.druid.client.DruidClientHttpExecutionAware]]
+  * trait, so that [[org.apache.http.concurrent.Cancellable]] resources are relayed to the
+  * registered holder.
+
+  */
+
+class DruidHttpGet(url : String,
+                    val ch : CancellableHolder)
+  extends HttpGet(url) with DruidClientHttpExecutionAware
+
+/*
+ * ''DruidClient'' is not thread-safe. ''cancellableHolder'' state is used to relay
+ * cancellable resources information
+ */
 abstract class DruidClient(val host : String,
                            val port : Int,
                            val useSmile : Boolean = false) extends Logging {
+
+  private var cancellableHolder : CancellableHolder = null
 
   import Utils._
   import org.json4s.JsonDSL._
@@ -84,6 +141,10 @@ abstract class DruidClient(val host : String,
 
   def this(s : String) = {
     this(DruidClient.hosPort(s))
+  }
+
+  def setCancellableHolder(c : CancellableHolder) : Unit = {
+    cancellableHolder = c
   }
 
   protected def httpClient: CloseableHttpClient = {
@@ -103,8 +164,8 @@ abstract class DruidClient(val host : String,
     }
   }
 
-  protected def getRequest(url : String) = new HttpGet(url)
-  protected def postRequest(url : String) = new HttpPost(url)
+  protected def getRequest(url : String) = new DruidHttpGet(url, cancellableHolder)
+  protected def postRequest(url : String) = new DruidHttpPost(url, cancellableHolder)
 
   @throws(classOf[DruidDataSourceException])
   protected def perform(url : String,
@@ -171,8 +232,8 @@ abstract class DruidClient(val host : String,
     var resp: CloseableHttpResponse = null
 
     val enterTime = System.currentTimeMillis()
-    var beforeExecTime : Long = 0L
-    var afterExecTime : Long = 0L
+    var beforeExecTime : Long = System.currentTimeMillis()
+    var afterExecTime : Long = System.currentTimeMillis()
 
     val it: Try[CloseableIterator[ResultRow]] = for {
       r <- Try {
@@ -227,7 +288,7 @@ abstract class DruidClient(val host : String,
                      reqHeaders: Map[String, String] = null ) : JValue =
     perform(url, postRequest _, payload, reqHeaders)
 
-  protected def postQuery(url : String,
+  def postQuery(url : String,
                           qrySpec : QuerySpec,
                           payload : JValue,
                           reqHeaders: Map[String, String] = null ) :

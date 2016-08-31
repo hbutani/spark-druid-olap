@@ -27,7 +27,7 @@ import org.apache.spark.util.NextIterator
 import org.json4s.{JsonAST, JsonInput}
 import org.json4s.jackson.Json4sScalaModule
 import org.sparklinedata.druid.Utils
-import org.sparklinedata.druid.client.QueryResultRow
+import org.sparklinedata.druid.client.{QueryResultRow, ResultRow}
 import org.sparklinedata.druid.CloseableIterator
 
 private[druid] class OM(mapper : ObjectMapper) extends ObjectMapper(mapper) {
@@ -169,4 +169,15 @@ object DruidQueryResultIterator {
       new DruidQueryResultIterator2(useSmile, is, onDone)
     }
 
+}
+
+class DummyResultIterator
+  extends NextIterator[ResultRow] with CloseableIterator[ResultRow] {
+
+  override protected def getNext(): ResultRow = {
+    finished = true
+    null
+  }
+
+  override protected def close(): Unit = ()
 }

@@ -20,7 +20,7 @@ package org.sparklinedata.druid
 import java.io.InputStream
 import java.util.Locale
 
-import org.apache.spark.sql.sources.druid.{DruidQueryResultIterator, DruidSelectResultIterator, SearchQueryResultIterator}
+import org.apache.spark.sql.sources.druid.{DruidQueryResultIterator, DruidSelectResultIterator, DummyResultIterator, SearchQueryResultIterator}
 
 import scala.collection.breakOut
 import org.apache.spark.sql.types._
@@ -1018,4 +1018,33 @@ case class SelectSpecWithSegmentIntervals(queryType: String,
 
   def setFilter(fSpec : FilterSpec) : QuerySpec = this.copy(filter = Some(fSpec))
 
+}
+
+/**
+  * Used for testing only.
+  */
+case class DummyQuerySpec(val queryType : String = null) extends QuerySpec {
+
+  override val dataSource: String = null
+
+  override def intervalList: List[String] = ???
+
+  override def setIntervals(ins: List[Interval]): QuerySpec = ???
+
+  override def setSegIntervals(segIns: List[(DruidSegmentInfo, Interval)]): QuerySpec = ???
+
+  override def filter: Option[FilterSpec] = ???
+
+  override def setFilter(fSpec: FilterSpec): QuerySpec = ???
+
+  override def context: Option[QuerySpecContext] = ???
+
+  override def schemaFromQuerySpec(dInfo: DruidRelationInfo): StructType = ???
+
+  def apply(useSmile : Boolean,
+            is : InputStream,
+            druidQuerySvrConn: DruidClient,
+            onDone : => Unit = (),
+            fromList : Boolean = false) : CloseableIterator[ResultRow] =
+    new DummyResultIterator()
 }
