@@ -30,7 +30,7 @@ object SmileJsonMethods extends JsonMethods {
     smileFactory.delegateToTextual(true)
     val m = new ObjectMapper(smileFactory)
     m.getFactory().setCodec(m)
-    m.registerModule(new Json4sScalaModule)
+    m.registerModule(SmileJson4sScalaModule)
     m
   }
 
