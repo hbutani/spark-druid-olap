@@ -19,7 +19,7 @@ package org.sparklinedata.druid.client
 
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.sparklinedata.druid.{DruidQuery, GroupByQuerySpec, SearchQuerySpec}
+import org.sparklinedata.druid.{DruidQuery, GroupByQuerySpec, SearchQuerySpec, TopNQuerySpec}
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 
 import scala.language.postfixOps
@@ -427,7 +427,12 @@ class DruidRewritesTest extends BaseTest {
       "limit 200",
     1,
     true,
-    true
+    true,
+    false,
+    Seq(
+      isTopN _,
+      TopNThresholdCheck(200)
+    )
   )
 
   test("topNDesc",
@@ -438,7 +443,59 @@ class DruidRewritesTest extends BaseTest {
       "limit 200",
     1,
     true,
-    true
+    true,
+    false,
+    Seq(
+      isTopN _,
+      TopNThresholdCheck(200)
+    )
+  )
+
+  test("topNNotPushedLargeLimit",
+    "select l_returnflag, " +
+      "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a " +
+      "from orderLineItemPartSupplier group by l_returnflag " +
+      "order by max(ps_supplycost) " +
+      "limit 100001",
+    1,
+    false,
+    false,
+    false,
+    Seq(
+      isGBy _
+    )
+  )
+
+  test("topNNotPushedMultiDim",
+    "select l_returnflag, l_linestatus, " +
+      "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a " +
+      "from orderLineItemPartSupplier " +
+      "group by l_returnflag, l_linestatus " +
+      "order by max(ps_supplycost) " +
+      "limit 10",
+    1,
+    false,
+    false,
+    false,
+    Seq(
+      isGBy _
+    )
+  )
+
+  test("topNNotPushedOByDim",
+    "select l_returnflag, " +
+      "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a " +
+      "from orderLineItemPartSupplier " +
+      "group by l_returnflag " +
+      "order by l_returnflag " +
+      "limit 10",
+    1,
+    false,
+    false,
+    false,
+    Seq(
+      isGBy _
+    )
   )
 
 }

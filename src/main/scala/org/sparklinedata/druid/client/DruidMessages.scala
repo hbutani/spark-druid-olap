@@ -110,3 +110,20 @@ class SelectResultRowSerializer extends CustomSerializer[SelectResultRow](format
 }
   )
 )
+
+case class TopNResult(timestamp: String,
+                      result: List[TopNResultRow]
+                       )
+
+case class TopNResultRow(event: Map[String, Any]) extends ResultRow
+
+class TopNResultRowSerializer extends CustomSerializer[TopNResultRow](format => ( {
+  case JObject(obj) =>
+    val m: Map[String, Any] = obj.map(t => (t._1, t._2.values)).toMap
+    TopNResultRow(m)
+}, {
+  case x: TopNResultRow =>
+    throw new RuntimeException("TopNResultRow serialization not supported.")
+}
+  )
+)

@@ -20,7 +20,7 @@ package org.sparklinedata.druid
 import java.io.InputStream
 import java.util.Locale
 
-import org.apache.spark.sql.sources.druid.{DruidQueryResultIterator, DruidSelectResultIterator, DummyResultIterator, SearchQueryResultIterator}
+import org.apache.spark.sql.sources.druid._
 
 import scala.collection.breakOut
 import org.apache.spark.sql.types._
@@ -571,7 +571,7 @@ abstract class AggQuerySpec extends QuerySpec {
                      is : InputStream,
                      druidQuerySvrConn: DruidClient,
                      onDone : => Unit = (),
-                     fromList : Boolean = false) : CloseableIterator[QueryResultRow] =
+                     fromList : Boolean = false) : CloseableIterator[ResultRow] =
     DruidQueryResultIterator(useSmile, is, onDone, fromList)
 
 }
@@ -753,6 +753,13 @@ case class TopNQuerySpec(
 
   override def dimensions : List[DimensionSpec] =
     List(dimension)
+
+  override def apply(useSmile : Boolean,
+                     is : InputStream,
+                     druidQuerySvrConn: DruidClient,
+                     onDone : => Unit = (),
+                     fromList : Boolean = false) : CloseableIterator[ResultRow] =
+    DruidTopNResultIterator(useSmile, is, onDone, fromList)
 }
 
 case class TopNQuerySpecWithSegIntervals(
@@ -791,6 +798,14 @@ case class TopNQuerySpecWithSegIntervals(
 
   override def dimensions : List[DimensionSpec] =
     List(dimension)
+
+  override def apply(useSmile : Boolean,
+                     is : InputStream,
+                     druidQuerySvrConn: DruidClient,
+                     onDone : => Unit = (),
+                     fromList : Boolean = false) : CloseableIterator[ResultRow] =
+    DruidTopNResultIterator(useSmile, is, onDone, fromList)
+
 }
 
 case class SearchQuerySpec(

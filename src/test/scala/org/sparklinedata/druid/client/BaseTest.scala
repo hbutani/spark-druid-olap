@@ -29,11 +29,27 @@ import org.apache.spark.sql.types.DataType
 import org.apache.spark.sql.util.ExprUtil
 import org.joda.time.DateTimeZone
 import org.scalatest.{BeforeAndAfterAll, fixture}
-import org.sparklinedata.druid.{DruidQuery, DruidQueryBuilder, Utils}
+import org.sparklinedata.druid._
 import org.sparklinedata.spark.dateTime.Functions._
-import sun.text.normalizer.UCharacter.NumericType
 
-abstract class BaseTest extends fixture.FunSuite with
+trait DruidQueryChecks {
+
+  def isTopN(dq : DruidQuery) = dq.q.isInstanceOf[TopNQuerySpec]
+
+  def isGBy(dq : DruidQuery) = dq.q.isInstanceOf[GroupByQuerySpec]
+
+  case class TopNThresholdCheck(limit : Int) extends (DruidQuery => Boolean) {
+
+    def apply(dq : DruidQuery) : Boolean = {
+      isTopN(dq) &&
+        dq.q.asInstanceOf[TopNQuerySpec].threshold == limit
+    }
+
+  }
+
+}
+
+abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
   fixture.TestDataFixture with BeforeAndAfterAll with Logging {
 
   val colMapping =

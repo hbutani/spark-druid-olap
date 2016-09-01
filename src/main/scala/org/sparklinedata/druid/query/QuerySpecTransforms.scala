@@ -252,11 +252,6 @@ object TopNQueryTransform extends Transform {
 
   override def apply(sqlContext : SQLContext,
                      drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = qSpec match {
-    case _ if !drInfo.options.allowTopN(sqlContext) => qSpec
-    case GroupByQuerySpec(_, _, _,
-    Some(LimitSpec(_, limValue, List(OrderByColumnSpec(ordName, "ascending")))),
-    _, _, _, _, _, _, _
-    ) if limValue >= drInfo.options.topNMaxThreshold(sqlContext) => qSpec
     case GroupByQuerySpec(_, ds,
     List(dimSpec@DefaultDimensionSpec(_, dName, oName)),
     Some(LimitSpec(_, limValue, List(OrderByColumnSpec(ordName, ordDirection)))),
@@ -267,9 +262,11 @@ object TopNQueryTransform extends Transform {
     postAggregations,
     intervals,
     context
-    ) if oName != ordName => {
+    ) if drInfo.options.allowTopN(sqlContext) &&
+      limValue < drInfo.options.topNMaxThreshold(sqlContext) &&
+      oName != ordName => {
       var c = context.get
-      c = c.copy(minTopNThreshold = Some(limValue + 1))
+      c = c.copy(minTopNThreshold = Some(limValue))
       new TopNQuerySpec(
         ds,
         intervals,
@@ -289,11 +286,11 @@ object TopNQueryTransform extends Transform {
 
 object QuerySpecTransforms extends TransformExecutor {
 
-  override  protected val batches: Seq[Batch] = Seq(
+  override protected val batches: Seq[Batch] = Seq(
     Batch("dimensionQueries", FixedPoint(100),
       SearchQuerySpecTransform, AddCountAggregateForNoMetricsGroupByQuerySpec, BetweenFilterSpec),
-    Batch("timeseries", Once, AllGroupingGroupByQuerySpecToTimeSeriesSpec)
-    // Batch("topN", Once, TopNQueryTransform)
+    Batch("timeseries", Once, AllGroupingGroupByQuerySpecToTimeSeriesSpec),
+    Batch("topN", Once, TopNQueryTransform)
   )
 
 }
