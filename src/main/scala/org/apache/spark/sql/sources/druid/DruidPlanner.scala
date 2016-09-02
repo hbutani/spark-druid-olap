@@ -61,7 +61,8 @@ object DruidPlanner {
     ConnectionManager.init(sqlContext)
   }
 
-  val SPARKLINEDATA_CACHE_TABLES_TOCHECK = stringSeqConf("spark.sparklinedata.cache.tables.tocheck",
+  val SPARKLINEDATA_CACHE_TABLES_TOCHECK = stringSeqConf(
+    "spark.sparklinedata.druid.cache.tables.tocheck",
     defaultValue = Some(List()),
     doc = "A comma separated list of tableNames that should be checked if they are cached." +
       "For Star-Schemas with associated Druid Indexes, even if tables are cached, we " +
@@ -70,7 +71,7 @@ object DruidPlanner {
       "tell us to restrict our check to certain tables. Otherwise by default we will check" +
       "all tables.  ")
 
-  val DEBUG_TRANSFORMATIONS = booleanConf("spark.sparklinedata.debug.transformations",
+  val DEBUG_TRANSFORMATIONS = booleanConf("spark.sparklinedata.druid.debug.transformations",
     defaultValue = Some(false),
     doc = "When set to true each transformation is logged.")
 
