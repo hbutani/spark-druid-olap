@@ -11,7 +11,7 @@ val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
 val sparkdateTimeVersion = "0.0.2"
 val scoptVersion = "3.3.0"
-val sparkVersion = "1.6.0"
+val sparkVersion = "1.6.1"
 
 val coreDependencies = Seq(
   "com.github.nscala-time" %% "nscala-time" % nscalaVersion,

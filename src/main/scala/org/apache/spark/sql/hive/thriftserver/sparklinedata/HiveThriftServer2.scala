@@ -126,7 +126,7 @@ object SparklineSQLEnv extends Logging {
 
       sparkContext = new SparkContext(sparkConf)
       sparkContext.addSparkListener(new StatsReportListener())
-      hiveContext = new SparklineDataContext(sparkContext, DruidLogicalOptimizer)
+      hiveContext = new SparklineDataContext(sparkContext)
 
       hiveContext.metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
       hiveContext.metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))

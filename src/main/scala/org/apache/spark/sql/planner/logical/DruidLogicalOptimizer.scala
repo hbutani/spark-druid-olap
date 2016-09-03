@@ -16,6 +16,7 @@
  */
 package org.apache.spark.sql.planner.logical
 
+import org.apache.spark.sql.SQLConf
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count, Sum}
 import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
@@ -25,7 +26,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.util.PlanUtil.maxCardinalityIsOne
 import org.apache.spark.sql.util.{ExprUtil, PlanUtil}
 
-object DruidLogicalOptimizer extends Optimizer {
+case class DruidLogicalOptimizer(conf : SQLConf) extends Optimizer {
   override protected val batches: Seq[Batch] = DefaultOptimizer.batches.
     asInstanceOf[Seq[Batch]] :+ Batch("Rewrite Sum(Literal) as Count(1)*Literal",
     FixedPoint(100), SumOfLiteralRewrite) :+ Batch("Push GB through Project, Join",
