@@ -58,7 +58,7 @@ lazy val commonSettings = Seq(
     url("http://www.apache.org/licenses/LICENSE-2.0")
   ),
 
-  homepage := Some(url("https://github.com/SparklineData/spark-datetime")),
+  homepage := Some(url("https://github.com/SparklineData/spark-druid-olap")),
 
   publishMavenStyle := true,
 
@@ -84,8 +84,8 @@ lazy val commonSettings = Seq(
 
   pomExtra := (
     <scm>
-      <url>https://github.com/SparklineData/spark-datetime.git</url>
-      <connection>scm:git:git@github.com:SparklineData/spark-datetime.git</connection>
+      <url>https://github.com/SparklineData/spark-druid-olap.git</url>
+      <connection>scm:git:git@github.com:SparklineData/spark-druid-olap.git</connection>
     </scm>
       <developers>
         <developer>
@@ -93,6 +93,12 @@ lazy val commonSettings = Seq(
           <organization>SparklineData</organization>
           <organizationUrl>http://sparklinedata.com/</organizationUrl>
         </developer>
+        <developer>
+          <name>John Pullokkaran</name>
+          <organization>SparklineData</organization>
+          <organizationUrl>http://sparklinedata.com/</organizationUrl>
+        </developer>
+
       </developers>),
 
   fork in Test := true
@@ -103,7 +109,7 @@ lazy val commonSettings = Seq(
 
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
-  .settings(name := "accelerator")
+  .settings(name := "spl-accelerator")
   .settings(libraryDependencies ++= (coreDependencies ++ coreTestDependencies))
   .settings(assemblyOption in assembly :=
     (assemblyOption in assembly).value.copy(includeScala = false)
