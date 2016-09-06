@@ -24,7 +24,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.analysis.OverrideCatalog
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.{ParserDialect, TableIdentifier}
+import org.apache.spark.sql.catalyst.{ParserDialect, SqlParser, TableIdentifier}
 import org.apache.spark.sql.execution.CacheManager
 import org.apache.spark.sql.execution.ui.SQLListener
 import org.apache.spark.sql.hive.client.{ClientInterface, ClientWrapper}
@@ -93,6 +93,30 @@ class SparklineDataContext(
     new SparklineMetastoreCatalog(metadataHive, this) with OverrideCatalog
 
   override protected[sql] lazy val optimizer: Optimizer = new DruidLogicalOptimizer(conf)
+
+  def currentDB = catalog.currentDB
+}
+
+object SparklineDataContext {
+
+  def qualifiedName(sqlContext : SQLContext,
+                    tableName : String) : String = {
+
+    var tId = SqlParser.parseTableIdentifier(tableName)
+
+    if (!tId.database.isDefined) {
+      tId = tId.copy(database = Some(sqlContext.asInstanceOf[SparklineDataContext].currentDB))
+    }
+    s"${tId.database.get}.${tId.table}"
+  }
+
+  def qualifyWithDefault(sqlContext : SQLContext,
+                    tableName : String) : String = {
+
+    var tId = SqlParser.parseTableIdentifier(tableName)
+    s"${tId.database.getOrElse("default")}.${tId.table}"
+  }
+
 }
 
 class SparklineMetastoreCatalog(client: ClientInterface, hive: HiveContext) extends
@@ -122,4 +146,6 @@ class SparklineMetastoreCatalog(client: ClientInterface, hive: HiveContext) exte
 //      case LogicalRelation(DruidRelation(info, _), _) => info
 //    }.toSeq
   }
+
+  def currentDB : String = client.currentDatabase
 }

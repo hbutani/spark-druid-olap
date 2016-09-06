@@ -60,7 +60,7 @@ class SelectQueryTest extends StarSchemaBaseTest with BeforeAndAfterAll with Log
       numProcessingThreadsPerHistorical '1',
       nonAggregateQueryHandling "push_project_and_filters",
       functionalDependencies '$functionalDependencies',
-      starSchema '${starSchema.replaceAll("lineitem", "lineitem_select")}')""".stripMargin
+      starSchema '${starSchema().replaceAll("lineitem", "lineitem_select")}')""".stripMargin
     )
   }
 

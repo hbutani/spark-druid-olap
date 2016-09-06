@@ -318,7 +318,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       columnMapping '$colMapping',
       numProcessingThreadsPerHistorical '1',
       functionalDependencies '$functionalDependencies',
-      starSchema '$starSchema')""".stripMargin
+      starSchema '${starSchema()}')""".stripMargin
     )
 
 

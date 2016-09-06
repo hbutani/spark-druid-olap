@@ -19,6 +19,7 @@ package org.sparklinedata.druid
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
 import org.apache.spark.sql.sources.{BaseRelation, RelationProvider}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
@@ -33,10 +34,12 @@ class DefaultSource extends RelationProvider with Logging {
 
     import Utils.jsonFormat
 
-    val sourceDFName = parameters.getOrElse(SOURCE_DF_PARAM,
+    var sourceDFName = parameters.getOrElse(SOURCE_DF_PARAM,
       throw new DruidDataSourceException(
         s"'$SOURCE_DF_PARAM' must be specified for Druid DataSource")
     )
+
+    sourceDFName = SparklineDataContext.qualifiedName(sqlContext, sourceDFName)
 
     val sourceDF = sqlContext.table(sourceDFName)
 
@@ -71,11 +74,11 @@ class DefaultSource extends RelationProvider with Logging {
 
     val druidHost = parameters.get(DRUID_HOST_PARAM).getOrElse(DEFAULT_DRUID_HOST)
 
-    val starSchemaInfo =
-      parameters.get(STAR_SCHEMA_INFO_PARAM).map(parse(_).extract[StarSchemaInfo]).orElse(
-        throw new DruidDataSourceException(
-          s"'$STAR_SCHEMA_INFO_PARAM' must be specified for Druid DataSource")
-      ).get
+    var starSchemaInfo =
+      parameters.get(STAR_SCHEMA_INFO_PARAM).map(parse(_).extract[StarSchemaInfo]).
+        getOrElse(StarSchemaInfo(sourceDFName))
+
+    starSchemaInfo = StarSchemaInfo.qualifyTableNames(sqlContext, starSchemaInfo)
 
     val ss = StarSchema(sourceDFName, starSchemaInfo)(sqlContext)
     if (ss.isLeft) {

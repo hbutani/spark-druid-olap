@@ -82,21 +82,22 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
       | }
     """.stripMargin.replace('\n', ' ')
 
-  val starSchema =
-  """
+  def starSchema(factDB : String = "default",
+                 dimDB : String = "default") =
+  s"""
     |{
-    |  "factTable" : "lineitem",
+    |  "factTable" : "$factDB.lineitem",
     |  "relations" : [ {
-    |    "leftTable" : "lineitem",
-    |    "rightTable" : "orders",
+    |    "leftTable" : "$factDB.lineitem",
+    |    "rightTable" : "$dimDB.orders",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "l_orderkey",
     |      "rightAttribute" : "o_orderkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "lineitem",
-    |    "rightTable" : "partsupp",
+    |    "leftTable" : "$factDB.lineitem",
+    |    "rightTable" : "$dimDB.partsupp",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "l_partkey",
@@ -106,56 +107,56 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
     |      "rightAttribute" : "ps_suppkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "partsupp",
-    |    "rightTable" : "part",
+    |    "leftTable" : "$dimDB.partsupp",
+    |    "rightTable" : "$dimDB.part",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "ps_partkey",
     |      "rightAttribute" : "p_partkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "partsupp",
-    |    "rightTable" : "supplier",
+    |    "leftTable" : "$dimDB.partsupp",
+    |    "rightTable" : "$dimDB.supplier",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "ps_suppkey",
     |      "rightAttribute" : "s_suppkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "orders",
-    |    "rightTable" : "customer",
+    |    "leftTable" : "$dimDB.orders",
+    |    "rightTable" : "$dimDB.customer",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "o_custkey",
     |      "rightAttribute" : "c_custkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "customer",
-    |    "rightTable" : "custnation",
+    |    "leftTable" : "$dimDB.customer",
+    |    "rightTable" : "$dimDB.custnation",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "c_nationkey",
     |      "rightAttribute" : "cn_nationkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "custnation",
-    |    "rightTable" : "custregion",
+    |    "leftTable" : "$dimDB.custnation",
+    |    "rightTable" : "$dimDB.custregion",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "cn_regionkey",
     |      "rightAttribute" : "cr_regionkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "supplier",
-    |    "rightTable" : "suppnation",
+    |    "leftTable" : "$dimDB.supplier",
+    |    "rightTable" : "$dimDB.suppnation",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "s_nationkey",
     |      "rightAttribute" : "sn_nationkey"
     |    } ]
     |  }, {
-    |    "leftTable" : "suppnation",
-    |    "rightTable" : "suppregion",
+    |    "leftTable" : "$dimDB.suppnation",
+    |    "rightTable" : "$dimDB.suppregion",
     |    "relationType" : "n-1",
     |    "joinCondition" : [ {
     |      "leftAttribute" : "sn_regionkey",
@@ -165,19 +166,8 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
     |}
   """.stripMargin.replace('\n', ' ')
 
-  override def beforeAll() = {
-
-    System.setProperty("user.timezone", "UTC")
-    TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-    DateTimeZone.setDefault(DateTimeZone.forID("UTC"))
-    TestHive.setConf(DruidPlanner.TZ_ID.key, "UTC")
-
-    TestHive.sparkContext.setLogLevel("INFO")
-
-    register(TestHive)
-    // DruidPlanner(TestHive)
-
-    val cT = s"""CREATE TABLE if not exists orderLineItemPartSupplierBase(o_orderkey integer,
+  val olFlatCreateTable =
+    s"""CREATE TABLE if not exists orderLineItemPartSupplierBase(o_orderkey integer,
              o_custkey integer,
       o_orderstatus string, o_totalprice double, o_orderdate string, o_orderpriority string,
       o_clerk string,
@@ -200,6 +190,36 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
       OPTIONS (path "src/test/resources/tpch/datascale1/orderLineItemPartSupplierCustomer.small",
       header "false", delimiter "|")""".stripMargin
 
+  def olDruidDS(db : String = "default",
+                table : String = "orderLineItemPartSupplierBase",
+                dsName : String = "orderLineItemPartSupplier") =
+    s"""CREATE TABLE if not exists $dsName
+      USING org.sparklinedata.druid
+      OPTIONS (sourceDataframe "$db.$table",
+      timeDimensionColumn "l_shipdate",
+      druidDatasource "tpch",
+      druidHost "localhost",
+      zkQualifyDiscoveryNames "true",
+      columnMapping '$colMapping',
+      numProcessingThreadsPerHistorical '1',
+      allowTopNRewrite "true",
+      functionalDependencies '$functionalDependencies',
+      starSchema '$flatStarSchema')""".stripMargin
+
+  override def beforeAll() = {
+
+    System.setProperty("user.timezone", "UTC")
+    TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    DateTimeZone.setDefault(DateTimeZone.forID("UTC"))
+    TestHive.setConf(DruidPlanner.TZ_ID.key, "UTC")
+
+    TestHive.sparkContext.setLogLevel("INFO")
+
+    register(TestHive)
+    // DruidPlanner(TestHive)
+
+    val cT = olFlatCreateTable
+
     println(cT)
     sql(cT)
 
@@ -210,18 +230,7 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
 
     // sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
 
-    val cTOlap = s"""CREATE TABLE if not exists orderLineItemPartSupplier
-      USING org.sparklinedata.druid
-      OPTIONS (sourceDataframe "orderLineItemPartSupplierBase",
-      timeDimensionColumn "l_shipdate",
-      druidDatasource "tpch",
-      druidHost "localhost",
-      zkQualifyDiscoveryNames "true",
-      columnMapping '$colMapping',
-      numProcessingThreadsPerHistorical '1',
-      allowTopNRewrite "true",
-      functionalDependencies '$functionalDependencies',
-      starSchema '$flatStarSchema')""".stripMargin
+    val cTOlap = olDruidDS()
 
     println(cTOlap)
     sql(cTOlap)

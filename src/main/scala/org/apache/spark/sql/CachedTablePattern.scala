@@ -20,11 +20,11 @@ package org.apache.spark.sql
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.{Subquery, Filter, Project, LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, Subquery}
 import org.apache.spark.sql.execution.columnar.InMemoryRelation
-
-import org.apache.spark.sql.catalyst.planning.PhysicalOperation.{ReturnType}
+import org.apache.spark.sql.catalyst.planning.PhysicalOperation.ReturnType
 import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
 import org.apache.spark.sql.sources.druid.DruidPlanner
 
 import scala.collection.mutable.{Map => mMap}
@@ -77,7 +77,7 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
     l match {
       case l if l.isEmpty => Array()
       case l if l.size == 1 && l(0).trim == "" => Array()
-      case _ => l.toArray
+      case _ => l.map(SparklineDataContext.qualifyWithDefault(sqlContext, _)).toArray
     }
   }
 
