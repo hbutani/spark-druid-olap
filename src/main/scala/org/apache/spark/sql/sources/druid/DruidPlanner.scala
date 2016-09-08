@@ -182,6 +182,12 @@ object DruidPlanner {
       "executed."
   )
 
+  val DRUID_USE_V2_GBY_ENGINE = booleanConf(
+    "spark.sparklinedata.druid.option.use.v2.groupByEngine",
+    defaultValue = Some(false),
+    doc = "for druid queries use the smile binary protocol"
+  )
+
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
       case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery

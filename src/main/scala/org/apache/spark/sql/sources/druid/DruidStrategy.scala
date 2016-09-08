@@ -269,6 +269,12 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
      */
     qs = QuerySpecTransforms.transform(planner.sqlContext, dqb.drInfo, qs)
 
+    qs.context.foreach{ ctx =>
+      if( planner.sqlContext.getConf(DruidPlanner.DRUID_USE_V2_GBY_ENGINE) ) {
+        ctx.groupByStrategy = Some("v2")
+      }
+    }
+
     val (queryHistorical : Boolean, numSegsPerQuery : Int) =
       if ( !pAgg.canBeExecutedInHistorical ) {
         (false, -1)

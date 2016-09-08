@@ -508,7 +508,8 @@ case class QuerySpecContext(
                              minTopNThreshold : Option[Int] = None,
                              maxResults : Option[Int] = None,
                              maxIntermediateRows : Option[Int] = None,
-                             groupByIsSingleThreaded : Option[Boolean] = None
+                             groupByIsSingleThreaded : Option[Boolean] = None,
+                             var groupByStrategy : Option[String] = None
                            )
 
 sealed trait QuerySpec {
