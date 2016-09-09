@@ -498,5 +498,16 @@ class DruidRewritesTest extends BaseTest {
     )
   )
 
+  test("countSName",
+    "select " +
+      "count(s_name) " +
+      "from orderLineItemPartSupplier " +
+      "limit 10",
+    1,
+    true,
+    true,
+    false
+  )
+
 }
 

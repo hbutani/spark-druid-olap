@@ -59,11 +59,15 @@ case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
   }
 
   private[this] val jsAggType: Option[DataType] =
-    agg.dataType match {
-      case ShortType | IntegerType | LongType |
-           FloatType | DoubleType => Some(DoubleType)
-      case TimestampType => Some(LongType)
-      case _ => None
+    agg match {
+      case Count(a :: Nil) => Some(a.dataType)
+      case _ =>
+        agg.dataType match {
+          case ShortType | IntegerType | LongType |
+               FloatType | DoubleType => Some(DoubleType)
+          case TimestampType => Some(LongType)
+          case _ => None
+        }
     }
 
   val druidType: Option[DataType] =
