@@ -94,6 +94,12 @@ private class DruidSelectResultIterator(val useSmile : Boolean,
     val pagingIdentifiersJV: JsonAST.JValue = jValDeser.deserialize(jp, ctxt)
     nextPagingIdentifiers = pagingIdentifiersJV.extract[Map[String, Int]]
 
+//    nextPagingIdentifiers = nextPagingIdentifiers.map {
+//      case (s,i) if !selectSpec.descending => (s, i + 1)
+//      case (s,i) if selectSpec.descending => (s, i - 1)
+//    }
+
+
     // 1.2.2 events events field
     t = jp.nextToken // FIELD_NAME, jp.getCurrentName == events
     t = jp.nextToken // START_ARRAY
@@ -118,21 +124,8 @@ private class DruidSelectResultIterator(val useSmile : Boolean,
       val o: JsonAST.JValue = jValDeser.deserialize(jp, ctxt)
       val r = o.extract[SelectResultRow]
       t = jp.nextToken()
-      if (!thisRoundHadData) {
-        // if this the first row in this round,
-        // check that it's offset is greater
-        // than the nextPagingIdentifiers value
-        val nextOffset = nextPagingIdentifiers(r.segmentId)
-        if (r.offset >= nextOffset) {
-          finished = true
-          null
-        } else {
-          thisRoundHadData = true
-          r
-        }
-      } else {
-        r
-      }
+      thisRoundHadData = true
+      r
     }
   }
 

@@ -917,7 +917,8 @@ case class SearchQuerySpecWithSegIntervals(
 }
 
 case class PagingSpec(pagingIdentifiers : Map[String, Int],
-                      threshold : Int)
+                      threshold : Int,
+                      fromNext : Option[Boolean] = None)
 
 abstract class SelectSpec extends QuerySpec {
   self : Product =>
@@ -956,6 +957,8 @@ abstract class SelectSpec extends QuerySpec {
       case dc => dc.name
     }
 
+  def descending : Boolean
+
 }
 
 case class SelectSpecWithIntervals(queryType: String,
@@ -984,7 +987,7 @@ case class SelectSpecWithIntervals(queryType: String,
   )
 
   def withPagingIdentifier(ps :  Map[String, Int]) = {
-    copy(pagingSpec = pagingSpec.copy(pagingIdentifiers = ps))
+    copy(pagingSpec = pagingSpec.copy(pagingIdentifiers = ps, fromNext = Some(true)))
   }
 
   override def setIntervals(ins : List[Interval]) = this.copy(intervals = ins.map(_.toString))
@@ -1021,7 +1024,7 @@ case class SelectSpecWithSegmentIntervals(queryType: String,
   extends SelectSpec {
 
   def withPagingIdentifier(ps :  Map[String, Int]) = {
-    copy(pagingSpec = pagingSpec.copy(pagingIdentifiers = ps))
+    copy(pagingSpec = pagingSpec.copy(pagingIdentifiers = ps, fromNext = Some(true)))
   }
 
   override def setSegIntervals(segInAssignments: List[(DruidSegmentInfo, Interval)]): QuerySpec = {
