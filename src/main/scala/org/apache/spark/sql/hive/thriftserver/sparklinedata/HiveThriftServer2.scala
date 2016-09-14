@@ -19,17 +19,19 @@ package org.apache.spark.sql.hive.thriftserver.sparklinedata
 
 import java.io.PrintStream
 
+import org.apache.hadoop.hive.conf.HiveConf
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars
 import org.apache.hive.service.server.{HiveServer2, HiveServerServerOptionsProcessor}
 import org.apache.spark.scheduler.{SparkListenerJobStart, StatsReportListener}
 import org.apache.spark.sql.SQLConf
 import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.hive.thriftserver.ReflectionUtils._
 import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
-import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
 import org.apache.spark.sql.hive.thriftserver.HiveThriftServer2.HiveThriftServer2Listener
+import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
 import org.apache.spark.sql.hive.thriftserver.sparklinedata.ui.DruidQueriesTab
 import org.apache.spark.sql.hive.thriftserver.ui.ThriftServerTab
 import org.apache.spark.sql.hive.thriftserver.{SparkSQLCLIDriver, SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
-import org.apache.spark.sql.planner.logical.DruidLogicalOptimizer
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 import org.apache.spark.{Logging, SparkConf, SparkContext}
@@ -84,6 +86,14 @@ object HiveThriftServer2 extends Logging {
     val server = new RealHiveThriftServer2(sqlContext)
     server.init(sqlContext.hiveconf)
     server.start()
+    if (SparkSQLEnv.hiveContext.hiveconf.getBoolVar(
+            ConfVars.HIVE_SERVER2_SUPPORT_DYNAMIC_SERVICE_DISCOVERY)) {
+            invoke(classOf[HiveServer2], server, "addServerInstanceToZooKeeper",
+                classOf[HiveConf] -> SparkSQLEnv.hiveContext.hiveconf)
+      ShutdownHookManager.addShutdownHook { () =>
+        invoke(classOf[HiveServer2], server, "removeServerInstanceFromZooKeeper")
+      }
+    }
     RealHiveThriftServer2.listener =
       new HS2Listener(server, sqlContext.conf)
     sqlContext.sparkContext.addSparkListener(hs2Listener)
