@@ -799,5 +799,23 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       |order by x, y
     """.stripMargin
     ,0,true,true)
+
+  test("date_format1",
+    """
+      |select o_orderstatus as x, date_format(cast(o_orderdate as date), 'YY') as y
+      |from orderLineItemPartSupplier
+      |group by o_orderstatus, date_format(cast(o_orderdate as date), 'YY')
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
+
+  test("date_format2",
+    """
+      |select o_orderstatus as x, date_format(cast(o_orderdate as date), 'u') as y
+      |from orderLineItemPartSupplier
+      |group by o_orderstatus, date_format(cast(o_orderdate as date), 'u')
+      |order by x, y
+    """.stripMargin
+    ,1,true,true)
 }
 

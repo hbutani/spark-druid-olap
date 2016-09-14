@@ -17,6 +17,8 @@
 
 package org.sparklinedata.druid.jscodegen
 
+import org.apache.spark.sql.types.{DateType, StringType, TimestampType}
+
 
 private[jscodegen] case class JSDateTimeCtx(val tz_id: String, val ctx: JSCodeGenerator) {
   private[jscodegen] val tzVar: String = ctx.makeUniqueVarName
@@ -50,6 +52,16 @@ private[jscodegen] object JSDateTimeCtx {
   private val dateFormat = "yyyy-MM-dd"
   private val timeStampFormat = "yyyy-MM-dd HH:mm:ss"
   private val mSecsInDay = 86400000
+
+  private[jscodegen] def dateFormatCode(dtVal: JSExpr, fmt: String): Option[String] =
+    for (javaDate <- dtVal.fnDT match {
+      case TimestampType => Some(s"""${dtVal.curLine}.toDate()""".stripMargin)
+      case DateType => Some(s"""${dtVal.curLine}.toDate()""".stripMargin)
+      case StringType => Some(s"""${dtVal.curLine}""".stripMargin)
+      case _ => None
+    }) yield {
+      s"(new java.text.SimpleDateFormat(${fmt})).format(${javaDate})"
+    }
 
   private[jscodegen] def dtInFormatCode(f: String, ctx: JSDateTimeCtx) = {
     ctx.createJodaTZ = true
