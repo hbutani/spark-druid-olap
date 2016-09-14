@@ -96,7 +96,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                 dD.isInstanceOf[DruidTimeDimension])
               val cs = JSCast(jE, e.dataType, this).castCode
               cs.map( cs =>
-                JSExpr(cs.fnVar, jE.linesSoFar + cs.linesSoFar, cs.curLine, e.dataType)
+                JSExpr(cs.fnVar, jE.linesSoFar + cs.linesSoFar, cs.getRef, e.dataType)
               )
             }
           }.get
@@ -191,6 +191,19 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
             None
           }
         }
+        case If(pe, te, fe) =>
+          for (
+            jspe <- genExprCode(pe);
+            jste <- genExprCode(te);
+            jsfe <- genExprCode(fe)) yield {
+            val v1 = makeUniqueVarName
+            JSExpr(Some(v1),
+              jspe.linesSoFar + jste.linesSoFar + jsfe.linesSoFar +
+              s"""var ${v1} = null;
+                 |if (${jspe.getRef})
+                 |{$v1 = ${jste.getRef}} else {$v1 = ${jsfe.getRef}}""".stripMargin,
+              "", jste.fnDT, false)
+          }
         case LessThan(l, r) => genComparisonCode(l, r, " < ")
         case LessThanOrEqual(l, r) => genComparisonCode(l, r, " <= ")
         case GreaterThan(l, r) => genComparisonCode(l, r, " > ")
@@ -308,7 +321,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
         case DateFormatClass(de, fmt) => {
           for (jsDe <- genExprCode(de);
                jsFmt <- genExprCode(fmt);
-               fmtDStr <- dateFormatCode(jsDe, jsFmt.curLine)) yield {
+               fmtDStr <- dateFormatCode(jsDe, jsFmt.getRef)) yield {
             JSExpr(None, jsDe.linesSoFar + jsFmt.linesSoFar, fmtDStr, StringType, false)
           }
         }
@@ -456,7 +469,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
   private[this] def genCastExprCode(e: Expression, dt: DataType): Option[JSExpr] = {
     for (fn <- genExprCode(ExprUtil.simplifyCast(e, dt));
          cs <- JSCast(fn, dt, this).castCode) yield
-      JSExpr(cs.fnVar, fn.linesSoFar + cs.linesSoFar, cs.curLine, dt)
+      JSExpr(cs.fnVar, fn.linesSoFar + cs.linesSoFar, cs.getRef, dt)
   }
 
   private[this] def validInParams(inParam: String): Boolean = {

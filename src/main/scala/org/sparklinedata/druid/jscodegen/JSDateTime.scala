@@ -55,9 +55,9 @@ private[jscodegen] object JSDateTimeCtx {
 
   private[jscodegen] def dateFormatCode(dtVal: JSExpr, fmt: String): Option[String] =
     for (javaDate <- dtVal.fnDT match {
-      case TimestampType => Some(s"""${dtVal.curLine}.toDate()""".stripMargin)
-      case DateType => Some(s"""${dtVal.curLine}.toDate()""".stripMargin)
-      case StringType => Some(s"""${dtVal.curLine}""".stripMargin)
+      case TimestampType => Some(s"""${dtVal.getRef}.toDate()""".stripMargin)
+      case DateType => Some(s"""${dtVal.getRef}.toDate()""".stripMargin)
+      case StringType => Some(s"""${dtVal.getRef}""".stripMargin)
       case _ => None
     }) yield {
       s"(new java.text.SimpleDateFormat(${fmt})).format(${javaDate})"
