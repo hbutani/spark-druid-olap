@@ -20,13 +20,37 @@ package org.sparklinedata.druid.client
 import org.joda.time.{DateTime, Interval}
 import org.json4s.CustomSerializer
 import org.json4s.JsonAST._
+import org.sparklinedata.druid.{DruidQueryGranularity, NoneGranularity}
 
 case class ColumnDetails(typ : String, size : Long,
-                         cardinality : Option[Long], errorMessage : Option[String])
+                         cardinality : Option[Long],
+                         minValue : Option[String],
+                         maxValue : Option[String],
+                         errorMessage : Option[String]) {
+
+  def isDimension = cardinality.isDefined
+}
+
 case class MetadataResponse(id : String,
                             intervals : List[String],
                              columns : Map[String, ColumnDetails],
-                             size : Long)
+                             size : Long,
+                            numRows : Option[Long],
+                            queryGranularity : Option[DruidQueryGranularity]
+                           ) {
+
+  def getIntervals : List[Interval] = intervals.map(Interval.parse(_))
+
+  def timeTicks(ins : List[Interval] ) : Long =
+    queryGranularity.getOrElse(NoneGranularity).ndv(ins)
+
+  def getNumRows : Long = numRows.getOrElse{
+    val p =
+      columns.values.filter(c => c.isDimension).map(_.cardinality.get).map(_.toDouble).product
+    if (p > Long.MaxValue) Long.MaxValue else p.toLong
+  }
+
+}
 
 case class SegmentInfo(id : String,
                        intervals : Interval,

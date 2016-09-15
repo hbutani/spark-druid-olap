@@ -105,7 +105,8 @@ class DruidRDD(sqlContext: SQLContext,
   val drOptions = drInfo.options
   val drFullName = drInfo.fullName
   val drDSIntervals = drInfo.druidDS.intervals
-  val ndvEstimate = DruidQueryCostModel.estimateNDV(dQuery.q, drInfo)
+  val inputEstimate = DruidQueryCostModel.estimateInput(dQuery.q, drInfo)
+  val outputEstimate = DruidQueryCostModel.estimateOutput(dQuery.q, drInfo)
   val (httpMaxPerRoute, httpMaxTotal) = (
     DruidPlanner.getConfValue(sqlContext,
       DruidPlanner.DRUID_CONN_POOL_MAX_CONNECTIONS_PER_ROUTE),

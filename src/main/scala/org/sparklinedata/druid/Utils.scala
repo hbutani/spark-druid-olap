@@ -89,6 +89,7 @@ object Utils extends Logging {
   ) +
     new EnumNameSerializer(FunctionalDependencyType) +
     new EnumNameSerializer(DruidDataType) +
+    new DruidQueryGranularitySerializer +
     new QueryResultRowSerializer +
     new SelectResultRowSerializer +
     new TopNResultRowSerializer ++

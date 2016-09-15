@@ -56,10 +56,13 @@ class DruidQueryCostModelTest extends fixture.FunSuite with
   val tpch_numProcessingThreadsPerHistorical = 7
   val tpch_numHistoricals = 8
 
+  val tpchInputSize : Long = 100L * 1000 * 1000
+
   test("tpch_one_year_query") { td =>
 
     // distinct values estimate = 100
     var costScenario = CostInput(
+      tpchInputSize,
       100,
       1.0,
       default_histMergeFactor,
@@ -78,15 +81,15 @@ class DruidQueryCostModelTest extends fixture.FunSuite with
       tpch_numSparkExecutors,
       tpch_numProcessingThreadsPerHistorical,
       tpch_numHistoricals,
-      classOf[GroupByQuerySpec]
+      Right(classOf[GroupByQuerySpec])
     )
     DruidQueryCostModel.compute(costScenario)
 
     // distinct values estimate = 1000
-    DruidQueryCostModel.compute(costScenario.copy(dimsNDVEstimate = 1000))
+    DruidQueryCostModel.compute(costScenario.copy(outputEstimate = 1000))
 
     // distinct values estimate = 10000
-    DruidQueryCostModel.compute(costScenario.copy(dimsNDVEstimate = 10000))
+    DruidQueryCostModel.compute(costScenario.copy(outputEstimate = 10000))
   }
 
 
@@ -94,6 +97,7 @@ class DruidQueryCostModelTest extends fixture.FunSuite with
 
 
     val costScenario = CostInput(
+      tpchInputSize,
       100,
       1.0,
       default_histMergeFactor,
@@ -112,7 +116,7 @@ class DruidQueryCostModelTest extends fixture.FunSuite with
       tpch_numSparkExecutors,
       tpch_numProcessingThreadsPerHistorical,
       tpch_numHistoricals,
-      classOf[GroupByQuerySpec]
+      Right(classOf[GroupByQuerySpec])
     )
     DruidQueryCostModel.compute(costScenario)
   }
@@ -122,6 +126,7 @@ class DruidQueryCostModelTest extends fixture.FunSuite with
 
     // distinct values estimate = 100
     val costScenario = CostInput(
+      tpchInputSize,
       10000,
       1.0,
       default_histMergeFactor,
@@ -140,22 +145,22 @@ class DruidQueryCostModelTest extends fixture.FunSuite with
       tpch_numSparkExecutors,
       tpch_numProcessingThreadsPerHistorical,
       tpch_numHistoricals,
-      classOf[GroupByQuerySpec]
+      Right(classOf[GroupByQuerySpec])
     )
     DruidQueryCostModel.compute(costScenario)
 
     // distinct values estimate = 1000
-    DruidQueryCostModel.compute(costScenario.copy(dimsNDVEstimate = 1000))
+    DruidQueryCostModel.compute(costScenario.copy(outputEstimate = 1000))
 
     // distinct values estimate = 10000
-    DruidQueryCostModel.compute(costScenario.copy(dimsNDVEstimate = 10000))
+    DruidQueryCostModel.compute(costScenario.copy(outputEstimate = 10000))
 
     // distinct values estimate = 4611686018427387904L
-    DruidQueryCostModel.compute(costScenario.copy(dimsNDVEstimate = 4611686018427387904L))
+    DruidQueryCostModel.compute(costScenario.copy(outputEstimate = 50L * 1000 * 1000))
 
     DruidQueryCostModel.compute(
-      costScenario.copy(dimsNDVEstimate = 4611686018427387904L).
-        copy(querySpecClass = classOf[SelectSpecWithIntervals]))
+      costScenario.copy(outputEstimate = 50L * 1000 * 1000).
+        copy(querySpec = Right(classOf[SelectSpecWithIntervals])))
 
   }
 

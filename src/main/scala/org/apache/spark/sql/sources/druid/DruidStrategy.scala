@@ -95,11 +95,11 @@ private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
      * and not an epoch.
      */
     val replaceTimeReferencedDruidColumns = dqb1.referencedDruidColumns.mapValues {
-      case dtc@DruidTimeDimension(_, _, sz) => DruidDimension(
+      case dtc@DruidTimeDimension(_, _, sz, card) => DruidDimension(
         DruidDataSource.EVENT_TIMESTAMP_KEY_NAME,
         DruidDataType.String,
         sz,
-        dtc.cardinality)
+        card)
       case dc => dc
     }
 

@@ -40,34 +40,47 @@ sealed trait DruidQueryCost extends Ordered[DruidQueryCost] {
     }
 }
 
-case class CostDetails(
-                                        costInput : CostInput[_ <: QuerySpec],
-                                        histProcessingCostPerRow : Double,
-                                        queryOutputSizeEstimate : Long,
-                                        segmentOutputSizeEstimate : Long,
-                                        numSegmentsProcessed : Long,
-                                        numSparkCores : Long,
-                                        numHistoricalThreads : Long,
-                                        parallelismPerWave : Long,
-                                        minCost : DruidQueryCost,
-                                        allCosts : List[DruidQueryCost]
-                                      ) {
+case class CostDetails(costInput : CostInput,
+                       histMergeCostPerRow: Double,
+                       brokerMergeCostPerRow: Double,
+                       histInputProcessingCostPerRow: Double,
+                       histOutputProcessingCostPerRow: Double,
+                       queryInputSizeEstimate: Long,
+                       segmentInputSizeEstimate : Long,
+                       queryOutputSizeEstimate: Long,
+                       segmentOutputSizeEstimate: Long,
+                       numSparkCores: Long,
+                       numHistoricalThreads: Long,
+                       parallelismPerWave: Long,
+                       minCost : DruidQueryCost,
+                       allCosts : List[DruidQueryCost]
+                      ) {
 
 
   override def toString : String = {
     val header = s"""Druid Query Cost Model::
-                     |         |${costInput}histProcessingCost = $histProcessingCostPerRow
-                     |         |queryOutputSizeEstimate = $queryOutputSizeEstimate
-                     |         |segmentOutputSizeEstimate = $segmentOutputSizeEstimate
-                     |         |numSegmentsProcessed = $numSegmentsProcessed
-                     |         |numSparkCores = $numSparkCores
-                     |         |numHistoricalThreads = $numHistoricalThreads
-                     |         |parallelismPerWave = $parallelismPerWave
+                     ${costInput}
+Cost Per Row(
+             histMergeCost=$histMergeCostPerRow,
+             brokerMergeCost=$brokerMergeCostPerRow,
+             histInputProcessingCost=$histInputProcessingCostPerRow,
+             histOutputProcessingCost=$histOutputProcessingCostPerRow
+            )
+numSegmentsProcessed = ${costInput.numSegmentsProcessed}
+Size Estimates(
+               queryInputSize=$queryInputSizeEstimate,
+               segmentInputSize=$segmentInputSizeEstimate,
+               queryOutputSize=$queryOutputSizeEstimate,
+               segmentOutputSize=$segmentOutputSizeEstimate
+              )
+Environment(
+            numSparkCores = $numSparkCores
+            numHistoricalThreads = $numHistoricalThreads
+            parallelismPerWave = $parallelismPerWave
+           )
+                     |minCost : $minCost
                      |
-                     |         |minCost : $minCost
-                     |         |
-                     |       """.stripMargin
-
+                     |""".stripMargin
 
 
     val rows = allCosts.map(CostDetails.costRow(_)).mkString("", "\n", "")
@@ -216,8 +229,9 @@ case class DruidQueryMethod(
   }
 }
 
-case class CostInput[T <: QuerySpec](
-                      dimsNDVEstimate : Long,
+case class CostInput(
+                                    inputEstimate : Long,
+                                    outputEstimate : Long,
                       shuffleCostPerRow : Double,
                       histMergeCostPerRowFactor : Double,
                       histSegsPerQueryLimit : Int,
@@ -235,13 +249,14 @@ case class CostInput[T <: QuerySpec](
                       numSparkExecutors : Int,
                       numProcessingThreadsPerHistorical : Long,
                       numHistoricals : Int,
-                      querySpecClass : Class[T]
+                      querySpec : Either[QuerySpec,Class[_ <: QuerySpec]]
                     ) {
 
   // scalastyle:off line.size.limit
   override def toString : String = {
     s"""
-       |dimsNDVEstimate = $dimsNDVEstimate
+       |inputEstimate = $inputEstimate
+       |outputEstimate = $outputEstimate
        |shuffleCostPerRow = $shuffleCostPerRow,
        |histMergeCostPerRowFactor = $histMergeCostPerRowFactor,
        |histSegsPerQueryLimit = $histSegsPerQueryLimit,
@@ -259,10 +274,345 @@ case class CostInput[T <: QuerySpec](
        |numSparkExecutors = $numSparkExecutors,
        |numProcessingThreadsPerHistorical = $numProcessingThreadsPerHistorical,
        |numHistoricals = $numHistoricals,
-       |querySpecClass = $querySpecClass
+       |querySpec = $querySpec
      """.stripMargin
   }
   // scalastyle:on
+}
+
+sealed trait QueryCost extends Logging {
+  val cI: CostInput
+
+  import cI._
+
+  def histMergeCostPerRow: Double
+
+  def brokerMergeCostPerRow: Double
+
+  def histInputProcessingCostPerRow: Double
+  def histOutputProcessingCostPerRow: Double
+
+  def queryInputSizeEstimate: Long
+
+  def segmentInputSizeEstimate : Long
+
+  def queryOutputSizeEstimate: Long
+
+  def segmentOutputSizeEstimate: Long
+
+  def numSparkCores: Long
+
+  def numHistoricalThreads: Long
+
+  def parallelismPerWave: Long
+
+  def estimateNumWaves(numSegsPerQuery: Long,
+                       parallelism: Long = parallelismPerWave): Long = {
+    var d = numSegmentsProcessed.toDouble / numSegsPerQuery.toDouble
+    d = d / parallelism
+    Math.round(d + 0.5)
+  }
+
+  def shuffleCostPerWave: Double
+
+  def sparkSchedulingCostPerWave: Double
+
+  def sparkAggCostPerWave: Double
+
+  def intervalRatio(intervalMillis: Long): Double =
+    Math.min(intervalMillis.toDouble / indexIntervalMillis.toDouble, 1.0)
+
+  def scaledRatio(intervalMillis: Long): Double = {
+    val s = Math.min(queryIntervalRatioScaleFactor * intervalRatio(intervalMillis) * 10.0, 10.0)
+
+    if (s < 1.0) {
+      queryIntervalRatioScaleFactor * intervalRatio(intervalMillis)
+    } else {
+      Math.log10(s)
+    }
+  }
+
+  def estimateInput(intervalMillis : Long) : Long
+
+  def estimateOutput(intervalMillis : Long) : Long
+
+  def brokerQueryCost : DruidQueryCost
+
+  def histQueryCost(numSegsPerQuery : Long) : DruidQueryCost
+
+  def druidQueryMethod: DruidQueryMethod = {
+
+    log.info(
+      s"""Druid Query Cost Model Input:
+          |$cI
+          |Cost Per Row(
+          |             histMergeCost=$histMergeCostPerRow,
+          |             brokerMergeCost=$brokerMergeCostPerRow,
+          |             histInputProcessingCost=$histInputProcessingCostPerRow,
+          |             histOutputProcessingCost=$histOutputProcessingCostPerRow
+          |            )
+          |numSegmentsProcessed = $numSegmentsProcessed
+          |Size Estimates(
+          |               queryInputSize=$queryInputSizeEstimate,
+          |               segmentInputSize=$segmentInputSizeEstimate,
+          |               queryOutputSize=$queryOutputSizeEstimate,
+          |               segmentOutputSize=$segmentOutputSizeEstimate
+          |              )
+          |Environment(
+          |            numSparkCores = $numSparkCores
+          |            numHistoricalThreads = $numHistoricalThreads
+          |            parallelismPerWave = $parallelismPerWave
+          |           )
+          |
+       """.stripMargin)
+
+    val allCosts: ArrayBuffer
+      [DruidQueryCost] =
+      ArrayBuffer()
+    var minCost:
+
+
+    DruidQueryCost = brokerQueryCost
+    allCosts += minCost
+    var
+    minNumSegmentsPerQuery = -1
+
+
+    (1 to
+      histSegsPerQueryLimit).foreach { (numSegsPerQuery: Int) =>
+      val c = histQueryCost(numSegsPerQuery)
+      allCosts += c
+      if (c < minCost) {
+        minCost = c
+        minNumSegmentsPerQuery =
+          numSegsPerQuery
+      }
+    }
+
+    val costDetails = CostDetails(
+      cI,
+      histMergeCostPerRow,
+      brokerMergeCostPerRow,
+      histInputProcessingCostPerRow,
+      histOutputProcessingCostPerRow,
+      queryInputSizeEstimate,
+      segmentInputSizeEstimate,
+      queryOutputSizeEstimate,
+      segmentOutputSizeEstimate,
+      numSparkCores,
+      numHistoricalThreads,
+      parallelismPerWave,
+      minCost,
+      allCosts.toList
+    )
+
+    log.info(costDetails.toString)
+    DruidQueryMethod(minCost.isInstanceOf[HistoricalQueryCost],
+      minNumSegmentsPerQuery, minCost, costDetails)
+
+  }
+
+}
+
+class AggQueryCost(val cI : CostInput) extends QueryCost {
+
+  import cI._
+
+  val histMergeCostPerRow = shuffleCostPerRow * histMergeCostPerRowFactor
+  val brokerMergeCostPerRow = shuffleCostPerRow * histMergeCostPerRowFactor
+
+  val histInputProcessingCostPerRow =
+    historicalTimeSeriesProcessingCostPerRowFactor * shuffleCostPerRow
+
+  val histOutputProcessingCostPerRow =
+    historicalGByProcessigCostPerRowFactor * shuffleCostPerRow
+
+  val queryInputSizeEstimate = estimateInput(queryIntervalMillis)
+
+  val segmentInputSizeEstimate : Long = estimateInput(segIntervalMillis)
+
+  val queryOutputSizeEstimate = estimateOutput(queryIntervalMillis)
+
+  val segmentOutputSizeEstimate : Long = estimateOutput(segIntervalMillis)
+
+  val numSparkCores : Long = {
+    numSparkExecutors * sparkCoresPerExecutor
+  }
+
+  val numHistoricalThreads = numHistoricals * numProcessingThreadsPerHistorical
+
+  val parallelismPerWave = Math.min(numHistoricalThreads, numSparkCores)
+
+  def estimateOutput(intervalMillis : Long) : Long =
+    Math.round(outputEstimate * scaledRatio(intervalMillis))
+
+  def estimateInput(intervalMillis : Long) : Long =
+    Math.round(inputEstimate * intervalRatio(intervalMillis))
+
+
+  def shuffleCostPerWave = segmentOutputSizeEstimate * shuffleCostPerRow
+
+  def sparkSchedulingCostPerWave =
+    Math.min(parallelismPerWave, numSegmentsProcessed) * sparkSchedulingCostPerTask
+
+  def sparkAggCostPerWave = segmentOutputSizeEstimate *
+    (sparkAggregationCostPerRowFactor * shuffleCostPerRow)
+
+  def costPerHistorical(numSegsPerQuery : Int) : Double = {
+    val inputProcessingCostPerHist: Double =
+      numSegsPerQuery * segmentInputSizeEstimate * histInputProcessingCostPerRow
+
+    val outputProcessingCostPerHist: Double =
+      numSegsPerQuery * segmentOutputSizeEstimate * histOutputProcessingCostPerRow
+
+    inputProcessingCostPerHist + outputProcessingCostPerHist
+  }
+
+  def brokerMergeCost : Double = {
+    val numMerges = 2 * (numSegmentsProcessed - 1)
+
+    (Math.max(numMerges.toDouble / numProcessingThreadsPerHistorical.toDouble,1.0))  *
+        segmentOutputSizeEstimate * brokerMergeCostPerRow
+  }
+
+  def brokerQueryCost : DruidQueryCost = {
+    val numWaves: Long = estimateNumWaves(1, numHistoricalThreads)
+    val processingCostPerHistPerWave : Double = costPerHistorical(1)
+
+    val brokerTransportCostPerWave = segmentOutputSizeEstimate *
+      (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
+
+    val histCostPerWave = processingCostPerHistPerWave + brokerTransportCostPerWave
+
+    val mergeCost : Double = brokerMergeCost
+
+    val segmentOutputTransportCost = queryOutputSizeEstimate *
+      (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
+
+
+    val queryCost: Double =
+      numWaves * histCostPerWave + segmentOutputTransportCost + mergeCost
+
+    BrokerQueryCost(
+      numWaves,
+      numWaves * histCostPerWave,
+      mergeCost,
+      segmentOutputTransportCost,
+      queryCost
+    )
+  }
+
+  def histQueryCost(numSegsPerQuery : Long) : DruidQueryCost = {
+
+    val numWaves = estimateNumWaves(numSegsPerQuery)
+    val estimateOutputSizePerHist =
+      estimateOutput(segIntervalMillis * numSegsPerQuery)
+
+    val inputProcessingCostPerHist : Double =
+      numSegsPerQuery * segmentInputSizeEstimate * histInputProcessingCostPerRow
+
+    val outputProcessingCostPerHist : Double =
+      numSegsPerQuery * segmentOutputSizeEstimate * histOutputProcessingCostPerRow
+
+    val processingCostPerHist = inputProcessingCostPerHist + outputProcessingCostPerHist
+
+    val histMergeCost : Double =
+      (numSegsPerQuery - 1) * segmentOutputSizeEstimate * histMergeCostPerRow
+
+    val segmentOutputTransportCost = estimateOutputSizePerHist *
+      (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
+
+    val costPerHistoricalWave = processingCostPerHist + histMergeCost + segmentOutputTransportCost
+    val costPerSparkWave = shuffleCostPerWave + sparkSchedulingCostPerWave + sparkAggCostPerWave
+
+    val druidStageCost = numWaves * costPerHistoricalWave
+    val sparkStageCost = numWaves * costPerSparkWave
+
+    val queryCost = druidStageCost + sparkStageCost
+
+    HistoricalQueryCost(
+      numWaves,
+      numSegsPerQuery,
+      estimateOutputSizePerHist,
+      processingCostPerHist,
+      histMergeCost,
+      segmentOutputTransportCost,
+      shuffleCostPerWave,
+      sparkSchedulingCostPerWave,
+      sparkAggCostPerWave,
+      costPerHistoricalWave,
+      druidStageCost,
+      queryCost
+    )
+  }
+
+}
+
+class GroupByQueryCost(cI : CostInput) extends AggQueryCost(cI) {
+
+}
+
+/*
+ * - OutputSize = InputSize
+ * - there is no cost for doing GroupBy.
+ * - Prevent Broker plans. TODO revisit this
+ * - No Spark-side shuffle.
+ */
+class SelectQueryCost(i : CostInput) extends GroupByQueryCost(i) {
+
+  override val histMergeCostPerRow = 0.0
+  override val brokerMergeCostPerRow = 0.0
+
+  override val histOutputProcessingCostPerRow = 0.0
+
+  override def estimateOutput(intervalMillis : Long) = estimateInput(intervalMillis)
+
+  override def shuffleCostPerWave = 0.0
+
+  override def sparkAggCostPerWave = 0.0
+
+  override def brokerMergeCost : Double = Double.MaxValue
+}
+
+/*
+ * - inputSize = 0, because rows are not scanned.
+ * - Prevent Broker plans.
+ */
+class SearchQueryCost(i : CostInput) extends GroupByQueryCost(i) {
+  override val queryInputSizeEstimate : Long = 0
+
+  override val segmentInputSizeEstimate : Long = 0
+
+  override def brokerMergeCost : Double = Double.MaxValue
+
+}
+
+/*
+ * - outputSize = 1
+ */
+class TimeSeriesQueryCost(i : CostInput) extends GroupByQueryCost(i) {
+
+  override val queryOutputSizeEstimate : Long = 1
+
+  override val segmentOutputSizeEstimate : Long = 1
+}
+
+/*
+ * - queryOutputSize = query TopN threshold
+ * - segmentOutputSize = queryContext maxTopNThreshold
+ */
+class TopNQueryCost(i : CostInput) extends GroupByQueryCost(i) {
+  import cI._
+  override val segmentOutputSizeEstimate : Long = cI.querySpec match {
+    case Left(qS : TopNQuerySpec) if qS.context.flatMap(_.minTopNThreshold).isDefined =>
+      qS.context.flatMap(_.minTopNThreshold).get
+    case _ => estimateOutput(segIntervalMillis)
+  }
+
+  override val queryOutputSizeEstimate: Long = cI.querySpec match {
+    case Left(qS : TopNQuerySpec) => qS.threshold
+    case _ => estimateOutput(queryIntervalMillis)
+  }
 }
 
 object DruidQueryCostModel extends Logging {
@@ -285,179 +635,48 @@ object DruidQueryCostModel extends Logging {
     Math.round(ndvForIndexEstimate * scaledRatio)
   }
 
-  private[druid] def compute[T <: QuerySpec](cI : CostInput[T]) : DruidQueryMethod = {
-    import cI._
-
-    val histMergeCostPerRow = shuffleCostPerRow * histMergeCostPerRowFactor
-    val brokerMergeCostPerRow = shuffleCostPerRow * histMergeCostPerRowFactor
-    val histProcessingCostPerRow = {
-      if (classOf[TimeSeriesQuerySpec].isAssignableFrom(querySpecClass)) {
-        historicalTimeSeriesProcessingCostPerRowFactor
-      } else {
-        historicalGByProcessigCostPerRowFactor
-      } * shuffleCostPerRow
+  private[druid] def compute[T <: QuerySpec](cI : CostInput) : DruidQueryMethod = {
+    val queryCost = cI.querySpec match {
+      case Left(q : SelectSpec) => new SelectQueryCost(cI)
+      case Right(cls) if classOf[SelectSpec].isAssignableFrom(cls) =>
+        new SelectQueryCost(cI)
+      case Left(q : SearchQuerySpec) => new SearchQueryCost(cI)
+      case Right(cls) if classOf[SearchQuerySpec].isAssignableFrom(cls) =>
+        new SearchQueryCost(cI)
+      case Left(q : TimeSeriesQuerySpec) => new TimeSeriesQueryCost(cI)
+      case Right(cls) if classOf[TimeSeriesQuerySpec].isAssignableFrom(cls) =>
+        new TimeSeriesQueryCost(cI)
+      case Left(q : TopNQuerySpec) => new TopNQueryCost(cI)
+      case Right(cls) if classOf[TopNQuerySpec].isAssignableFrom(cls) =>
+        new TopNQueryCost(cI)
+      case Left(q : GroupByQuerySpec) => new GroupByQueryCost(cI)
+       case Right(cls) if classOf[GroupByQuerySpec].isAssignableFrom(cls) =>
+         new GroupByQueryCost(cI)
+      case _ => new GroupByQueryCost(cI)
     }
-
-    val queryOutputSizeEstimate = intervalNDVEstimate(queryIntervalMillis,
-      indexIntervalMillis,
-      dimsNDVEstimate,
-      queryIntervalRatioScaleFactor
-    )
-
-    val segmentOutputSizeEstimate = querySpecClass match {
-      case qC if classOf[SelectSpec].isAssignableFrom(qC) =>
-        queryOutputSizeEstimate/numSegmentsProcessed
-      case _ => intervalNDVEstimate(segIntervalMillis,
-        indexIntervalMillis,
-        dimsNDVEstimate,
-        queryIntervalRatioScaleFactor
-      )
-    }
-
-    val numSparkCores : Long = {
-      numSparkExecutors * sparkCoresPerExecutor
-    }
-
-    val numHistoricalThreads = numHistoricals * numProcessingThreadsPerHistorical
-
-    val parallelismPerWave = Math.min(numHistoricalThreads, numSparkCores)
-
-    def estimateNumWaves(numSegsPerQuery : Long,
-                         parallelism : Long = parallelismPerWave) : Long = {
-      var d = numSegmentsProcessed.toDouble / numSegsPerQuery.toDouble
-      d = d/ parallelism
-      Math.round(d + 0.5)
-    }
-
-    def brokerQueryCost : DruidQueryCost = {
-      val numWaves: Long = estimateNumWaves(1, numHistoricalThreads)
-      val processingCostPerHist : Double =
-        segmentOutputSizeEstimate * histProcessingCostPerRow
-
-      val numMerges = 2 * (numSegmentsProcessed - 1)
-
-      val brokertMergeCost : Double =
-        (Math.max(numMerges.toDouble / numProcessingThreadsPerHistorical.toDouble,1.0))  *
-          segmentOutputSizeEstimate * brokerMergeCostPerRow
-      val segmentOutputTransportCost = queryOutputSizeEstimate *
-        (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
-      val queryCost: Double = {
-        /*
-         * SearchQuerySpecs cannot be run against broker.
-         */
-        if ( classOf[SelectSpec].isAssignableFrom(cI.querySpecClass)) {
-          Double.MaxValue
-        } else {
-          numWaves * processingCostPerHist + segmentOutputTransportCost + brokertMergeCost
-        }
-      }
-
-      BrokerQueryCost(
-        numWaves,
-        processingCostPerHist,
-        brokertMergeCost,
-        segmentOutputTransportCost,
-        queryCost
-      )
-    }
-
-    def histQueryCost(numSegsPerQuery : Long) : DruidQueryCost = {
-
-      val numWaves = estimateNumWaves(numSegsPerQuery)
-      val estimateOutputSizePerHist = intervalNDVEstimate(
-        segIntervalMillis * numSegsPerQuery,
-        indexIntervalMillis,
-        dimsNDVEstimate,
-        queryIntervalRatioScaleFactor
-      )
-
-      val processingCostPerHist : Double =
-        numSegsPerQuery * segmentOutputSizeEstimate * histProcessingCostPerRow
-
-      val histMergeCost : Double =
-        (numSegsPerQuery - 1) * segmentOutputSizeEstimate * histMergeCostPerRow
-
-      val segmentOutputTransportCost = estimateOutputSizePerHist *
-        (druidOutputTransportCostPerRowFactor * shuffleCostPerRow)
-
-      val shuffleCost = numWaves * segmentOutputSizeEstimate * shuffleCostPerRow
-
-      val sparkSchedulingCost =
-        numWaves * Math.min(parallelismPerWave, numSegmentsProcessed) * sparkSchedulingCostPerTask
-
-      val sparkAggCost = numWaves * segmentOutputSizeEstimate *
-        (sparkAggregationCostPerRowFactor * shuffleCostPerRow)
-
-      val costPerHistoricalWave = processingCostPerHist + histMergeCost + segmentOutputTransportCost
-
-      val druidStageCost = numWaves * costPerHistoricalWave
-
-      val queryCost = druidStageCost + shuffleCost + sparkSchedulingCost + sparkAggCost
-
-      HistoricalQueryCost(
-        numWaves,
-        numSegsPerQuery,
-        estimateOutputSizePerHist,
-        processingCostPerHist,
-        histMergeCost,
-        segmentOutputTransportCost,
-        shuffleCost,
-        sparkSchedulingCost,
-        sparkAggCost,
-        costPerHistoricalWave,
-        druidStageCost,
-        queryCost
-      )
-    }
-
-    log.info(
-      s"""Druid Query Cost Model Input:
-         |$cI
-         |histProcessingCost = $histProcessingCostPerRow
-         |queryOutputSizeEstimate = $queryOutputSizeEstimate
-         |segmentOutputSizeEstimate = $segmentOutputSizeEstimate
-         |numSegmentsProcessed = $numSegmentsProcessed
-         |numSparkCores = $numSparkCores
-         |numHistoricalThreads = $numHistoricalThreads
-         |parallelismPerWave = $parallelismPerWave
-         |
-       """.stripMargin)
-
-    val allCosts : ArrayBuffer[DruidQueryCost] = ArrayBuffer()
-    var minCost : DruidQueryCost = brokerQueryCost
-    allCosts += minCost
-    var minNumSegmentsPerQuery = -1
-
-
-    (1 to histSegsPerQueryLimit).foreach { (numSegsPerQuery : Int) =>
-      val c = histQueryCost(numSegsPerQuery)
-      allCosts += c
-      if ( c < minCost ) {
-        minCost = c
-        minNumSegmentsPerQuery = numSegsPerQuery
-      }
-    }
-
-    val costDetails = CostDetails(
-      cI,
-      histProcessingCostPerRow,
-      queryOutputSizeEstimate,
-      segmentOutputSizeEstimate,
-      numSegmentsProcessed,
-      numSparkCores,
-      numHistoricalThreads,
-      parallelismPerWave,
-      minCost,
-      allCosts.toList
-    )
-
-    log.info(costDetails.toString)
-
-    DruidQueryMethod(minCost.isInstanceOf[HistoricalQueryCost],
-      minNumSegmentsPerQuery, minCost, costDetails)
-
+    queryCost.druidQueryMethod
   }
-  
+
+  def estimateInput(qs : QuerySpec,
+                                  drInfo : DruidRelationInfo) : Long = {
+
+    def applyFilterSelectivity(f : FilterSpec) : Double = f match {
+      case SelectorFilterSpec(_, dm, _) =>
+        (1.0/drInfo.druidDS.columns(dm).cardinality)
+      case ExtractionFilterSpec(_, dm, _, InExtractionFnSpec(_, LookUpMap(_, lm)))
+      =>
+        (lm.size.toDouble/drInfo.druidDS.columns(dm).cardinality)
+      case LogicalFilterSpec("and", sfs) => sfs.map(applyFilterSelectivity).product
+      case LogicalFilterSpec("or", sfs) => sfs.map(applyFilterSelectivity).sum
+      case NotFilterSpec(_, fs) => 1.0 - applyFilterSelectivity(fs)
+      case _ => 1.0/3.0
+    }
+
+    val selectivity : Double = qs.filter.map(applyFilterSelectivity).getOrElse(1.0)
+    (drInfo.druidDS.numRows.toDouble * selectivity).toLong
+  }
+
+
   /**
     * Cardinality = product of dimension(ndv) * dimension(selectivity)
     * where selectivity:
@@ -469,54 +688,48 @@ object DruidQueryCostModel extends Logging {
     * @param drInfo
     * @return
     */
-  def estimateNDV(qs : QuerySpec,
+  private def estimateOutputCardinality(qs : QuerySpec,
                   drInfo : DruidRelationInfo) : Long = {
-    val m : MMap[String, Long] = MHashMap()
+
+    val gByColumns : Map[String, DruidColumn] =
+      qs.dimensionSpecs.map(ds => (ds.dimension, drInfo.druidDS.columns(ds.dimension))).toMap
+
+    var queryNumRows = gByColumns.values.map(_.cardinality).map(_.toDouble).product
+    queryNumRows = Math.min(queryNumRows, drInfo.druidDS.numRows)
 
     def applyFilterSelectivity(f : FilterSpec) : Unit = f match {
-      case SelectorFilterSpec(_, dm, _) if m.contains(dm) => m(dm) = 1
+      case SelectorFilterSpec(_, dm, _) if gByColumns.contains(dm) => {
+        queryNumRows = queryNumRows * (1.0/gByColumns(dm).cardinality)
+      }
       case ExtractionFilterSpec(_, dm, _, InExtractionFnSpec(_, LookUpMap(_, lm)))
-        if m.contains(dm) => m(dm) = Math.min(m(dm), lm.size)
+        if gByColumns.contains(dm) => {
+        queryNumRows = queryNumRows * (lm.size.toDouble/gByColumns(dm).cardinality)
+      }
       case LogicalFilterSpec("and", sfs) => sfs.foreach(applyFilterSelectivity)
       case _ => ()
     }
 
-    val timeTicks = drInfo.options.queryGranularity.ndv(drInfo.druidDS.intervals)
-
-    def populateNDVMap(columns : Iterable[DruidColumn]) : Unit = {
-      columns.foreach { dC =>
-        m(dC.name) = dC match {
-          case t: DruidTimeDimension => timeTicks
-          case dC => dC.cardinality
-        }
-      }
-    }
-
-    val columns = qs match {
-      case s : SelectSpec => {
-        drInfo.druidDS.columns.values
-      }
-      case a => {
-        a.dimensionSpecs.map(ds => drInfo.druidDS.columns(ds.dimension))
-      }
-    }
-
-    populateNDVMap(columns)
-
     if ( qs.filter.isDefined) {
       applyFilterSelectivity(qs.filter.get)
     }
-    m.values.product
+    queryNumRows.toLong
   }
 
-  private[druid] def computeMethod[T <: QuerySpec](
+  def estimateOutput(qs : QuerySpec,
+                  drInfo : DruidRelationInfo) : Long = qs match {
+    case select : SelectSpec => estimateInput(select, drInfo)
+    case _ => estimateOutputCardinality(qs, drInfo)
+  }
+
+  private[druid] def computeMethod(
                    sqlContext : SQLContext,
                    druidDSIntervals : List[Interval],
                    druidDSFullName : DruidRelationName,
                    druidDSOptions : DruidRelationOptions,
-                   dimsNDVEstimate : Long,
+                   inputEstimate : Long,
+                   outputEstimate : Long,
                    queryIntervalMillis : Long,
-                   querySpecClass : Class[_ <: T]
+                   querySpec : QuerySpec
                    ) : DruidQueryMethod = {
 
     val shuffleCostPerRow: Double = 1.0
@@ -567,18 +780,6 @@ object DruidQueryCostModel extends Logging {
       (totalSegments / totalIntervals)
     }
 
-    val queryOutputSizeEstimate = intervalNDVEstimate(queryIntervalMillis,
-      indexIntervalMillis,
-      dimsNDVEstimate,
-      queryIntervalRatioScaleFactor
-    )
-
-    val segmentOutputSizeEstimate = intervalNDVEstimate(segIntervalMillis,
-      indexIntervalMillis,
-      dimsNDVEstimate,
-      queryIntervalRatioScaleFactor
-    )
-
     val numSegmentsProcessed: Long = Math.round(
       Math.max(Math.round(queryIntervalMillis / segIntervalMillis), 1L
       ) * avgNumSegmentsPerSegInterval
@@ -603,7 +804,8 @@ object DruidQueryCostModel extends Logging {
 
     compute(
       CostInput(
-        dimsNDVEstimate,
+        inputEstimate,
+        outputEstimate,
         shuffleCostPerRow,
         histMergeFactor,
         histSegsPerQueryLimit,
@@ -621,14 +823,14 @@ object DruidQueryCostModel extends Logging {
         numSparkExecutors,
         numProcessingThreadsPerHistorical,
         numHistoricals,
-        querySpecClass
+        Left(querySpec)
       )
     )
   }
 
-  def computeMethod[T <: QuerySpec](sqlContext : SQLContext,
+  def computeMethod(sqlContext : SQLContext,
                                      drInfo : DruidRelationInfo,
-                                     querySpec : T
+                                     querySpec : QuerySpec
                                    ) : DruidQueryMethod = {
     val queryIntervalMillis : Long = intervalsMillis(querySpec.intervalList.map(Interval.parse(_)))
 
@@ -637,19 +839,21 @@ object DruidQueryCostModel extends Logging {
       drInfo.druidDS.intervals,
       drInfo.fullName,
       drInfo.options,
-      estimateNDV(querySpec, drInfo),
+      estimateInput(querySpec, drInfo),
+      estimateOutput(querySpec, drInfo),
       queryIntervalMillis,
-      querySpec.getClass
+      querySpec
     )
 
   }
 
-  def computeMethod[T <: QuerySpec](sqlContext : SQLContext,
+  def computeMethod(sqlContext : SQLContext,
                                     druidDSIntervals : List[Interval],
                                     druidDSFullName : DruidRelationName,
                                     druidDSOptions : DruidRelationOptions,
-                                    ndvEstimate : Long,
-                                    querySpec : T
+                                    inputEstimate: Long,
+                                    outputEstimate : Long,
+                                    querySpec : QuerySpec
                                    ) : DruidQueryMethod = {
     val queryIntervalMillis : Long = intervalsMillis(querySpec.intervalList.map(Interval.parse(_)))
 
@@ -658,9 +862,10 @@ object DruidQueryCostModel extends Logging {
       druidDSIntervals,
       druidDSFullName,
       druidDSOptions,
-      ndvEstimate,
+      inputEstimate,
+      outputEstimate,
       queryIntervalMillis,
-      querySpec.getClass
+      querySpec
     )
 
   }

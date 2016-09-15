@@ -349,7 +349,7 @@ abstract class DruidClient(val host : String,
     val jR = render(
       ("queryType" -> "segmentMetadata") ~ ("dataSource" -> dataSource) ~
         ("intervals" -> ins) ~
-        ("analysisTypes" -> List[String]("cardinality")) ~
+        ("analysisTypes" -> List[String]("cardinality", "interval", "minmax", "queryGranularity")) ~
         ("merge" -> "true")
     )
 

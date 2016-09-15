@@ -20,7 +20,8 @@ package org.sparklinedata.druid
 import jodd.datetime.Period
 import org.joda.time.chrono.ISOChronology
 import org.joda.time.{DateTime, DateTimeZone, Interval}
-import org.json4s.MappingException
+import org.json4s.JsonAST.{JField, JObject, JString}
+import org.json4s.{CustomSerializer, MappingException}
 
 import scala.util.Try
 import scala.language.postfixOps
@@ -104,5 +105,24 @@ case class DurationGranularity(
     Utils.intervalsMillis(boundedIns) / duration
   }
 }
+
+class DruidQueryGranularitySerializer extends CustomSerializer[DruidQueryGranularity](format => {
+  implicit val f = format
+  (
+    {
+      case jO@JObject(JField("type", JString("duration")) :: rest) =>
+        jO.extract[DurationGranularity]
+      case jO@JObject(JField("type", JString("period")) :: rest) =>
+        jO.extract[PeriodGranularity]
+      case jO@JObject(JField("type", JString("all")) :: rest) => AllGranularity
+      case jO@JObject(JField("type", JString("none")) :: rest) => NoneGranularity
+    }
+    ,
+    {
+      case x: DruidQueryGranularity =>
+        throw new RuntimeException("DruidQueryGranularity serialization not supported.")
+    }
+    )
+})
 
 

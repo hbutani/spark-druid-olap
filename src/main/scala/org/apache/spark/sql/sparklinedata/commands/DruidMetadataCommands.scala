@@ -63,11 +63,13 @@ case class ExplainDruidRewrite(sql: String) extends RunnableCommand {
       val druidDSIntervals  = dR.drDSIntervals
       val druidDSFullName= dR.drFullName
       val druidDSOptions = dR.drOptions
-      val ndvEstimate = dR.ndvEstimate
+      val inputEstimate = dR.inputEstimate
+      val outputEstimate = dR.outputEstimate
 
       s"""DruidQuery(${System.identityHashCode(dR.dQuery)}) details ::
          |${DruidQueryCostModel.computeMethod(
-        sqlContext, druidDSIntervals, druidDSFullName, druidDSOptions, ndvEstimate, dR.dQuery.q)
+        sqlContext, druidDSIntervals, druidDSFullName, druidDSOptions,
+        inputEstimate, outputEstimate, dR.dQuery.q)
       }
        """.stripMargin.split("\n").map(Row(_))
     }

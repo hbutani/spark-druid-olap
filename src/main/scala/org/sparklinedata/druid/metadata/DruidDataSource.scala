@@ -46,20 +46,23 @@ sealed trait DruidColumn {
     * assume the worst for time dim and metrics,
     * this is only used during query costing
     */
-  def cardinality : Long = Int.MaxValue.toLong
+  val cardinality : Long
 
   def isDimension(excludeTime : Boolean = false) : Boolean
 }
 
 object DruidColumn {
 
-  def apply(nm : String, c : ColumnDetails) : DruidColumn = {
+  def apply(nm : String,
+            c : ColumnDetails,
+            idxNumRows : Long,
+            idxTicks : Long) : DruidColumn = {
     if (nm == DruidDataSource.TIME_COLUMN_NAME) {
-      DruidTimeDimension(nm, DruidDataType.withName(c.typ), c.size)
+      DruidTimeDimension(nm, DruidDataType.withName(c.typ), c.size, Math.min(idxTicks,idxNumRows))
     } else if ( c.cardinality.isDefined) {
       DruidDimension(nm, DruidDataType.withName(c.typ), c.size, c.cardinality.get)
     } else {
-      DruidMetric(nm, DruidDataType.withName(c.typ), c.size)
+      DruidMetric(nm, DruidDataType.withName(c.typ), c.size, idxNumRows)
     }
   }
 }
@@ -67,19 +70,21 @@ object DruidColumn {
 case class DruidDimension(name : String,
                        dataType : DruidDataType.Value,
                        size : Long,
-                          override val cardinality : Long) extends DruidColumn {
+                          cardinality : Long) extends DruidColumn {
   def isDimension(excludeTime : Boolean = false) = true
 }
 
 case class DruidMetric(name : String,
                           dataType : DruidDataType.Value,
-                          size : Long) extends DruidColumn {
+                          size : Long,
+                       cardinality : Long) extends DruidColumn {
   def isDimension(excludeTime : Boolean = false) = false
 }
 
 case class DruidTimeDimension(name : String,
                        dataType : DruidDataType.Value,
-                       size : Long) extends DruidColumn {
+                       size : Long,
+                              cardinality : Long) extends DruidColumn {
   def isDimension(excludeTime : Boolean = false) = !excludeTime
 
 }
@@ -93,6 +98,8 @@ case class DruidDataSource(name : String,
                          intervals : List[Interval],
                          columns : Map[String, DruidColumn],
                          size : Long,
+                           numRows : Long,
+                           timeTicks : Long,
                            druidVersion : String = null) extends DruidDataSourceCapability {
 
   import DruidDataSource._
@@ -132,9 +139,13 @@ object DruidDataSource {
 
   def apply(dataSource : String, mr : MetadataResponse,
              is : List[Interval]) : DruidDataSource = {
+
+    val idxNumRows = mr.getNumRows
+    val idxTicks = mr.timeTicks(is)
+
     val columns = mr.columns.map {
-      case (n, c) => (n -> DruidColumn(n,c))
+      case (n, c) => (n -> DruidColumn(n,c, idxNumRows, idxTicks))
     }
-    new DruidDataSource(dataSource, is, columns, mr.size)
+    new DruidDataSource(dataSource, is, columns, mr.size, idxNumRows, idxTicks)
   }
 }
