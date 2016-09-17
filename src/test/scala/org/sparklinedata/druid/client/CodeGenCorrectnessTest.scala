@@ -27,32 +27,32 @@ class CodeGenCorrectnessTest extends BaseTest with BeforeAndAfterAll with Loggin
       "'1994-01-01' " +
       " and  l_shipdate <= '1994-01-07'  group by " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000')" +
-      " AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by bal",
+      " AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by bal",
     "select sum(c_acctbal) as bal from orderLineItemPartSupplierBase where " +
       "l_shipdate >= " +
       "'1994-01-01'  and  l_shipdate " +
       "<= '1994-01-07' group by " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000')" +
-      " AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by bal"
+      " AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by bal"
   )
 
   cTest("gbexprtest2",
     "select o_orderdate, " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000Z') " +
-      "AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) x," +
+      "AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) x," +
       "sum(c_acctbal) as bal from orderLineItemPartSupplier where l_shipdate >= " +
       "'1994-01-01'" +
       " and  l_shipdate <= '1994-01-07'  group by " +
       "o_orderdate, (substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate)," +
-      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by o_orderdate, x, bal",
+      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by o_orderdate, x, bal",
     "select o_orderdate, " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000Z') " +
-      "AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) x," +
+      "AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) x," +
       "sum(c_acctbal) as bal from orderLineItemPartSupplierBase where To_date(l_shipdate) >= " +
       "cast('1994-01-01' as date) " +
       "and  To_date(l_shipdate) <= cast('1994-01-07' as date) group by " +
       "o_orderdate, (substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate)," +
-      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by o_orderdate, x, bal"
+      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by o_orderdate, x, bal"
   )
 
   cTest("gbexprtest3",
@@ -309,7 +309,7 @@ class CodeGenCorrectnessTest extends BaseTest with BeforeAndAfterAll with Loggin
   cTest("gbexprtest14",
     "select o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20) as x " +
       "from orderLineItemPartSupplier " +
       "where l_shipdate >= '1994-01-01'  and  " +
@@ -317,12 +317,12 @@ class CodeGenCorrectnessTest extends BaseTest with BeforeAndAfterAll with Loggin
       "group by " +
       "o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20)" +
       "order by o_orderdate, x",
     "select o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20) as x " +
       "from orderLineItemPartSupplierBase " +
       "where l_shipdate >= '1994-01-01'  and  " +
@@ -330,7 +330,7 @@ class CodeGenCorrectnessTest extends BaseTest with BeforeAndAfterAll with Loggin
       "group by " +
       "o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20)" +
       "order by o_orderdate, x"
   )

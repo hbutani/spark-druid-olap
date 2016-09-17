@@ -25,32 +25,32 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
   test("gbexprtest1",
     "select sum(c_acctbal) as bal from orderLineItemPartSupplier group by " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000')" +
-      " AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by bal",
+      " AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by bal",
     1,
     true, true)
   test("gbexprtest1B",
     "select sum(c_acctbal) as bal from orderLineItemPartSupplierBase group by " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000')" +
-      " AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by bal",
+      " AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by bal",
     0,
     true, true)
 
   test("gbexprtest2",
     "select o_orderdate, " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000Z') " +
-      "AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) x," +
+      "AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) x," +
       "sum(c_acctbal) as bal from orderLineItemPartSupplier group by " +
       "o_orderdate, (substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate)," +
-      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by o_orderdate, x, bal",
+      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by o_orderdate, x, bal",
     1,
     true, true)
   test("gbexprtest2B",
     "select o_orderdate, " +
       "(substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000Z') " +
-      "AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) x," +
+      "AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) x," +
       "sum(c_acctbal) as bal from orderLineItemPartSupplierBase group by " +
       "o_orderdate, (substr(CAST(Date_Add(TO_DATE(CAST(CONCAT(TO_DATE(o_orderdate)," +
-      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 0, 10)) order by o_orderdate, x, bal",
+      " 'T00:00:00.000Z') AS TIMESTAMP)), 5) AS TIMESTAMP), 1, 10)) order by o_orderdate, x, bal",
     0,
     true, true)
   test("gbexprtest3",
@@ -299,12 +299,12 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
   test("gbexprtest14",
     "select o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20) as x " +
       "from orderLineItemPartSupplier group by " +
       "o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20)" +
       "order by o_orderdate, x",
     1,
@@ -313,12 +313,12 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
   test("gbexprtest14B",
     "select o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20) as x " +
       "from orderLineItemPartSupplierBase group by " +
       "o_orderdate, " +
       "date_add(cast(upper(concat(concat(substr(cast(cast(o_orderdate as timestamp) as string)," +
-      " 0, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 11, 8))) as date)," +
+      " 1, 10), 't'), substr(cast(cast(o_orderdate as timestamp) as string), 12, 8))) as date)," +
       " 20)" +
       "order by o_orderdate, x",
     0,
@@ -841,5 +841,67 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       |order by a, b, c
     """.stripMargin
     ,1,true,true)
+
+  test("substr1",
+    """
+      |select o_orderstatus as x, date_format(cast(o_orderdate as date), 'YYY') y,
+      |cast(Substring(date_format(cast(o_orderdate as date), 'YYY'), 1,1) as int)as z
+      |from orderLineItemPartSupplier
+      |group by
+      |o_orderstatus,
+      |date_format(cast(o_orderdate as date), 'YYY'),
+      |cast(Substring(date_format(cast(o_orderdate as date), 'YYY'), 1,1) as int)
+      |order by x, y, z
+    """.stripMargin
+    ,1,true,true)
+
+  test("substr2",
+    """
+      |select o_orderstatus as x, date_format(cast(o_orderdate as date), 'YYY') y,
+      |cast(Substring(date_format(cast(o_orderdate as date), 'YYY'), 0,4) as int)as z
+      |from orderLineItemPartSupplier
+      |group by
+      |o_orderstatus,
+      |date_format(cast(o_orderdate as date), 'YYY'),
+      |cast(Substring(date_format(cast(o_orderdate as date), 'YYY'), 0,4) as int)
+      |order by x, y, z
+    """.stripMargin
+    ,1,true,true)
+
+  test("substr3",
+    """
+      |select o_orderstatus as x, l_shipdate as y,
+      |Substring(l_shipdate, -1, 2)as z
+      |from orderLineItemPartSupplier
+      |group by
+      |o_orderstatus, l_shipdate,
+      |Substring(l_shipdate, -1, 2)
+      |order by x, y, z
+    """.stripMargin
+    ,0,true,true)
+
+  test("substr4",
+    """
+      |select o_orderstatus as x, l_shipdate as y,
+      |Substring(l_shipdate, 1, 0)as z
+      |from orderLineItemPartSupplier
+      |group by
+      |o_orderstatus, l_shipdate,
+      |Substring(l_shipdate, 1, 0)
+      |order by x, y, z
+    """.stripMargin
+    ,0,true,true)
+
+  test("substr5",
+    """
+      |select o_orderstatus as x, l_shipdate as y,
+      |Substring(l_shipdate, 1, -2)as z
+      |from orderLineItemPartSupplier
+      |group by
+      |o_orderstatus, l_shipdate,
+      |Substring(l_shipdate, 1, -2)
+      |order by x, y, z
+    """.stripMargin
+    ,0,true,true)
 }
 

@@ -23,7 +23,8 @@ import org.sparklinedata.druid.jscodegen.JSDateTimeCtx._
 case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
   private[jscodegen] val castCode: Option[JSExpr] =
     to match {
-      case _ if (to == from.fnDT || from.fnDT == NullType) =>
+      case _ if ((to == from.fnDT && (!from.timeDim || to != StringType)) ||
+        from.fnDT == NullType) =>
         Some(new JSExpr(from.getRef, StringType))
       case BooleanType => castToBooleanCode
       case ShortType => castToShortCode
@@ -72,14 +73,16 @@ case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
   }
 
   private[this] def castToStringCode: Option[JSExpr] = from.fnDT match {
-      case ShortType | IntegerType | LongType | FloatType | DoubleType | DecimalType() =>
-        Some(new JSExpr(s"${from.getRef}.toString()", StringType))
-      case DateType =>
-        Some(new JSExpr(dateToStrCode(from.getRef), StringType))
-      case TimestampType =>
-        Some(new JSExpr(dtToStrCode(from.getRef), StringType))
-      case _ => None
-    }
+    case ShortType | IntegerType | LongType | FloatType | DoubleType | DecimalType() =>
+      Some(new JSExpr(s"${from.getRef}.toString()", StringType))
+    case DateType =>
+      Some(new JSExpr(dateToStrCode(from.getRef), StringType))
+    case TimestampType =>
+      Some(new JSExpr(dtToStrCode(from.getRef), StringType))
+    case StringType if from.timeDim =>
+      Some(new JSExpr(dtToStrCode(longToISODTCode(from.getRef, ctx.dateTimeCtx)), StringType))
+    case _ => None
+  }
 
   // TODO: Handle parsing failure as in Spark
   private[this] def castToDateCode: Option[JSExpr] = from.fnDT match {

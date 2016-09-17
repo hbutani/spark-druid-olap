@@ -144,12 +144,16 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
             JSExpr(None,
               exCode.linesSoFar, s"(${exCode.getRef}).toLowerCase()", StringType)
         case Substring(str, pos, len) =>
-          for (strcode <- genExprCode(str); posL <- genExprCode(pos)
-               if pos.isInstanceOf[Literal]; lenL <- genExprCode(len)
-               if len.isInstanceOf[Literal]) yield
-            JSExpr(None, s"${strcode.linesSoFar} ${posL.linesSoFar}",
-              s"(${strcode.getRef}).substr(${posL.getRef}, ${lenL.getRef})",
-              StringType)
+          for (strcode <- genExprCode(str); cstrCode <- JSCast(strcode, StringType, this).castCode;
+               posL <- genExprCode(pos) if pos.isInstanceOf[Literal];
+               pos = posL.getRef.toInt; if pos >= 0;
+               lenL <- genExprCode(len) if len.isInstanceOf[Literal];
+               len = lenL.getRef.toInt; if len > 0;
+               start: Int = if (pos > 0) pos - 1 else 0;
+               end: Int = if (len == Integer.MAX_VALUE) len else (start + len);
+               if end > start) yield
+            JSExpr(None, s"${cstrCode.linesSoFar} ${posL.linesSoFar} ${lenL.linesSoFar}",
+              s"(${cstrCode.getRef}).substr(${start}, ${end})", StringType, false)
         case Coalesce(le) => {
           val l = le.flatMap(e => genExprCode(e))
           if (le.size == l.size) {
