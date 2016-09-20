@@ -69,6 +69,9 @@ class SparklineTestHiveContext(sc: SparkContext) extends SparklineDataContext(sc
 
   hiveconf.set("hive.plan.serialization.format", "javaXML")
 
+  moduleLoader.registerFunctions
+  moduleLoader.addPhysicalRules
+
   lazy val warehousePath = Utils.createTempDir(namePrefix = "warehouse-")
 
   lazy val scratchDirPath = {

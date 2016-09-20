@@ -29,7 +29,7 @@ import org.sparklinedata.druid.metadata._
 import org.sparklinedata.druid.query.QuerySpecTransforms
 import scala.collection.mutable.{Map => MMap}
 
-private[druid] class DruidStrategy(val planner: DruidPlanner) extends Strategy
+private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
   with PredicateHelper with DruidPlannerHelper with Logging {
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {

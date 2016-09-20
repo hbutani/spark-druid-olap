@@ -25,17 +25,15 @@ import org.apache.hive.service.server.{HiveServer2, HiveServerServerOptionsProce
 import org.apache.spark.scheduler.{SparkListenerJobStart, StatsReportListener}
 import org.apache.spark.sql.SQLConf
 import org.apache.spark.sql.hive.HiveContext
-import org.apache.spark.sql.hive.thriftserver.ReflectionUtils._
 import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
 import org.apache.spark.sql.hive.thriftserver.HiveThriftServer2.HiveThriftServer2Listener
+import org.apache.spark.sql.hive.thriftserver.ReflectionUtils._
 import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
 import org.apache.spark.sql.hive.thriftserver.sparklinedata.ui.DruidQueriesTab
 import org.apache.spark.sql.hive.thriftserver.ui.ThriftServerTab
 import org.apache.spark.sql.hive.thriftserver.{SparkSQLCLIDriver, SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
-import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 import org.apache.spark.{Logging, SparkConf, SparkContext}
-import org.sparklinedata.spark.dateTime.Functions
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -57,8 +55,8 @@ object HiveThriftServer2 extends Logging {
     logInfo("Starting SparkContext")
     SparklineSQLEnv.init()
 
-    Functions.register(SparkSQLEnv.hiveContext)
-    DruidPlanner(SparkSQLEnv.hiveContext)
+    SparklineSQLEnv.sparkLineContext.moduleLoader.registerFunctions
+    SparklineSQLEnv.sparkLineContext.moduleLoader.addPhysicalRules
 
     ShutdownHookManager.addShutdownHook { () =>
       SparkSQLEnv.stop()
@@ -114,6 +112,8 @@ object HiveThriftServer2 extends Logging {
 object SparklineSQLEnv extends Logging {
   logDebug("Initializing SparkSQLEnv")
 
+  var sparkLineContext : SparklineDataContext = _
+
   def init() {
     if (hiveContext == null) {
       val sparkConf = new SparkConf(loadDefaults = true)
@@ -136,7 +136,8 @@ object SparklineSQLEnv extends Logging {
 
       sparkContext = new SparkContext(sparkConf)
       sparkContext.addSparkListener(new StatsReportListener())
-      hiveContext = new SparklineDataContext(sparkContext)
+      sparkLineContext = new SparklineDataContext(sparkContext)
+      hiveContext = sparkLineContext
 
       hiveContext.metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
       hiveContext.metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))

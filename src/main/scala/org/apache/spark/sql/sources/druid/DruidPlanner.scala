@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.sources.druid
 
-import java.util.TimeZone
-
 import org.apache.spark.sql.SQLConf.SQLConfEntry
 import org.apache.spark.sql.SQLConf.SQLConfEntry._
 import org.apache.spark.sql.execution.{PhysicalRDD, SparkPlan}
@@ -26,14 +24,10 @@ import org.apache.spark.sql.{CachedTablePattern, SQLContext}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.client.ConnectionManager
-import org.sparklinedata.druid.metadata.DruidRelationInfo
 
 class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTransforms {
 
   val cacheTablePatternMatch = new CachedTablePattern(sqlContext)
-
-  sqlContext.experimental.extraStrategies =
-    (new DruidStrategy(this) +: sqlContext.experimental.extraStrategies)
 
   val joinGraphTransform =
     druidRelationTransformForJoin.debug("druidRelationTransformForJoin") or
@@ -56,9 +50,10 @@ class DruidPlanner private[druid](val sqlContext : SQLContext) extends DruidTran
 
 object DruidPlanner {
 
-  def apply(sqlContext : SQLContext) : Unit = {
-    new DruidPlanner(sqlContext)
+  def apply(sqlContext : SQLContext) : DruidPlanner = {
+    val dP = new DruidPlanner(sqlContext)
     ConnectionManager.init(sqlContext)
+    dP
   }
 
   val SPARKLINEDATA_CACHE_TABLES_TOCHECK = stringSeqConf(

@@ -29,8 +29,7 @@ import org.apache.spark.sql.execution.CacheManager
 import org.apache.spark.sql.execution.ui.SQLListener
 import org.apache.spark.sql.hive.client.{ClientInterface, ClientWrapper}
 import org.apache.spark.sql.hive.{HiveContext, HiveMetastoreCatalog}
-import org.apache.spark.sql.planner.logical.DruidLogicalOptimizer
-import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.apache.spark.sql.sparklinedata.ModuleLoader
 import org.apache.spark.{Logging, SparkContext}
 import org.sparklinedata.druid.metadata.{DruidMetadataViews, DruidRelationInfo}
 
@@ -68,7 +67,7 @@ class SparklineDataContext(
     }
   }
 
-  DruidPlanner(this)
+  val moduleLoader = new ModuleLoader(this)
 
   def this(sc: SparkContext) = {
     this(sc, new CacheManager, SQLContext.createListenerAndUI(sc), null, null, true)
@@ -76,7 +75,7 @@ class SparklineDataContext(
   def this(sc: JavaSparkContext) = this(sc.sc)
 
   protected[sql] override def getSQLDialect(): ParserDialect = {
-    new SparklineDataDialect(this)
+    new SparklineDataDialect(this, moduleLoader.parsers)
   }
 
   override def newSession(): HiveContext = {
@@ -92,7 +91,7 @@ class SparklineDataContext(
   override lazy val catalog =
     new SparklineMetastoreCatalog(metadataHive, this) with OverrideCatalog
 
-  override protected[sql] lazy val optimizer: Optimizer = DruidLogicalOptimizer(conf)
+  override protected[sql] lazy val optimizer: Optimizer = moduleLoader.logicalOptimizer
 
   def currentDB = catalog.currentDB
 }

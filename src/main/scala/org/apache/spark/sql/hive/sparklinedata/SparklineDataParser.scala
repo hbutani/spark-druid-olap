@@ -23,17 +23,34 @@ import org.apache.spark.sql.hive.{HiveContext, HiveQLDialect, HiveQl}
 import org.apache.spark.sql.sparklinedata.commands.{ClearMetadata, ExplainDruidRewrite}
 import org.apache.spark.sql.util.PlanUtil
 
-class SparklineDataDialect(sqlContext: HiveContext) extends HiveQLDialect(sqlContext) {
-  val parser = new SparklineDataParser(sqlContext)
+class SparklineDataDialect(
+                            sqlContext: HiveContext,
+                            moduleParserExtensions : Seq[SparklineDataParser] = Nil
+                          ) extends HiveQLDialect(sqlContext) {
+  val parsers = {
+    if (moduleParserExtensions.isEmpty) {
+      Seq(new SparklineDruidCommandsParser(sqlContext))
+    } else {
+      moduleParserExtensions
+    }
+  }
 
   override def parse(sqlText: String): LogicalPlan = {
     sqlContext.executionHive.withHiveState {
-      parser.parse2(sqlText).getOrElse(HiveQl.parseSql(sqlText))
+
+      parsers.foldLeft(None:Option[LogicalPlan]) {
+        case (None, p) => p.parse2(sqlText)
+        case (Some(lP), _) => Some(lP)
+      }.getOrElse(HiveQl.parseSql(sqlText))
     }
   }
 }
 
-class SparklineDataParser(sqlContext: HiveContext) extends AbstractSparkSQLParser {
+abstract class SparklineDataParser extends AbstractSparkSQLParser {
+  def parse2(input: String): Option[LogicalPlan]
+}
+
+class SparklineDruidCommandsParser(sqlContext: HiveContext) extends SparklineDataParser {
 
   protected val CLEAR = Keyword("CLEAR")
   protected val DRUID = Keyword("DRUID")
