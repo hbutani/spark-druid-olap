@@ -7,7 +7,7 @@ import sbt._
   */
 object SparkShim {
 
-  val sparkVersion = sys.props.getOrElse("sparkVersion", default = "1.6.1")
+  val sparkVersion = sys.props.getOrElse("sparkVersion", default = "1.6.2")
   val sparkVersion_161 = "1.6.1"
   val sparkVersion_162 = "1.6.2"
 
