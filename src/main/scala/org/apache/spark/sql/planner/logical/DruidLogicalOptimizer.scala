@@ -19,18 +19,24 @@ package org.apache.spark.sql.planner.logical
 import org.apache.spark.sql.SQLConf
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count, Sum}
-import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.sparklinedata.shim.SparkShim
 import org.apache.spark.sql.util.PlanUtil.maxCardinalityIsOne
 import org.apache.spark.sql.util.{ExprUtil, PlanUtil}
 
-case class DruidLogicalOptimizer(conf : SQLConf) extends Optimizer {
-  override protected val batches: Seq[Batch] = DefaultOptimizer.batches.
-    asInstanceOf[Seq[Batch]] :+ Batch("Rewrite Sum(Literal) as Count(1)*Literal",
-    FixedPoint(100), SumOfLiteralRewrite) :+ Batch("Push GB through Project, Join",
-    FixedPoint(100), PushGB)
+object DruidLogicalOptimizer {
+
+  val batches: Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])] = Seq(
+    ("Rewrite Sum(Literal) as Count(1)*Literal", SparkShim.fixedPoint(100), SumOfLiteralRewrite),
+    ("Push GB through Project, Join", SparkShim.fixedPoint(100), PushGB)
+  )
+
+  def apply(conf : SQLConf) : Optimizer = {
+    SparkShim.extendedlogicalOptimizer(conf, batches)
+  }
 }
 
 /**

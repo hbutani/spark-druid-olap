@@ -1,4 +1,6 @@
 
+import SparkShim._
+
 scalaVersion := "2.10.5"
 
 crossScalaVersions := Seq("2.10.5", "2.11.6")
@@ -11,14 +13,9 @@ val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
 val sparkdateTimeVersion = "0.0.2"
 val scoptVersion = "3.3.0"
-val sparkVersion = "1.6.1"
 
 val coreDependencies = Seq(
   "com.github.nscala-time" %% "nscala-time" % nscalaVersion,
-  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion % "provided",
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
   // "org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
@@ -106,18 +103,33 @@ lazy val commonSettings = Seq(
   ReleaseKeys.publishArtifactsAction := PgpKeys.publishSigned.value
 )
 
+lazy val spark1_6_1 = project.in(file("shims/spark-1.6.1"))
+  .settings(
+    libraryDependencies ++= spark161Dependencies
+  )
+
+lazy val spark1_6_2 = project.in(file("shims/spark-1.6.2"))
+  .settings(
+    libraryDependencies ++= spark162Dependencies
+  )
+
+lazy val sparkShimProject =
+  if (sparkVersion == sparkVersion_161 ) spark1_6_1 else spark1_6_2
 
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
-  .settings(name := "spl-accelerator")
-  .settings(libraryDependencies ++= (coreDependencies ++ coreTestDependencies))
-  .settings(assemblyOption in assembly :=
-    (assemblyOption in assembly).value.copy(includeScala = false)
-  )
   .settings(
+    name := "spl-accelerator",
+    libraryDependencies ++= (sparkDependencies ++ coreDependencies ++ coreTestDependencies),
+    assemblyJarName in assembly := s"${name.value}-${version.value}-$sparkVersion.jar",
+    assemblyOption in assembly :=
+      (assemblyOption in assembly).value.copy(includeScala = false),
     artifact in (Compile, assembly) ~= { art =>
       art.copy(`classifier` = Some("assembly"))
     }
   )
   .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
+  .dependsOn(
+    sparkShimProject
+  )
 

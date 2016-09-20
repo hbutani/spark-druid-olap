@@ -92,7 +92,7 @@ class SparklineDataContext(
   override lazy val catalog =
     new SparklineMetastoreCatalog(metadataHive, this) with OverrideCatalog
 
-  override protected[sql] lazy val optimizer: Optimizer = new DruidLogicalOptimizer(conf)
+  override protected[sql] lazy val optimizer: Optimizer = DruidLogicalOptimizer(conf)
 
   def currentDB = catalog.currentDB
 }
