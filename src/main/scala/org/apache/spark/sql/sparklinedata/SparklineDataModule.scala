@@ -17,8 +17,9 @@
 
 package org.apache.spark.sql.sparklinedata
 
-import org.apache.spark.sql.{SQLContext, Strategy, UDFRegistration}
-import org.apache.spark.sql.catalyst.AbstractSparkSQLParser
+import org.apache.spark.sql.SQLConf.SQLConfEntry._
+import org.apache.spark.sql.Strategy
+import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -78,8 +79,16 @@ object BaseModule extends SparklineDataModule {
 class ModuleLoader(sqlContext : SparklineDataContext) {
 
   lazy val modules : Seq[SparklineDataModule] = {
-    Seq(BaseModule)
-    // TODO: add in other plugins
+
+    val runtimeMirror = ScalaReflection.mirror
+    val modulesToLoad = sqlContext.conf.getConf(ModuleLoader.SPARKLINE_MODULES)
+
+    Seq(BaseModule) ++
+    modulesToLoad.map{ m =>
+      val module = runtimeMirror.staticModule(m)
+      val obj = runtimeMirror.reflectModule(module)
+      obj.instance.asInstanceOf[SparklineDataModule]
+    }
   }
 
   def registerFunctions : Unit = {
@@ -103,4 +112,14 @@ class ModuleLoader(sqlContext : SparklineDataContext) {
     modules.flatMap(_.parser(sqlContext).toSeq)
   }
 
+}
+
+object ModuleLoader {
+
+  val SPARKLINE_MODULES = seqConf[String](
+    "spark.sparklinedata.modules",
+    identity _,
+    defaultValue = Some(Seq()),
+    doc = "sparkline modules to load."
+  )
 }
