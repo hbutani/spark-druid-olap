@@ -121,11 +121,12 @@ lazy val root = project.in(file("."))
   .settings(
     name := "spl-accelerator",
     libraryDependencies ++= (sparkDependencies ++ coreDependencies ++ coreTestDependencies),
-    assemblyJarName in assembly := s"${name.value}-${version.value}-$sparkVersion.jar",
+    assemblyJarName in assembly := s"${name.value}-$sparkVersion-${version.value}.jar",
     assemblyOption in assembly :=
       (assemblyOption in assembly).value.copy(includeScala = false),
+    publishArtifact in (Compile, packageBin) := false,
     artifact in (Compile, assembly) ~= { art =>
-      art.copy(`classifier` = Some("assembly"))
+      art.copy(`classifier` = Some("assembly"), name = s"${art.name}-$sparkVersion")
     }
   )
   .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
