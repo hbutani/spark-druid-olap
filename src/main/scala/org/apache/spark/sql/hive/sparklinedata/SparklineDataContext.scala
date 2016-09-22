@@ -67,7 +67,10 @@ class SparklineDataContext(
     }
   }
 
-  val moduleLoader = new ModuleLoader(this)
+  val moduleLoader = ModuleLoader(this)
+
+  moduleLoader.registerFunctions
+  moduleLoader.addPhysicalRules
 
   def this(sc: SparkContext) = {
     this(sc, new CacheManager, SQLContext.createListenerAndUI(sc), null, null, true)

@@ -55,9 +55,6 @@ object HiveThriftServer2 extends Logging {
     logInfo("Starting SparkContext")
     SparklineSQLEnv.init()
 
-    SparklineSQLEnv.sparkLineContext.moduleLoader.registerFunctions
-    SparklineSQLEnv.sparkLineContext.moduleLoader.addPhysicalRules
-
     ShutdownHookManager.addShutdownHook { () =>
       SparkSQLEnv.stop()
       RealHiveThriftServer2.uiTab.foreach(_.detach())

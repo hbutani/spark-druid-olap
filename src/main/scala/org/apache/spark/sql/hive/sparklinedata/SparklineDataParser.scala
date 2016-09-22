@@ -38,15 +38,16 @@ class SparklineDataDialect(
   override def parse(sqlText: String): LogicalPlan = {
     sqlContext.executionHive.withHiveState {
 
-      parsers.foldLeft(None:Option[LogicalPlan]) {
-        case (None, p) => p.parse2(sqlText)
-        case (Some(lP), _) => Some(lP)
+      parsers.foldRight(None:Option[LogicalPlan]) {
+        case (p, None) => p.parse2(sqlText)
+        case (_, Some(lP)) => Some(lP)
       }.getOrElse(HiveQl.parseSql(sqlText))
     }
   }
 }
 
 abstract class SparklineDataParser extends AbstractSparkSQLParser {
+
   def parse2(input: String): Option[LogicalPlan]
 }
 

@@ -18,7 +18,7 @@
 package org.apache.spark.sql.sparklinedata
 
 import org.apache.spark.sql.SQLConf.SQLConfEntry._
-import org.apache.spark.sql.Strategy
+import org.apache.spark.sql.{SQLContext, Strategy}
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -37,7 +37,7 @@ trait SparklineDataModule {
     *
     * @param sqlContext
     */
-  def registerFunctions(sqlContext : HiveContext) : Unit
+  def registerFunctions(sqlContext : HiveContext) : Unit = {}
 
   /**
     * Any extra rules that should be added to the Logical Optimizer.
@@ -51,7 +51,7 @@ trait SparklineDataModule {
     * @param sqlContext
     * @return
     */
-  def parser(sqlContext : HiveContext) : Option[SparklineDataParser]
+  def parser(sqlContext : HiveContext) : Option[SparklineDataParser] = None
 
   def physicalRules(sqlContext : HiveContext) : Seq[Strategy] = Nil
 
@@ -76,20 +76,8 @@ object BaseModule extends SparklineDataModule {
 
 }
 
-class ModuleLoader(sqlContext : SparklineDataContext) {
-
-  lazy val modules : Seq[SparklineDataModule] = {
-
-    val runtimeMirror = ScalaReflection.mirror
-    val modulesToLoad = sqlContext.conf.getConf(ModuleLoader.SPARKLINE_MODULES)
-
-    Seq(BaseModule) ++
-    modulesToLoad.map{ m =>
-      val module = runtimeMirror.staticModule(m)
-      val obj = runtimeMirror.reflectModule(module)
-      obj.instance.asInstanceOf[SparklineDataModule]
-    }
-  }
+class ModuleLoader(sqlContext : SparklineDataContext,
+                   val modules : Seq[SparklineDataModule]) {
 
   def registerFunctions : Unit = {
     modules.foreach { m =>
@@ -116,10 +104,33 @@ class ModuleLoader(sqlContext : SparklineDataContext) {
 
 object ModuleLoader {
 
+  private var modules : Seq[SparklineDataModule] = _
+
+  private def loadModules(sqlContext : SparklineDataContext) : Unit = synchronized {
+
+    if (modules == null ) {
+
+      val runtimeMirror = ScalaReflection.mirror
+      val modulesToLoad = sqlContext.conf.getConf(ModuleLoader.SPARKLINE_MODULES)
+
+      modules = Seq(BaseModule) ++
+        modulesToLoad.map { m =>
+          val module = runtimeMirror.staticModule(m)
+          val obj = runtimeMirror.reflectModule(module)
+          obj.instance.asInstanceOf[SparklineDataModule]
+        }
+    }
+  }
+
   val SPARKLINE_MODULES = seqConf[String](
     "spark.sparklinedata.modules",
     identity _,
     defaultValue = Some(Seq()),
     doc = "sparkline modules to load."
   )
+
+  def apply(sqlContext : SparklineDataContext) : ModuleLoader = {
+    loadModules(sqlContext)
+    new ModuleLoader(sqlContext, modules)
+  }
 }
