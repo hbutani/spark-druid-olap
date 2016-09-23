@@ -57,7 +57,8 @@ abstract class DruidPartition extends Partition {
 }
 
 class HistoricalPartition(idx: Int, hs : HistoricalServerAssignment) extends DruidPartition {
-  val index: Int = idx
+  private[druid] var _index: Int = idx
+  def index = _index
   val hsName = hs.server.host
 
   def queryClient(useSmile : Boolean,
@@ -218,7 +219,13 @@ class DruidRDD(sqlContext: SQLContext,
       }
         )
 
-      val l1 : Array[Partition] = Random.shuffle(l).toArray
+      val l1 : Array[Partition] = Random.shuffle(l).zipWithIndex.map{t =>
+        val p = t._1
+        val i = t._2
+        p._index = i
+        p
+      }.toArray
+
       l1
   } else {
       // ensure DataSource is in the Metadata Cache.
