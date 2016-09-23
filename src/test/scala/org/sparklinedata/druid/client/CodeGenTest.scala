@@ -903,5 +903,23 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       |order by x, y, z
     """.stripMargin
     ,0,true,true)
+
+  test("subquery1",
+    """
+        select x, sum(z) as z from
+        ( select
+        Substring(o_orderstatus, 1, 2) x, Substring(l_shipdate, 1, 2) as y, c_acctbal as z
+        from orderLineItemPartSupplier) r1 group by x, y
+    """.stripMargin
+    , 1, true, true)
+
+  test("subquery2",
+    """
+        select x, sum(z) as z from
+        ( select
+        Substring(o_orderstatus, 1, rand()) x, Substring(l_shipdate, 1, 2) as y, c_acctbal as z
+        from orderLineItemPartSupplier) r1 group by x, y
+    """.stripMargin
+    , 0, true, true)
 }
 

@@ -31,7 +31,8 @@ object DruidLogicalOptimizer {
 
   val batches: Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])] = Seq(
     ("Rewrite Sum(Literal) as Count(1)*Literal", SparkShim.fixedPoint(100), SumOfLiteralRewrite),
-    ("Push GB through Project, Join", SparkShim.fixedPoint(100), PushGB)
+    ("Push GB through Project, Join", SparkShim.fixedPoint(100), PushGB),
+    ("Pull true VC up in to Agg", SparkShim.fixedPoint(100), PullVColsIntoAgg)
   )
 
   def apply(conf : SQLConf) : Optimizer = {
@@ -300,6 +301,33 @@ object SumOfLiteralRewrite extends Rule[LogicalPlan] with PredicateHelper {
           case ag@_ => ((t._1 :+ ag), t._2)
         })
       if (sumLitInf._2.isEmpty) None else Some(sumLitInf)
+    }
+  }
+
+}
+
+object PullVColsIntoAgg extends Rule[LogicalPlan] with PredicateHelper {
+  override def apply(plan: LogicalPlan): LogicalPlan = plan transform {
+    case Pull(plan) => plan
+  }
+
+  object Pull {
+    def unapply(op: LogicalPlan): Option[LogicalPlan] = op match {
+      case a@Aggregate(ge, ae, p@Project(plst, pc)) if plst.forall(pe => pe.deterministic) &&
+          plst.exists(pe =>
+            pe match{
+            case Alias(ae, _) if ae.children.size > 1 => true
+            case _ => false}) =>
+        for (te <- ExprUtil.translateAggBelowProject(ge, ae, None, p)) yield {
+          val newChildOp = te._4 match {
+            case Project(_, _) => te._4
+            case _ => Project(
+              (te._1 ++ te._2).foldLeft(Seq[Attribute]())((ars, e) => ars ++ e.references.toSeq),
+              te._4)
+          }
+          Aggregate(te._1, te._2, newChildOp)
+        }
+      case _ => None
     }
   }
 
