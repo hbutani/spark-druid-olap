@@ -78,7 +78,7 @@ class SparklineDataContext(
   def this(sc: JavaSparkContext) = this(sc.sc)
 
   protected[sql] override def getSQLDialect(): ParserDialect = {
-    new SparklineDataDialect(this, moduleLoader.parsers)
+    new SparklineDataDialect(this, moduleLoader.parsers, moduleLoader.parserTransformers)
   }
 
   override def newSession(): HiveContext = {

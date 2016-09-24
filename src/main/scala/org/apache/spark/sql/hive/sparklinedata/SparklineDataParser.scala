@@ -19,13 +19,15 @@ package org.apache.spark.sql.hive.sparklinedata
 
 import org.apache.spark.sql.catalyst.AbstractSparkSQLParser
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.rules.RuleExecutor
 import org.apache.spark.sql.hive.{HiveContext, HiveQLDialect, HiveQl}
 import org.apache.spark.sql.sparklinedata.commands.{ClearMetadata, ExplainDruidRewrite}
 import org.apache.spark.sql.util.PlanUtil
 
 class SparklineDataDialect(
                             sqlContext: HiveContext,
-                            moduleParserExtensions : Seq[SparklineDataParser] = Nil
+                            moduleParserExtensions : Seq[SparklineDataParser] = Nil,
+                            moduleParserTransforms : Seq[RuleExecutor[LogicalPlan]] = Nil
                           ) extends HiveQLDialect(sqlContext) {
   val parsers = {
     if (moduleParserExtensions.isEmpty) {
@@ -38,10 +40,14 @@ class SparklineDataDialect(
   override def parse(sqlText: String): LogicalPlan = {
     sqlContext.executionHive.withHiveState {
 
-      parsers.foldRight(None:Option[LogicalPlan]) {
+      val parsedPlan = parsers.foldRight(None:Option[LogicalPlan]) {
         case (p, None) => p.parse2(sqlText)
         case (_, Some(lP)) => Some(lP)
       }.getOrElse(HiveQl.parseSql(sqlText))
+
+      moduleParserTransforms.foldRight(parsedPlan){
+        case (rE, lP) => rE.execute(lP)
+      }
     }
   }
 }

@@ -18,26 +18,42 @@
 package org.apache.spark.sql.sparklinedata.shim
 
 import org.apache.spark.sql.SQLConf
-import org.apache.spark.sql.catalyst.analysis.EliminateSubQueries
 import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.catalyst.rules.{Rule, RuleExecutor}
+
+
+trait ShimStrategyToRuleStrategy {
+  self : RuleExecutor[LogicalPlan] =>
+
+  implicit def toStrategy(s : SparkShim.RuleStrategy) : self.Strategy = s match {
+    case SparkShim.Once => self.Once
+    case SparkShim.FixedPoint(m) => self.FixedPoint(m)
+  }
+
+}
 
 case class ExtendedLogicalOptimizer private[shim](conf : SQLConf,
                                  extraRules :
                                  Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])]
-                                ) extends Optimizer(conf) {
-
-  implicit def toStrategy(s : SparkShim.RuleStrategy) : Strategy = s match {
-    case SparkShim.Once => Once
-    case SparkShim.FixedPoint(m) => FixedPoint(m)
-  }
+                                ) extends Optimizer(conf)
+  with ShimStrategyToRuleStrategy {
 
   override val batches =
     DefaultOptimizer(conf).batches.asInstanceOf[List[Batch]] ++
       extraRules.map(b => Batch(b._1, b._2, b._3)).toList
 }
 
+case class
+ParsedLogicalPlanTransform private[shim](conf : SQLConf,
+                                        rules :
+                                        Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])]
+                                       )
+  extends RuleExecutor[LogicalPlan] with ShimStrategyToRuleStrategy {
+
+  override val batches =
+    rules.map(b => Batch(b._1, b._2, b._3)).toList
+}
 
 object SparkShim {
 
@@ -53,6 +69,12 @@ object SparkShim {
                        extraRules : Seq[(String, RuleStrategy, Rule[LogicalPlan])]
                       ) : Optimizer = {
     ExtendedLogicalOptimizer(conf, extraRules)
+  }
+
+  def parsedLogicalPlanTransform(conf : SQLConf,
+                                 rules : Seq[(String, RuleStrategy, Rule[LogicalPlan])]
+                              ) : RuleExecutor[LogicalPlan] = {
+    ParsedLogicalPlanTransform(conf, rules)
   }
 
 }
