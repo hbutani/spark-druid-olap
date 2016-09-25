@@ -119,15 +119,11 @@ lazy val sparkShimProject =
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
   .settings(
-    name := "spl-accelerator",
+    name := s"spl-accel$sparkNamExt",
     libraryDependencies ++= (sparkDependencies ++ coreDependencies ++ coreTestDependencies),
-    assemblyJarName in assembly := s"${name.value}-$sparkVersion-${version.value}.jar",
     assemblyOption in assembly :=
       (assemblyOption in assembly).value.copy(includeScala = false),
-    publishArtifact in (Compile, packageBin) := false,
-    artifact in (Compile, assembly) ~= { art =>
-      art.copy(`classifier` = Some("assembly"), name = s"${art.name}-$sparkVersion")
-    }
+    publishArtifact in (Compile, packageBin) := false
   )
   .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
   .dependsOn(
