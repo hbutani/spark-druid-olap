@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.sparklinedata
 
+import org.apache.spark.Logging
 import org.apache.spark.sql.SQLConf.SQLConfEntry._
 import org.apache.spark.sql.{SQLContext, Strategy}
 import org.apache.spark.sql.catalyst.ScalaReflection
@@ -117,7 +118,7 @@ class ModuleLoader(sqlContext : SparklineDataContext,
 
 }
 
-object ModuleLoader {
+object ModuleLoader extends Logging {
 
   private var modules : Seq[SparklineDataModule] = _
 
@@ -130,9 +131,12 @@ object ModuleLoader {
 
       modules = Seq(BaseModule) ++
         modulesToLoad.map { m =>
+
           val module = runtimeMirror.staticModule(m)
           val obj = runtimeMirror.reflectModule(module)
-          obj.instance.asInstanceOf[SparklineDataModule]
+          val o = obj.instance.asInstanceOf[SparklineDataModule]
+          log.info(s"loaded sparklinedata module '$m'")
+          o
         }
     }
   }
