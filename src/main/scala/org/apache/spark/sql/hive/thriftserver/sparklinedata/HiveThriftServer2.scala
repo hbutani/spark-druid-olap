@@ -32,6 +32,7 @@ import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
 import org.apache.spark.sql.hive.thriftserver.sparklinedata.ui.DruidQueriesTab
 import org.apache.spark.sql.hive.thriftserver.ui.ThriftServerTab
 import org.apache.spark.sql.hive.thriftserver.{SparkSQLCLIDriver, SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
+import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 import org.apache.spark.{Logging, SparkConf, SparkContext}
 
@@ -94,7 +95,9 @@ object HiveThriftServer2 extends Logging {
     sqlContext.sparkContext.addSparkListener(hs2Listener)
     RealHiveThriftServer2.uiTab =
       if (sqlContext.sparkContext.getConf.getBoolean("spark.ui.enabled", true)) {
-        Some(new DruidQueriesTab(sqlContext.sparkContext))
+        if (DruidPlanner.getConfValue(sqlContext, DruidPlanner.DRUID_RECORD_QUERY_EXECUTION)) {
+          Some(new DruidQueriesTab(sqlContext.sparkContext))
+        }
         Some(new ThriftServerTab(sqlContext.sparkContext))
       } else {
         None

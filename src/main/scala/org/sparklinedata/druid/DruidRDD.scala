@@ -99,7 +99,14 @@ class DruidRDD(sqlContext: SQLContext,
                drInfo : DruidRelationInfo,
                 val dQuery : DruidQuery)  extends  RDD[InternalRow](sqlContext.sparkContext, Nil) {
 
-  val druidQueryAcc : DruidQueryExecutionMetric = new DruidQueryExecutionMetric()
+  val recordDruidQuery = DruidPlanner.getConfValue(sqlContext,
+    DruidPlanner.DRUID_RECORD_QUERY_EXECUTION
+  )
+  val druidQueryAcc : DruidQueryExecutionMetric = if (recordDruidQuery) {
+    new DruidQueryExecutionMetric()
+  } else {
+    null
+  }
   val numSegmentsPerQuery = dQuery.numSegmentsPerQuery
   val useSmile = dQuery.useSmile
   val schema = dQuery.schema(drInfo)
@@ -169,24 +176,27 @@ class DruidRDD(sqlContext: SQLContext,
 
     context.addTaskCompletionListener{ context =>
       val queryExecTime = (System.currentTimeMillis() - qrySTime)
-      druidQueryAcc.add(
-        DruidQueryExecutionView(
-          context.stageId,
-          context.partitionId(),
-          context.taskAttemptId(),
-          s"${client.host}:${client.port}",
-          if (p.segIntervals == null) None else {
-            Some(
-              p.segIntervals.map(t => (t._1.identifier, t._2.toString))
-            )
-          },
-          qrySTimeStr,
-          druidExecTime,
-          queryExecTime,
-          numRows,
-          Utils.queryToString(mQry)
+      if (recordDruidQuery) {
+        druidQueryAcc.add(
+          DruidQueryExecutionView(
+            context.stageId,
+            context.partitionId(),
+            context.taskAttemptId(),
+            s"${client.host}:${client.port}",
+            if (p.segIntervals == null) None
+            else {
+              Some(
+                p.segIntervals.map(t => (t._1.identifier, t._2.toString))
+              )
+            },
+            qrySTimeStr,
+            druidExecTime,
+            queryExecTime,
+            numRows,
+            Utils.queryToString(mQry)
+          )
         )
-      )
+      }
       dr.closeIfNeeded()
     }
 

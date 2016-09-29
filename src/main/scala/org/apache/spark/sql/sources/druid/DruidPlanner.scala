@@ -183,6 +183,12 @@ object DruidPlanner {
     doc = "for druid queries use the smile binary protocol"
   )
 
+  val DRUID_RECORD_QUERY_EXECUTION = booleanConf(
+    "spark.sparklinedata.enable.druid.query.history",
+    defaultValue = Some(false),
+    doc = "track each druid query executed from every Spark Executor."
+  )
+
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
       case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery
