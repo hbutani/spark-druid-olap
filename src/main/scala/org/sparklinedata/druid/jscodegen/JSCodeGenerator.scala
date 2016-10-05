@@ -31,6 +31,9 @@ import scala.collection.mutable
 import scala.language.reflectiveCalls
 
 
+// TODO: Track nullability of each JSEXpr & and add null check if rqd.
+//       Metrics & Time DIM can't be null; Non TIME_DIM DIM or VCOLS of Metric/TIME_DIM
+//       using conditional exprs can have NULL values.
 case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAllowed: Boolean,
                            metricAllowed: Boolean, tz_id: String,
                            retType: DataType = StringType) extends Logging {
@@ -50,7 +53,6 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
       (
         s"""
             ${dateTimeCtx.dateTimeInitCode}
-            ${fnb.linesSoFar}
             ${rStmt.linesSoFar}""".stripMargin, rStmt.getRef)
     }
 
@@ -96,7 +98,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                 dD.isInstanceOf[DruidTimeDimension])
               val cs = JSCast(jE, e.dataType, this).castCode
               cs.map( cs =>
-                JSExpr(cs.fnVar, jE.linesSoFar + cs.linesSoFar, cs.getRef, e.dataType)
+                JSExpr(cs.fnVar, cs.linesSoFar, cs.getRef, e.dataType)
               )
             }
           }.get
@@ -259,65 +261,63 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
 
         case ToDate(de) =>
           for (fn <- genExprCode(de); cFn <- JSCast(fn, DateType, this).castCode)
-            yield JSExpr(None, fn.linesSoFar + cFn.linesSoFar, cFn.getRef, DateType)
+            yield JSExpr(None, cFn.linesSoFar, cFn.getRef, DateType)
         case DateAdd(sd, nd) =>
           for (sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode;
                nde <- genExprCode(nd); cnde <- JSCast(nde, IntegerType, this).castCode;
-               ade <- JSCast(new JSExpr(dateAdd(csde.getRef, cnde.getRef), DateType),
+               ade <- JSCast(JSExpr(None, csde.linesSoFar + cnde.linesSoFar,
+                 dateAdd(csde.getRef, cnde.getRef), DateType),
                  StringType, this).castCode)
-            yield JSExpr(None,
-              sde.linesSoFar + csde.linesSoFar + nde.linesSoFar + cnde.linesSoFar + ade.linesSoFar,
-              ade.getRef, StringType)
+            yield JSExpr(None, ade.linesSoFar, ade.getRef, StringType)
         case DateSub(sd, nd) =>
           for (sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode;
                nde <- genExprCode(nd); cnde <- JSCast(nde, IntegerType, this).castCode)
-            yield JSExpr(None,
-              sde.linesSoFar + csde.linesSoFar + nde.linesSoFar + cnde.linesSoFar,
+            yield JSExpr(None, csde.linesSoFar + cnde.linesSoFar,
               dateSub(csde.getRef, cnde.getRef), DateType)
         case DateDiff(ed, sd) =>
           for (ede <- genExprCode(ed); cede <- JSCast(ede, DateType, this).castCode;
                sde <- genExprCode(sd); csde <- JSCast(sde, DateType, this).castCode)
             yield JSExpr(None,
-              ede.linesSoFar + cede.linesSoFar + sde.linesSoFar + csde.linesSoFar,
+              cede.linesSoFar + csde.linesSoFar,
               dateDiff(cede.getRef, csde.getRef), IntegerType)
         case Year(y) =>
           for (ye <- genExprCode(y); cye <- JSCast(ye, DateType, this).castCode) yield
-            JSExpr(None, ye.linesSoFar + cye.linesSoFar, dTYear(cye.getRef), IntegerType)
+            JSExpr(None, cye.linesSoFar, dTYear(cye.getRef), IntegerType)
         case Quarter(q) =>
           for (qe <- genExprCode(q); cqe <- JSCast(qe, DateType, this).castCode) yield
-            JSExpr(None, qe.linesSoFar + cqe.linesSoFar, dTQuarter(cqe.getRef), IntegerType)
+            JSExpr(None, cqe.linesSoFar, dTQuarter(cqe.getRef), IntegerType)
         case Month(mo) =>
           for (moe <- genExprCode(mo); cmoe <- JSCast(moe, DateType, this).castCode)
             yield
-              JSExpr(None, moe.linesSoFar + cmoe.linesSoFar, dTMonth(cmoe.getRef), IntegerType)
+              JSExpr(None, cmoe.linesSoFar, dTMonth(cmoe.getRef), IntegerType)
         case DayOfMonth(d) =>
           for (de <- genExprCode(d); cde <- JSCast(de, DateType, this).castCode)
             yield
-              JSExpr(None, de.linesSoFar + cde.linesSoFar, dTDayOfMonth(cde.getRef), IntegerType)
+              JSExpr(None, cde.linesSoFar, dTDayOfMonth(cde.getRef), IntegerType)
         case WeekOfYear(w) =>
           for (we <- genExprCode(w); cwe <- JSCast(we, DateType, this).castCode)
             yield
-              JSExpr(None, we.linesSoFar + cwe.linesSoFar, dTWeekOfYear(cwe.getRef), IntegerType)
+              JSExpr(None, cwe.linesSoFar, dTWeekOfYear(cwe.getRef), IntegerType)
         case Hour(h) =>
           for (he <- genExprCode(h); che <- JSCast(he, TimestampType, this).castCode)
             yield
-              JSExpr(None, he.linesSoFar + che.linesSoFar, dTHour(che.getRef), IntegerType)
+              JSExpr(None, che.linesSoFar, dTHour(che.getRef), IntegerType)
         case Minute(m) =>
           for (me <- genExprCode(m); cme <- JSCast(me, TimestampType, this).castCode)
             yield
-              JSExpr(None, me.linesSoFar + cme.linesSoFar, dTMinute(cme.getRef), IntegerType)
+              JSExpr(None, cme.linesSoFar, dTMinute(cme.getRef), IntegerType)
         case Second(s) =>
           for (se <- genExprCode(s); cse <- JSCast(se, TimestampType, this).castCode)
             yield
-              JSExpr(None, se.linesSoFar + cse.linesSoFar, dTSecond(cse.getRef), IntegerType)
+              JSExpr(None, cse.linesSoFar, dTSecond(cse.getRef), IntegerType)
         case FromUnixTime(s, f) if f.isInstanceOf[Literal] =>
           for (se <- genExprCode(s); cse <- JSCast(se, LongType, this).castCode) yield
-            JSExpr(None, se.linesSoFar + cse.linesSoFar,
+            JSExpr(None, cse.linesSoFar,
               dtToStrCode(longToISODTCode(cse.getRef, dateTimeCtx),
                 s""""${f.toString()}"""".stripMargin), StringType)
         case UnixTimestamp(t, f) if f.isInstanceOf[Literal] =>
           for (te <- genExprCode(t); cte <- JSCast(te, TimestampType, this).castCode) yield
-            JSExpr(None, te.linesSoFar + cte.linesSoFar,
+            JSExpr(None, cte.linesSoFar,
               dtToSecondsCode(cte.getRef), LongType)
         case TruncDate(d, f@Literal(v, _)) if v.isInstanceOf[UTF8String] =>
           for (de <- genExprCode(d); tr <- trunc(de.getRef, f.value.toString)) yield
@@ -473,7 +473,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
   private[this] def genCastExprCode(e: Expression, dt: DataType): Option[JSExpr] = {
     for (fn <- genExprCode(ExprUtil.simplifyCast(e, dt));
          cs <- JSCast(fn, dt, this).castCode) yield
-      JSExpr(cs.fnVar, fn.linesSoFar + cs.linesSoFar, cs.getRef, dt)
+      JSExpr(cs.fnVar, cs.linesSoFar, cs.getRef, dt)
   }
 
   private[this] def validInParams(inParam: String): Boolean = {

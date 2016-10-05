@@ -85,13 +85,12 @@ class FilterPlanningTest extends PlanningTest {
       Some(
         new JavascriptFilterSpec("javascript",
           "o_orderdate",
-          "function (o_orderdate) {\n" +
-            "            \n" +
-            "            var v1 = new org.joda.time.DateTimeZone.forID(\"UTC\");var v2 = org.joda.time.format.ISODateTimeFormat.dateTimeParser();var v3 = v2.withZone(v1);\n" +
-            "              \n" +
-            "            \n" +
-            "\n" +
-            "            return(((org.joda.time.DateTime.parse((((org.joda.time.LocalDate.parse(o_orderdate, v2).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3)).compareTo((new org.joda.time.DateTime(870480000000, v1))) <= 0));\n" +
+          "function (o_orderdate) {\n            \n            " +
+            "var v1 = new org.joda.time.DateTimeZone.forID(\"UTC\");var v2 = org.joda.time.format.ISODateTimeFormat.dateTimeParser();" +
+            "var v3 = v2.withZone(v1);\n            " +
+            "var v4 = (org.joda.time.LocalDate.parse(o_orderdate, v2).toString(\"yyyy-MM-dd\"));  \n\n            " +
+            "return(((org.joda.time.DateTime.parse(((((v4 != null) ? v4.toString() : \"\")).concat(\" 00:00:00\"))." +
+            "replace(\" \", \"T\"), v3)).compareTo((new org.joda.time.DateTime(870480000000, v1))) <= 0));\n" +
             "            }")
       )
     )
@@ -107,14 +106,14 @@ class FilterPlanningTest extends PlanningTest {
       Some(
         new JavascriptFilterSpec("javascript",
           "__time",
-          "function (__time) {\n" +
-            "            \n" +
-            "            var v1 = new org.joda.time.DateTimeZone.forID(\"UTC\");var v2 = org.joda.time.format.ISODateTimeFormat.dateTimeParser();var v3 = v2.withZone(v1);\n" +
-            "              \n" +
-            "            \n" +
-            "\n" +
-            "            return((org.joda.time.DateTime.parse((((new org.joda.time.LocalDate(__time, v1).toString(\"yyyy-MM-dd\"))).concat(\" 00:00:00\")).replace(\" \", \"T\"), v3).toLocalDate().getMonthOfYear())  <  (4));\n" +
-            "            }")
+          "function (__time) {\n            \n            " +
+            "var v1 = new org.joda.time.DateTimeZone.forID(\"UTC\");" +
+            "var v2 = org.joda.time.format.ISODateTimeFormat.dateTimeParser();" +
+            "var v3 = v2.withZone(v1);\n            " +
+            "var v4 = (new org.joda.time.LocalDate(__time, v1).toString(\"yyyy-MM-dd\"));  \n\n  " +
+            "          return((org.joda.time.DateTime.parse(((((v4 != null) ? v4.toString() : \"\")" +
+            ").concat(\" 00:00:00\")).replace(\" \", \"T\"), v3)." +
+            "toLocalDate().getMonthOfYear())  <  (4));\n            }")
       )
     )
   }
@@ -129,13 +128,8 @@ class FilterPlanningTest extends PlanningTest {
       Some(
         new JavascriptFilterSpec("javascript",
           "s_name",
-          "function (s_name) {\n" +
-            "            \n" +
-            "            \n" +
-            "            \n" +
-            "            \n\n" +
-            """            return(((s_name).toUpperCase())  ==  ("S1"));
-            |            }""".stripMargin)
+          "function (s_name) {\n            \n            \n            \n\n            " +
+            "return(((s_name).toUpperCase())  ==  (\"S1\"));\n            }")
       )
     )
   }
@@ -149,13 +143,8 @@ class FilterPlanningTest extends PlanningTest {
       Some(
         new JavascriptFilterSpec("javascript",
           "s_name",
-          "function (s_name) {\n" +
-            "            \n" +
-            "            \n" +
-            "            \n" +
-            "            \n\n" +
-            """            return((((s_name) || ("no-supp")))  ==  ("S1"));
-              |            }""".stripMargin)
+          "function (s_name) {\n            \n            \n            \n\n            " +
+            "return((((s_name) || (\"no-supp\")))  ==  (\"S1\"));\n            }")
       )
     )
   }

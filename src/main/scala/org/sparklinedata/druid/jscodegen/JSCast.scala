@@ -20,12 +20,16 @@ package org.sparklinedata.druid.jscodegen
 import org.apache.spark.sql.types._
 import org.sparklinedata.druid.jscodegen.JSDateTimeCtx._
 
-case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
+// TODO: Track nullability of each JSEXpr & and add null safe casting if rqd.
+//       Metrics & Time DIM can't be null; Non TIME_DIM DIM or VCOLS of Metric/TIME_DIM
+//       using conditional exprs can have NULL values.
+
+case class JSCast(from: JSExpr, toDT: DataType, ctx: JSCodeGenerator) {
   private[jscodegen] val castCode: Option[JSExpr] =
-    to match {
-      case _ if ((to == from.fnDT && (!from.timeDim || to != StringType)) ||
+    toDT match {
+      case _ if ((toDT == from.fnDT && (!from.timeDim || toDT != StringType)) ||
         from.fnDT == NullType) =>
-        Some(new JSExpr(from.getRef, StringType))
+        Some(JSExpr(None,from.linesSoFar, from.getRef, StringType))
       case BooleanType => castToBooleanCode
       case ShortType => castToShortCode
       case IntegerType => castToNumericCode(IntegerType)
@@ -40,29 +44,29 @@ case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
 
   private[this] def castToBooleanCode: Option[JSExpr] = from.fnDT match {
     case StringType | IntegerType | LongType | FloatType | DoubleType =>
-      Some(new JSExpr(s"Boolean(${from.getRef})", BooleanType))
+      Some(JSExpr(None, from.linesSoFar, s"Boolean(${from.getRef})", BooleanType))
     case DateType =>
       // Hive would return null when cast from date to boolean
-      Some(new JSExpr(s"null", BooleanType))
+      // TODO: review this; Shouldn't this be "" ?
+      Some(JSExpr(None, from.linesSoFar, s"null", BooleanType))
     case TimestampType =>
-      Some(new JSExpr(s"Boolean(${from.getRef}.getMillis())", BooleanType))
+      Some(JSExpr(None, from.linesSoFar, s"Boolean(${from.getRef}.getMillis())", BooleanType))
     case _ => None
   }
-
 
   // TODO: enable support for Decimal (if Decimal is not represented by Number)
   private[this] def castToNumericCode(outDt: DataType): Option[JSExpr] =
     from.fnDT match {
       case BooleanType | StringType =>
-        Some(new JSExpr(s"Number(${from.getRef})", outDt))
+        Some(JSExpr(None, from.linesSoFar, s"Number(${from.getRef})", outDt))
       case (FloatType | DoubleType) if ctx.SPIntegralNumeric(outDt) =>
-        Some (new JSExpr(s"Math.round(${from.getRef})", outDt))
+        Some (JSExpr(None, from.linesSoFar, s"Math.round(${from.getRef})", outDt))
       case ShortType | IntegerType | LongType| FloatType | DoubleType  =>
-        Some (new JSExpr(from.getRef, outDt))
+        Some (JSExpr(None, from.linesSoFar, from.getRef, outDt))
       case DateType =>
-        Some(new JSExpr(s"null", outDt))
+        Some(JSExpr(None, from.linesSoFar, s"null", outDt))
       case TimestampType =>
-        Some(new JSExpr(s"Number(${dtToLongCode(from.getRef)})", outDt))
+        Some(JSExpr(None, from.linesSoFar, s"Number(${dtToLongCode(from.getRef)})", outDt))
       case _ => None
     }
 
@@ -74,33 +78,35 @@ case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
 
   private[this] def castToStringCode: Option[JSExpr] = from.fnDT match {
     case ShortType | IntegerType | LongType | FloatType | DoubleType | DecimalType() =>
-      Some(new JSExpr(s"${from.getRef}.toString()", StringType))
+      nullSafeCastToString(from.getRef)
     case DateType =>
-      Some(new JSExpr(dateToStrCode(from.getRef), StringType))
+      nullSafeCastToString(dateToStrCode(from.getRef))
     case TimestampType =>
-      Some(new JSExpr(dtToStrCode(from.getRef), StringType))
+      nullSafeCastToString(dtToStrCode(from.getRef))
     case StringType if from.timeDim =>
-      Some(new JSExpr(dtToStrCode(longToISODTCode(from.getRef, ctx.dateTimeCtx)), StringType))
+      nullSafeCastToString(dtToStrCode(longToISODTCode(from.getRef, ctx.dateTimeCtx)))
     case _ => None
   }
 
   // TODO: Handle parsing failure as in Spark
   private[this] def castToDateCode: Option[JSExpr] = from.fnDT match {
     case StringType =>
-      Some(new JSExpr(if (from.timeDim) {longToDateCode(from.getRef, ctx.dateTimeCtx)}
+      Some(JSExpr(None, from.linesSoFar,
+        if (from.timeDim) {longToDateCode(from.getRef, ctx.dateTimeCtx)}
       else {stringToDateCode(from.getRef, ctx.dateTimeCtx)}, DateType))
     case TimestampType =>
-      Some(new JSExpr(dtToDateCode(from.getRef), DateType))
+      Some(JSExpr(None, from.linesSoFar, dtToDateCode(from.getRef), DateType))
     case _ => None
   }
 
   // TODO: Support for DecimalType. Handle Double/Float isNaN/isInfinite
   private[this] def castToTimestampCode: Option[JSExpr] = from.fnDT match {
     case StringType =>
-      Some(new JSExpr(if (from.timeDim) {longToISODTCode(from.getRef, ctx.dateTimeCtx)}
-      else {stringToISODTCode(from.getRef, ctx.dateTimeCtx)}, TimestampType))
+      Some(JSExpr(None, from.linesSoFar,
+        if (from.timeDim) {longToISODTCode(from.getRef, ctx.dateTimeCtx)}
+        else {stringToISODTCode(from.getRef, ctx.dateTimeCtx)}, TimestampType))
     case BooleanType =>
-      Some(new JSExpr(stringToISODTCode
+      Some(JSExpr(None, from.linesSoFar, stringToISODTCode
       (s"((${from.getRef}) == true ? T00:00:01Z : T00:00:00Z)", ctx.dateTimeCtx),
         TimestampType))
     case FloatType | DoubleType | DecimalType() =>
@@ -108,9 +114,22 @@ case class JSCast(from: JSExpr, to: DataType, ctx: JSCodeGenerator) {
         JSExpr(None, le.linesSoFar, longToISODTCode(le.getRef, ctx.dateTimeCtx),
           TimestampType)
     case ShortType | IntegerType | LongType =>
-      Some(new JSExpr(longToISODTCode(from.getRef, ctx.dateTimeCtx), TimestampType))
-    case DateType => Some(new JSExpr(localDateToDTCode(from.getRef, ctx.dateTimeCtx),
-      TimestampType))
+      Some(JSExpr(None, from.linesSoFar,
+        longToISODTCode(from.getRef, ctx.dateTimeCtx), TimestampType))
+    case DateType => Some(JSExpr(None, from.linesSoFar,
+      localDateToDTCode(from.getRef, ctx.dateTimeCtx), TimestampType))
     case _ => None
+  }
+
+  private[this] def nullSafeCastToString(valToCast: String): Option[JSExpr] = {
+    if (from.fnVar.isEmpty) {
+      val v1 = ctx.makeUniqueVarName
+      Some(JSExpr(None, from.linesSoFar + s"var $v1 = $valToCast;",
+        s"""(($v1 != null) ? $v1.toString() : "")""".stripMargin, StringType))
+    } else {
+      Some(JSExpr(None, from.linesSoFar,
+        s"""(($valToCast != null) ? $valToCast.toString() : "")""".stripMargin,
+        StringType))
+    }
   }
 }

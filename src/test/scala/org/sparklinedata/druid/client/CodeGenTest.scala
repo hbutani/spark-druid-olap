@@ -842,6 +842,18 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     """.stripMargin
     ,1,true,true)
 
+  test("if3",
+    """
+      |select o_orderstatus as a,
+      |date_format(cast(o_orderdate as date), 'yy') as b,
+      |if(date_format(cast(o_orderdate as date), 'yy') = 94, 1, null) as c
+      |from orderLineItemPartSupplier
+      |group by o_orderstatus, date_format(cast(o_orderdate as date), 'yy'),
+      |if(date_format(cast(o_orderdate as date), 'yy') = 94, 1, null)
+      |order by a, b, c
+    """.stripMargin
+    ,1,true,true)
+
   test("substr1",
     """
       |select o_orderstatus as x, date_format(cast(o_orderdate as date), 'YYY') y,
