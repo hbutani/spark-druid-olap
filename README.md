@@ -5,7 +5,7 @@ Sparkline BI Accelerator
 **Documentation:** [Overview](https://github.com/SparklineData/spark-druid-olap/wiki/Overview), [Quick Start Guide](https://github.com/SparklineData/spark-druid-olap/wiki/Quick-Start-Guide), [User Guide](https://github.com/SparklineData/spark-druid-olap/wiki/User-Guide), [Dev. Guide](https://github.com/SparklineData/spark-druid-olap/wiki/Dev.-Guide) <br/>
 **Mailing List:** [User Mailing List](http://groups.google.com/group/sparklinedata) <br/>
 **License:** [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0) <br/>
-**Continuous Integration:** [![Build Status](https://travis-ci.org/SparklineData/spark-druid-olap.svg?branch=master)](https://travis-ci.org/SparklineData/spark-druid-olap)
+**Continuous Integration:** [![Build Status](https://travis-ci.org/SparklineData/spark-druid-olap.svg?branch=master)](https://travis-ci.org/SparklineData/spark-druid-olap) <br/>
 **Company:** [Sparkline Data](http://sparklinedata.com/) <br/>
 
 The Sparkline BI Accelerator is a [Spark](http://spark.apache.org/) native [Business Intelligence Stack](https://en.wikipedia.org/wiki/Business_intelligence) geared towards providing fast ad-hoc querying over a Logical Cube(aka Star-Schema). It simplifies how enterprises can provide

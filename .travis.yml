@@ -6,4 +6,4 @@ jdk:
 sudo: false
 script:
   - sbt -jvm-opts travis/jvmopts.compile compile
-  - sbt -jvm-opts travis/jvmopts.test test > /tmp/sbt.out 2>&1
+  - travis_wait 40 sbt -jvm-opts travis/jvmopts.test test > /tmp/sbt.out 2>&1
