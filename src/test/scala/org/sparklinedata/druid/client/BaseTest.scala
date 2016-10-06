@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.client
 
 import java.util.TimeZone
-
+import java.io.File
 import org.apache.spark.Logging
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.Row
@@ -30,7 +30,11 @@ import org.apache.spark.sql.util.ExprUtil
 import org.joda.time.DateTimeZone
 import org.scalatest.{BeforeAndAfterAll, fixture}
 import org.sparklinedata.druid._
+import org.sparklinedata.druid.testenv.{DruidTestCluster}
 import org.sparklinedata.spark.dateTime.Functions._
+import org.sparklinedata.druid.RetryUtils._
+
+import scala.language.reflectiveCalls
 
 trait DruidQueryChecks {
 
@@ -166,6 +170,8 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
     |}
   """.stripMargin.replace('\n', ' ')
 
+  def zkConnectString : String = DruidTestCluster.zkConnectString
+
   val olFlatCreateTable =
     s"""CREATE TABLE if not exists orderLineItemPartSupplierBase(o_orderkey integer,
              o_custkey integer,
@@ -192,13 +198,14 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
 
   def olDruidDS(db : String = "default",
                 table : String = "orderLineItemPartSupplierBase",
-                dsName : String = "orderLineItemPartSupplier") =
+                dsName : String = "orderLineItemPartSupplier"
+               ) =
     s"""CREATE TABLE if not exists $dsName
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "$db.$table",
       timeDimensionColumn "l_shipdate",
       druidDatasource "tpch",
-      druidHost "localhost",
+      druidHost '$zkConnectString',
       zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
       numProcessingThreadsPerHistorical '1',
@@ -206,7 +213,39 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
       functionalDependencies '$functionalDependencies',
       starSchema '$flatStarSchema')""".stripMargin
 
+  def ensureDruidIndex(dataSource: String,
+                       indexTask: File)(
+                        numTries: Int = Int.MaxValue, start: Int = 200, cap: Int = 5000
+                      ): Unit = {
+    if (!DruidTestCluster.indexExists(dataSource)) {
+      val overlordClient = new DruidOverlordClient("localhost", DruidTestCluster.overlordPort)
+      val taskId: String = retryOnError(ifException[DruidDataSourceException])(
+        "submit indexing task", {
+          overlordClient.submitTask(indexTask)
+        }
+      )(numTries, start, cap)
+      overlordClient.waitUntilTaskCompletes(taskId)
+    }
+
+    val coordClient = new DruidCoordinatorClient("localhost", DruidTestCluster.coordinatorPort)
+    retryOnError(ifException[DruidDataSourceException])(
+      "index metadata", {
+        coordClient.dataSourceInfo(dataSource)
+      }
+    )(numTries, start, cap)
+  }
+
   override def beforeAll() = {
+
+    val tpchIndexTask = Utils.createTempFileFromTemplate(
+      "tpch_index_task.json.template",
+      Map(
+        ":DATA_DIR:" ->
+          "src/test/resources/tpch/datascale1/orderLineItemPartSupplierCustomer.small"
+      ),
+      "tpch_index_task",
+      "json"
+    )
 
     System.setProperty("user.timezone", "UTC")
     TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
@@ -217,6 +256,8 @@ abstract class BaseTest extends fixture.FunSuite with DruidQueryChecks with
 
     register(TestHive)
     // DruidPlanner(TestHive)
+
+    ensureDruidIndex("tpch", tpchIndexTask)(10, 1000 * 1, 1000 * 10)
 
     val cT = olFlatCreateTable
 

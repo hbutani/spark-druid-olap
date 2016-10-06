@@ -79,7 +79,7 @@ class MultiDBTest extends StarSchemaBaseTest with BeforeAndAfterAll with Logging
       OPTIONS (sourceDataframe "default.lineItemBase",
       timeDimensionColumn "l_shipdate",
       druidDatasource "tpch",
-      druidHost "localhost",
+      druidHost '$zkConnectString',
       zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
       numProcessingThreadsPerHistorical '1',

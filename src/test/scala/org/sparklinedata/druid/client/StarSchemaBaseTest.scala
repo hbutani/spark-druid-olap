@@ -313,7 +313,7 @@ class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
       OPTIONS (sourceDataframe "lineItemBase",
       timeDimensionColumn "l_shipdate",
       druidDatasource "tpch",
-      druidHost "localhost",
+      druidHost '$zkConnectString',
       zkQualifyDiscoveryNames "true",
       columnMapping '$colMapping',
       numProcessingThreadsPerHistorical '1',

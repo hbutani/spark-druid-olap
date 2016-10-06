@@ -18,17 +18,17 @@
 package org.sparklinedata.druid.client
 
 import org.scalatest.{BeforeAndAfterAll, fixture}
-
 import org.sparklinedata.druid.{DruidQueryGranularity, NoneGranularity}
 import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationOptions, NonAggregateQueryHandling}
 import org.sparklinedata.druid.DefaultSource
+import org.sparklinedata.druid.testenv.DruidTestCluster
 
 class CuratorConnectionTest extends fixture.FunSuite with
   fixture.TestDataFixture {
 
   test("test1") { td =>
 
-    val zkHosts : String = "localhost"
+    val zkHosts : String = s"${DruidTestCluster.zkConnectString}"
     val options : DruidRelationOptions = DruidRelationOptions(
       1000L,
       1000L,

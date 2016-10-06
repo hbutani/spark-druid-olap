@@ -13,6 +13,8 @@ val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
 val sparkdateTimeVersion = "0.0.2"
 val scoptVersion = "3.3.0"
+val druidVersion = "0.9.1"
+val guava_version = "16.0.1"
 
 val coreDependencies = Seq(
   "com.github.nscala-time" %% "nscala-time" % nscalaVersion,
@@ -29,6 +31,16 @@ val coreDependencies = Seq(
 val coreTestDependencies = Seq(
   "org.scalatest" %% "scalatest" % scalatestVersion % "test",
   "com.databricks" %% "spark-csv" % "1.1.0" % "test"
+)
+val druidTestEnvDependencies =Seq(
+  "com.google.guava" % "guava" % guava_version force(),
+  "org.apache.derby" % "derby" % "10.10.2.0" force(),
+  "com.sun.jersey" % "jersey-servlet" % "1.17.1" % "test" force(),
+  "com.metamx" %% "scala-util" % "1.11.6" exclude("log4j", "log4j") force(),
+  "com.metamx" % "java-util" % "0.27.9" exclude("log4j", "log4j") force(),
+  "io.druid" % "druid-server" % druidVersion,
+  "io.druid" % "druid-services" % druidVersion,
+  "org.apache.curator" % "curator-test" % "2.4.0" % "test" exclude("log4j", "log4j") force()
 )
 
 lazy val commonSettings = Seq(
@@ -116,6 +128,11 @@ lazy val spark1_6_2 = project.in(file("shims/spark-1.6.2"))
 lazy val sparkShimProject =
   if (sparkVersion == sparkVersion_161 ) spark1_6_1 else spark1_6_2
 
+lazy val druidTestEnv = project.in(file("druidTestEnv"))
+  .settings(
+    libraryDependencies ++= (coreTestDependencies ++ druidTestEnvDependencies)
+  )
+
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
   .settings(
@@ -128,5 +145,6 @@ lazy val root = project.in(file("."))
   .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
   .dependsOn(
     sparkShimProject
-  )
+  ).
+  dependsOn(druidTestEnv % "test->test")
 

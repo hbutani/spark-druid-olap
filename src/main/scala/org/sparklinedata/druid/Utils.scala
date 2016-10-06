@@ -17,13 +17,17 @@
 
 package org.sparklinedata.druid
 
+import java.io.{File, InputStreamReader}
+
+import com.google.common.base.Charsets
+import com.google.common.io.{CharStreams, Files}
 import org.apache.spark.Logging
 import org.joda.time.{DateTimeZone, Interval}
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
 import org.json4s.{Extraction, ShortTypeHints}
-import org.sparklinedata.druid.client.{QueryResultRowSerializer, SelectResultRowSerializer, TopNResultRowSerializer}
+import org.sparklinedata.druid.client.{OverlordTaskStatus, QueryResultRowSerializer, SelectResultRowSerializer, TopNResultRowSerializer}
 import org.sparklinedata.druid.metadata._
 
 import scala.util.Random
@@ -89,6 +93,7 @@ object Utils extends Logging {
   ) +
     new EnumNameSerializer(FunctionalDependencyType) +
     new EnumNameSerializer(DruidDataType) +
+    new EnumNameSerializer(OverlordTaskStatus) +
     new DruidQueryGranularitySerializer +
     new QueryResultRowSerializer +
     new SelectResultRowSerializer +
@@ -135,6 +140,21 @@ object Utils extends Logging {
     intervals.foldLeft(0L) {
       case (t, i) => t + (i.getEndMillis - i.getStartMillis)
     }
+  }
+
+  def createTempFileFromTemplate(templateResource: String,
+                                 replacements: Map[String, String],
+                                 fileNamePrefix: String,
+                                 fileNameSuffix: String): File = {
+    val stream = getClass.getClassLoader.getResourceAsStream(templateResource)
+    val text = CharStreams.toString(new InputStreamReader(stream, Charsets.UTF_8))
+    val configFile = File.createTempFile(fileNamePrefix, s".$fileNameSuffix")
+    Files.write(replacements.foldLeft(text)(
+      (a, kv) => a.replace(kv._1, kv._2)
+    ),
+      configFile, Charsets.UTF_8)
+    configFile.deleteOnExit()
+    configFile
   }
 }
 

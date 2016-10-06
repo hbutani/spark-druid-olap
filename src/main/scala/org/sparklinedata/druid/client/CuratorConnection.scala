@@ -26,7 +26,7 @@ import org.apache.curator.framework.recipes.cache.PathChildrenCache.StartMode
 import org.apache.curator.framework.recipes.cache.{ChildData, PathChildrenCache, PathChildrenCacheEvent, PathChildrenCacheListener}
 import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.BoundedExponentialBackoffRetry
-import org.apache.curator.utils.ZKPaths
+import org.apache.curator.utils.{CloseableUtils, ZKPaths}
 import org.apache.spark.Logging
 import org.apache.spark.util.SparklineThreadUtils
 import org.sparklinedata.druid.{DruidDataSourceException, Utils}
@@ -138,6 +138,9 @@ class CuratorConnection(val zkHosts : String,
   announcementsCache.start(StartMode.BUILD_INITIAL_CACHE)
   serverSegmentsPathCache.start(StartMode.POST_INITIALIZED_EVENT)
 
+  // trigger loading class CloseableUtils
+  CloseableUtils.closeQuietly(null)
+
   SparklineThreadUtils.addShutdownHook {() =>
     Try {announcementsCache.close()}
     Try {serverSegmentsPathCache.close()}
@@ -149,7 +152,7 @@ class CuratorConnection(val zkHosts : String,
         }
       }
     }
-    Try {framework.close()}
+    Try {CloseableUtils.closeQuietly(framework)}
   }
 
   /*

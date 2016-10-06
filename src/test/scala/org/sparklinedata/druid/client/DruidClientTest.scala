@@ -23,6 +23,7 @@ import org.json4s.Extraction
 import org.json4s.jackson.JsonMethods._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import org.sparklinedata.druid.Utils
+import org.sparklinedata.druid.testenv.DruidTestCluster
 
 class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
 
@@ -34,8 +35,8 @@ class DruidClientTest extends FunSuite with BeforeAndAfterAll with TestUtils {
   import Utils._
 
   override def beforeAll() = {
-    brokerClient = new DruidQueryServerClient("localhost", 8082)
-    coordClient = new DruidCoordinatorClient("localhost", 8081)
+    brokerClient = new DruidQueryServerClient("localhost", DruidTestCluster.brokerPort)
+    coordClient = new DruidCoordinatorClient("localhost", DruidTestCluster.coordinatorPort)
   }
 
   test("timeBoundary") {

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/>
+        </Console>
+        <RollingFile name="file" fileName=":DRUIDLOGS:/${sys:druid.log.servicename}.log" filePattern=":DRUIDLOGS:/${sys:druid.log.serviceName}.log.%i">
+          <PatternLayout>
+            <pattern>%d{dd/MMM/yyyy HH:mm:ss,SSS}- %c{1}: %m%n</pattern>
+          </PatternLayout>
+          <Policies>
+            <SizeBasedTriggeringPolicy size="10 MB" />
+          </Policies>
+          <DefaultRolloverStrategy max="9" />
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+        <AppenderRef ref="file"/>
+      </Root>
+      <logger name="io.druid" level="info">
+        <AppenderRef ref="file"/>
+      </logger>
+    </Loggers>
+</Configuration>
