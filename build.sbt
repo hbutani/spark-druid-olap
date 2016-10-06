@@ -110,7 +110,8 @@ lazy val commonSettings = Seq(
 
       </developers>),
 
-  fork in Test := true
+  fork in Test := false,
+  parallelExecution in Test := false
 ) ++ releaseSettings ++ Seq(
   ReleaseKeys.publishArtifactsAction := PgpKeys.publishSigned.value
 )
