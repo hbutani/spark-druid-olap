@@ -40,7 +40,7 @@ val druidTestEnvDependencies =Seq(
   "com.metamx" % "java-util" % "0.27.9" exclude("log4j", "log4j") force(),
   "io.druid" % "druid-server" % druidVersion,
   "io.druid" % "druid-services" % druidVersion,
-  "org.apache.curator" % "curator-test" % "2.4.0" % "test" exclude("log4j", "log4j") force()
+  "org.apache.curator" % "curator-test" % "2.4.0" % "test" exclude("log4j", "log4j")  force()
 )
 
 lazy val commonSettings = Seq(
@@ -141,7 +141,8 @@ lazy val root = project.in(file("."))
     libraryDependencies ++= (sparkDependencies ++ coreDependencies ++ coreTestDependencies),
     assemblyOption in assembly :=
       (assemblyOption in assembly).value.copy(includeScala = false),
-    publishArtifact in (Compile, packageBin) := false
+    publishArtifact in (Compile, packageBin) := false,
+    publishArtifact in Test := true
   )
   .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
   .dependsOn(

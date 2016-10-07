@@ -46,3 +46,6 @@ build/sbt-launch-*.jar
 #druid
 druidRuntime/
 derby.log
+
+#customer
+src/test/scala/org/sparklinedata/druid/client/test/customer/
