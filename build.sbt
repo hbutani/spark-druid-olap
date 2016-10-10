@@ -40,7 +40,8 @@ val druidTestEnvDependencies =Seq(
   "com.metamx" % "java-util" % "0.27.9" exclude("log4j", "log4j") force(),
   "io.druid" % "druid-server" % druidVersion,
   "io.druid" % "druid-services" % druidVersion,
-  "org.apache.curator" % "curator-test" % "2.4.0" % "test" exclude("log4j", "log4j")  force()
+  "org.apache.curator" % "curator-test" % "2.4.0" % "test" exclude("log4j", "log4j")  force(),
+  "io.druid.extensions" % "druid-datasketches" % druidVersion
 )
 
 lazy val commonSettings = Seq(

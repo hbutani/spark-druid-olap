@@ -1,0 +1,89 @@
+{
+  "type": "index",
+  "spec": {
+    "dataSchema": {
+      "dataSource": "zipCodes",
+      "parser": {
+        "type": "string",
+        "parseSpec": {
+          "format": "tsv",
+          "timestampSpec": {
+            "column": "record_date",
+            "format": "iso"
+          },
+          "columns": [
+            "record_date",
+            "zip_code",
+            "lat",
+            "long",
+            "city",
+            "state",
+            "county",
+            "coordinates"
+          ],
+          "delimiter": ",",
+          "dimensionsSpec": {
+            "dimensions": [
+              "zip_code",
+              "state",
+              "county"
+            ],
+            "dimensionExclusions": [],
+            "spatialDimensions": [
+              {
+                "dimName": "coordinates",
+                "dims": ["lat", "long"]
+              }
+            ]
+          }
+        }
+      },
+      "metricsSpec": [
+        {
+          "type": "count",
+          "name": "count"
+        },
+        { "type" : "hyperUnique",
+          "name" : "unique_city",
+          "fieldName" : "city"
+        },
+        {
+          "type" : "thetaSketch",
+          "name" : "city_sketch",
+          "fieldName" : "city",
+          "isInputThetaSketch": false,
+          "size": 16384
+        }
+      ],
+      "granularitySpec": {
+        "type": "uniform",
+        "segmentGranularity": "MONTH",
+        "queryGranularity": "all",
+        "intervals": [
+          "2015-01-01/2016-12-31"
+        ]
+      }
+    },
+    "ioConfig": {
+      "type": "index",
+      "firehose": {
+        "type": "local",
+        "baseDir": ":DATA_DIR:",
+        "filter": "*.csv"
+      }
+    },
+    "tuningConfig": {
+      "type": "index",
+      "partitionsSpec": {
+        "type": "hashed",
+        "targetPartitionSize": 5000000
+      },
+      "leaveIntermediate": false,
+      "cleanupOnFailure": true,
+      "overwriteFiles": false,
+      "ignoreInvalidRows": false
+    }
+  },
+  "context" : {
+  }
+}
