@@ -95,11 +95,18 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
      * and not an epoch.
      */
     val replaceTimeReferencedDruidColumns = dqb1.referencedDruidColumns.mapValues {
-      case dtc@DruidTimeDimension(_, _, sz, card) => DruidDimension(
-        DruidDataSource.EVENT_TIMESTAMP_KEY_NAME,
-        DruidDataType.String,
-        sz,
-        card)
+      case dtc if dtc.isTimeDimension => DruidRelationColumn(
+        dtc.column,
+        Some(DruidDimension(
+          DruidDataSource.EVENT_TIMESTAMP_KEY_NAME,
+          DruidDataType.String,
+          dtc.size,
+          dtc.cardinality)),
+        dtc.spatialIndex,
+        dtc.hllMetric,
+        dtc.sketchMetric,
+        dtc.cardinalityEstimate
+      )
       case dc => dc
     }
 
@@ -146,11 +153,11 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
      */
 
     if (dims.isEmpty ) {
-      dims = Seq(dqb1.drInfo.druidDS.dimensions.head)
+      dims = Seq(DruidRelationColumn(dqb1.drInfo.druidDS.dimensions.head))
     }
 
     if (metrics.isEmpty ) {
-      metrics = Seq(dqb1.drInfo.druidDS.metrics.values.head)
+      metrics = Seq(DruidRelationColumn(dqb1.drInfo.druidDS.metrics.values.head))
     }
 
     /*

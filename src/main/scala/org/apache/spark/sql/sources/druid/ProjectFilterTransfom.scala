@@ -150,14 +150,14 @@ trait ProjectFilterTransfom {
     case _ => None
   }
 
-  private def javascriptFilter(dC : DruidColumn,
+  private def javascriptFilter(dC : DruidRelationColumn,
                        compOp : String,
                        value : Any) : FilterSpec = {
 
     JavascriptFilterSpec.create(dC.name, compOp, value.toString)
   }
 
-  private def boundFilter(dC : DruidColumn,
+  private def boundFilter(dC : DruidRelationColumn,
                   lowerValue : Option[Any],
                   lowerStrict : Boolean,
                   upperValue : Option[Any],
@@ -178,7 +178,7 @@ trait ProjectFilterTransfom {
   }
 
   private def compOp(dDS : DruidDataSource,
-             dC : DruidColumn,
+             dC : DruidRelationColumn,
              value : Any,
              sparkDT : DataType,
              compOp : String) : FilterSpec = {

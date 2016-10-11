@@ -80,22 +80,22 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
         case AttributeReference(nm, dT, _, _) =>
           for (dD <- dqb.druidColumn(nm);
                v = dqb.druidColumn(nm).get.name
-               if ((dD.isInstanceOf[DruidTimeDimension] ||
-                 (metricAllowed && dD.isInstanceOf[DruidMetric]) ||
-                 dD.isInstanceOf[DruidDimension]) && validInParams(v))) yield {
+               if ((dD.isTimeDimension ||
+                 (metricAllowed && dD.isMetric) ||
+                 dD.isDimension()) && validInParams(v))) yield {
             /*
              * If dim is __time, treat it like a String
              * TODO : why, should be treated like a timestamp
              * else if the Spark and Druid datatypes for a column don't match then
              * add in a cast for the generated JavaScript.
              */
-            if ( dD.isInstanceOf[DruidTimeDimension] ) {
+            if ( dD.isTimeDimension ) {
               Some(new JSExpr(v, StringType, true))
             } else if (DruidDataType.sparkDataType(dD.dataType) == dT ) {
-              Some(new JSExpr(v, e.dataType, dD.isInstanceOf[DruidTimeDimension]))
+              Some(new JSExpr(v, e.dataType, dD.isTimeDimension))
             } else {
               val jE = new JSExpr(v, DruidDataType.sparkDataType(dD.dataType),
-                dD.isInstanceOf[DruidTimeDimension])
+                dD.isTimeDimension)
               val cs = JSCast(jE, e.dataType, this).castCode
               cs.map( cs =>
                 JSExpr(cs.fnVar, cs.linesSoFar, cs.getRef, e.dataType)

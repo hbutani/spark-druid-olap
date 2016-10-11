@@ -53,7 +53,7 @@ trait AggregateTransform {
   Option[DruidQueryBuilder] = {
     expandOpExp match {
       case AttributeReference(nm, dT, _, _) if dqb.isDruidNonTimeDimension(nm) => {
-        for (dD <- dqb.druidColumn(nm) if dD.isInstanceOf[DruidDimension])
+        for (dD <- dqb.druidColumn(nm) if dD.isDimension())
           yield dqb.dimension(new DefaultDimensionSpec(dD.name, nm)).
             outputAttribute(nm, ge, ge.dataType, DruidDataType.sparkDataType(dD.dataType))
       }
@@ -453,7 +453,7 @@ trait AggregateTransform {
       val r = for (c <- aggFunc.children.headOption if (aggFunc.children.size == 1);
                    dNm <- attributeRef(c);
                    dD <-
-                   dqb.druidColumn(dNm) if dD.isInstanceOf[DruidDimension]
+                   dqb.druidColumn(dNm) if dD.isDimension()
       ) yield (aggFunc, dD)
 
       r flatMap {
@@ -481,21 +481,21 @@ trait AggregateTransform {
 
       val r = for (c <- aggFunc.children.headOption if (aggFunc.children.size == 1);
                    mNm <- attributeRef(c);
-                   dM <- dqb.druidColumn(mNm) if dM.isInstanceOf[DruidMetric];
+                   dM <- dqb.druidColumn(mNm) if dM.isMetric;
                    mDT <- Some(DruidDataType.sparkDataType(dM.dataType));
                    commonType <- HiveTypeCoercion.findTightestCommonTypeOfTwo(
                      aggFunc.dataType, mDT) if (commonType == mDT || aggFunc.isInstanceOf[Average])
       ) yield (aggFunc, commonType, dM)
 
       r flatMap {
-        case (p: Sum, LongType, dM) => Some(("longSum", dM))
-        case (p: Sum, DoubleType, dM) => Some(("doubleSum", dM))
-        case (p: Min, LongType, dM) => Some(("longMin", dM))
-        case (p: Min, DoubleType, dM) => Some(("doubleMin", dM))
-        case (p: Max, LongType, dM) => Some(("longMax", dM))
-        case (p: Max, DoubleType, dM) => Some(("doubleMax", dM))
-        case (p: Average, LongType, dM) => Some(("avg", dM))
-        case (p: Average, DoubleType, dM) => Some(("avg", dM))
+        case (p: Sum, LongType, dM) => Some(("longSum", dM.metric))
+        case (p: Sum, DoubleType, dM) => Some(("doubleSum", dM.metric))
+        case (p: Min, LongType, dM) => Some(("longMin", dM.metric))
+        case (p: Min, DoubleType, dM) => Some(("doubleMin", dM.metric))
+        case (p: Max, LongType, dM) => Some(("longMax", dM.metric))
+        case (p: Max, DoubleType, dM) => Some(("doubleMax", dM.metric))
+        case (p: Average, LongType, dM) => Some(("avg", dM.metric))
+        case (p: Average, DoubleType, dM) => Some(("avg", dM.metric))
         case _ => None
       }
     }

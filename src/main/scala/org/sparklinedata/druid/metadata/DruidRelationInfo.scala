@@ -40,7 +40,7 @@ case class DruidRelationInfo(val fullName : DruidRelationName,
                          val sourceDFName : String,
                             val timeDimensionCol : String,
                          val druidDS : DruidDataSource,
-                         val sourceToDruidMapping : Map[String, DruidColumn],
+                             val sourceToDruidMapping : Map[String, DruidRelationColumn],
                          val fd : FunctionalDependencies,
                             val starSchema : StarSchema,
                          val options : DruidRelationOptions) {
@@ -135,24 +135,57 @@ private[druid] object MappingBuilder extends Logging {
     case _ => false
   }
 
-  def buildMapping(sqlContext : SQLContext,
-                  sourceDFName : String,
-                    starSchema : StarSchema,
-                   nameMapping : Map[String, String],timeDimensionCol : String,
-                   druidDS : DruidDataSource) : Map[String, DruidColumn] = {
+  private def fillInColumnInfos(sqlContext : SQLContext,
+                                sourceDFName : String,
+                                starSchema : StarSchema,
+                                 nameMapping : Map[String, String],
+                                 columnInfos : List[DruidRelationColumnInfo],
+                                 timeDimensionCol : String,
+                                 druidDS : DruidDataSource
+                               ) : Map[String, DruidRelationColumnInfo] = {
 
-    val m = MMap[String, DruidColumn]()
+    val userProvidedInfo = columnInfos.map(i => i.column -> i).toMap
+    val m = MMap[String, DruidRelationColumnInfo]()
+
+    starSchema.tableMap.values.foreach { t =>
+      val tName = if (t.name == starSchema.factTable.name) sourceDFName else t.name
+      val df = sqlContext.table(tName)
+      df.schema.iterator.foreach { f =>
+        val cInfo = userProvidedInfo.getOrElse(f.name,
+          DruidRelationColumnInfo(f.name,
+            Some(nameMapping.getOrElse(f.name, f.name))
+          )
+        )
+        m += (f.name -> cInfo)
+      }
+    }
+
+    m.toMap
+  }
+
+  def buildMapping(sqlContext : SQLContext,
+                   sourceDFName : String,
+                   starSchema : StarSchema,
+                   nameMapping : Map[String, String],
+                    columnInfos : List[DruidRelationColumnInfo],
+                    timeDimensionCol : String,
+                   druidDS : DruidDataSource) : Map[String, DruidRelationColumn] = {
+
+    val m = MMap[String, DruidRelationColumn]()
+    val colInfoMap = fillInColumnInfos(sqlContext, sourceDFName,
+      starSchema, nameMapping, columnInfos, timeDimensionCol, druidDS)
 
     starSchema.tableMap.values.foreach { t =>
       val tName = if ( t.name == starSchema.factTable.name) sourceDFName else t.name
       val df = sqlContext.table(tName)
       df.schema.iterator.foreach { f =>
         if (supportedDataType(f.dataType)) {
-          val dCol = druidDS.columns.get(nameMapping.getOrElse(f.name, f.name))
-          if (f.name == timeDimensionCol) {
-            m += (f.name -> druidDS.timeDimension.get)
-          } else if (dCol.isDefined) {
-            m += (f.name -> dCol.get)
+          val colInfo = colInfoMap(f.name)
+          val dC = DruidRelationColumn(druidDS, timeDimensionCol, colInfo)
+          if (dC.isDefined) {
+            m += (f.name -> dC.get)
+          } else {
+            logDebug(s"${f.name} not mapped to Druid dataSource, illegal ColumnInfo $colInfo")
           }
         } else {
           logDebug(s"${f.name} not mapped to Druid dataSource, unsupported dataType")

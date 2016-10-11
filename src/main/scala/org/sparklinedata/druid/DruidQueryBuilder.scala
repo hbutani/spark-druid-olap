@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.expressions.{Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.types.DataType
 import org.sparklinedata.druid.metadata.{DruidColumn, DruidRelationInfo}
+import org.sparklinedata.druid.metadata.DruidRelationColumn
 
 import scala.collection.mutable
 
@@ -52,7 +53,7 @@ import scala.collection.mutable
  */
 case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
                              queryIntervals: QueryIntervals,
-                             referencedDruidColumns : MMap[String,DruidColumn] = MMap(),
+                             referencedDruidColumns : MMap[String,DruidRelationColumn] = MMap(),
                              dimensions: List[DimensionSpec] = Nil,
                              limitSpec: Option[LimitSpec] = None,
                              havingSpec: Option[HavingSpec] = None,
@@ -144,7 +145,7 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
     druidColumn(name).map(_.isDimension(true)).getOrElse(false)
   }
 
-  def druidColumn(name: String): Option[DruidColumn] = {
+  def druidColumn(name: String): Option[DruidRelationColumn] = {
     drInfo.sourceToDruidMapping.get(projectionAliasMap.getOrElse(name, name)).map { dc =>
       referencedDruidColumns(name) = dc
       dc

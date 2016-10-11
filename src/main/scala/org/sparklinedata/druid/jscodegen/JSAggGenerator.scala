@@ -141,7 +141,7 @@ object JSAggGenerator {
     e match {
       case Cast(a@AttributeReference(nm, _, _, _), TimestampType)
         if dqb.druidColumn(nm).nonEmpty &&
-          dqb.druidColumn(nm).get.isInstanceOf[DruidTimeDimension] =>
+          dqb.druidColumn(nm).get.isTimeDimension =>
           Some((Cast(a, LongType), "toTSWithTZAdj"))
       case _ => Some(e, null)
     }

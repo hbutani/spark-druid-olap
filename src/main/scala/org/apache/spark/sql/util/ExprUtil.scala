@@ -203,7 +203,10 @@ object ExprUtil {
       val c = dqb.druidColumn(a.name)
       if (c.nonEmpty) {
         c.get match {
-          case DruidDimension(_, _, _, _) if a.isInstanceOf[AttributeReference] =>
+            // TODO: revisit
+            // for now treat spatialIndex, hllMetric and sketchMetric
+            // as not nullable
+          case d if d.isDimension(true) && a.isInstanceOf[AttributeReference] =>
             s1 = s1 :+ a.asInstanceOf[AttributeReference]
           case _ => None
         }

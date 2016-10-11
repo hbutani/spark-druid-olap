@@ -191,7 +191,7 @@ trait DruidRelationInfoCache {
       options)._2
     val sourceToDruidMapping =
       MappingBuilder.buildMapping(sqlContext, sourceDFName,
-        starSchema, columnMapping, timeDimensionCol, druidDS)
+        starSchema, columnMapping, List(), timeDimensionCol, druidDS)
     val fd = new FunctionalDependencies(druidDS, functionalDeps,
       DependencyGraph(druidDS, functionalDeps))
 

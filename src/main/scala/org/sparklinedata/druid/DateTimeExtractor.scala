@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.ExprUtil
 import org.joda.time.DateTime
-import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataSource}
+import org.sparklinedata.druid.metadata.{DruidColumn, DruidDataSource, DruidRelationColumn}
 import org.sparklinedata.spark.dateTime.Functions._
 
 object PeriodExtractor {
@@ -132,7 +132,7 @@ class DateTimeWithZoneExtractor(val dqb : DruidQueryBuilder) {
 
   val rExtractor = this
 
-  def unapply(e : Expression) : Option[(String, DruidColumn, Option[String])] = e match {
+  def unapply(e : Expression) : Option[(String, DruidRelationColumn, Option[String])] = e match {
     case ScalaUDF(fn, _, Seq(AttributeReference(nm, _, _, _)), _)
       if fn == dateTimeFn  => {
       val dC = dqb.druidColumn(nm)
@@ -176,7 +176,8 @@ class TimeElementExtractor(val dqb : DruidQueryBuilder) {
   )
   val dateTimeWithZoneExtractor = new DateTimeWithZoneExtractor(dqb)
 
-  def unapply(e : Expression) : Option[(String, DruidColumn, Option[String], String)] = e match {
+  def unapply(e : Expression) :
+  Option[(String, DruidRelationColumn, Option[String], String)] = e match {
     case ScalaUDF(fn, _, Seq(dateTimeWithZoneExtractor((nm, dC, tz))), _)
       if functionToFormatMap.contains(fn)  => {
       val fmt = functionToFormatMap(fn)
@@ -206,7 +207,7 @@ class TimeElementExtractor(val dqb : DruidQueryBuilder) {
   */
 case class DateTimeGroupingElem(
                                outputName : String,
-                               druidColumn : DruidColumn,
+                               druidColumn : DruidRelationColumn,
                                formatToApply : String,
                                tzForFormat : Option[String],
                                pushedExpression : Expression,
@@ -214,7 +215,7 @@ case class DateTimeGroupingElem(
                                )
 
 class DruidColumnExtractor(val dqb : DruidQueryBuilder) {
-  def unapply(e : Expression) : Option[DruidColumn] = e match {
+  def unapply(e : Expression) : Option[DruidRelationColumn] = e match {
     case AttributeReference(nm, _, _, _) => {
       val dC = dqb.druidColumn(nm)
       dC.filter(_.isDimension())
