@@ -17,6 +17,8 @@
 
 package org.sparklinedata.druid.client.test
 
+import java.io.File
+
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
@@ -31,17 +33,31 @@ class QueryExtTest extends AbstractTest {
 
     super.beforeAll()
 
-    val zipCodesTask = Utils.createTempFileFromTemplate(
+    def zipCodeIndexTask(idxTemplate : String,
+                  taskName : String) : File = {
+      Utils.createTempFileFromTemplate(
+        idxTemplate,
+        Map(
+          ":DATA_DIR:" ->
+            "src/test/resources/zipCodes/sample"
+        ),
+        taskName,
+        "json"
+      )
+    }
+
+    val zipCodesTask = zipCodeIndexTask(
       "zip_code.json.template",
-      Map(
-        ":DATA_DIR:" ->
-          "src/test/resources/zipCodes/sample"
-      ),
-      "zipcode_index_task",
-      "json"
+      "zipcode_index_task"
+    )
+
+    val zipCodeAllsTask = zipCodeIndexTask(
+      "zip_codeAll.json.template",
+      "zipcodeAll_index_task"
     )
 
     ensureDruidIndex("zipCodes", zipCodesTask)(15, 1000 * 1, 1500 * 10)
+    ensureDruidIndex("zipCodesAll", zipCodeAllsTask)(15, 1000 * 1, 1500 * 10)
 
     val zipCodesTable =
       s"""CREATE TABLE if not exists zipCodesBase(
