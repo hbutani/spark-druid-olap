@@ -81,7 +81,24 @@ trait TestUtils {
   }
 }
 
-object DruidTestCluster extends TestUtils with FreePortFinder {
+trait DruidCluster {
+  def zkConnectString : String
+  def indexExists(dataSource: String): Boolean
+  def overlordPort: Int
+  def coordinatorPort: Int
+  def brokerPort: Int
+  def historicalPort: Int
+}
+
+object DruidCluster {
+  lazy val instance : DruidCluster = if (true) {
+    DruidTestCluster
+  } else {
+    LocalCluster
+  }
+}
+
+object DruidTestCluster extends TestUtils with FreePortFinder with DruidCluster {
 
   val DRUID_RUNTIME_DIR = "druidRuntime"
   val DRUID_RUNTIME_LOCAL_STORAGE = s"$DRUID_RUNTIME_DIR/localStorage"
@@ -268,4 +285,13 @@ object DruidTestCluster extends TestUtils with FreePortFinder {
 
   }
 
+}
+
+object LocalCluster extends DruidCluster {
+  def zkConnectString : String = "localhost"
+  def indexExists(dataSource: String): Boolean = true
+  def overlordPort: Int = 8090
+  def coordinatorPort: Int = 8081
+  def brokerPort: Int = 8082
+  def historicalPort: Int = 8083
 }

@@ -14,7 +14,7 @@ val json4sVersion = "3.2.10"
 val sparkdateTimeVersion = "0.0.2"
 val scoptVersion = "3.3.0"
 val druidVersion = "0.9.1"
-val guava_version = "16.0.1"
+val derbyVersion = "10.11.1.1"
 
 val coreDependencies = Seq(
   "com.github.nscala-time" %% "nscala-time" % nscalaVersion,
@@ -34,7 +34,9 @@ val coreTestDependencies = Seq(
 )
 val druidTestEnvDependencies =Seq(
   "com.google.guava" % "guava" % guava_version force(),
-  "org.apache.derby" % "derby" % "10.10.2.0" force(),
+  "org.apache.derby" % "derby" % derbyVersion force(),
+  "org.apache.derby" % "derbyclient" % derbyVersion force(),
+  "org.apache.derby" % "derbynet" % derbyVersion force(),
   "com.sun.jersey" % "jersey-servlet" % "1.17.1" % "test" force(),
   "com.metamx" %% "scala-util" % "1.11.6" exclude("log4j", "log4j") force(),
   "com.metamx" % "java-util" % "0.27.9" exclude("log4j", "log4j") force(),

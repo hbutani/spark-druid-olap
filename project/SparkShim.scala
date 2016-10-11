@@ -11,8 +11,10 @@ object SparkShim {
   val sparkNamExt = if (sparkVersion == "1.6.1") "-onesixone" else ""
   val sparkVersion_161 = "1.6.1"
   val sparkVersion_162 = "1.6.2"
+  val guava_version = "16.0.1"
 
   val spark161Dependencies = Seq(
+    "com.google.guava" % "guava" % guava_version % "provided" force(),
     "org.apache.spark" %% "spark-core" % sparkVersion_161 % "provided",
     "org.apache.spark" %% "spark-sql" % sparkVersion_161 % "provided",
     "org.apache.spark" %% "spark-hive" % sparkVersion_161 % "provided",
@@ -20,6 +22,8 @@ object SparkShim {
   )
 
   val spark162Dependencies = Seq(
+    "com.google.guava" % "guava" % guava_version % "provided" force(),
+
     "org.apache.spark" %% "spark-core" % sparkVersion_162 % "provided",
     "org.apache.spark" %% "spark-sql" % sparkVersion_162 % "provided",
     "org.apache.spark" %% "spark-hive" % sparkVersion_162 % "provided",

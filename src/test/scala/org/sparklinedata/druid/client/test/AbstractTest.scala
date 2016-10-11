@@ -32,7 +32,7 @@ import org.scalatest.{BeforeAndAfterAll, fixture}
 import org.sparklinedata.druid.RetryUtils._
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.client.{DruidCoordinatorClient, DruidOverlordClient}
-import org.sparklinedata.druid.testenv.DruidTestCluster
+import org.sparklinedata.druid.testenv.DruidCluster
 
 import scala.language.reflectiveCalls
 
@@ -56,14 +56,14 @@ trait DruidQueryChecks {
 class AbstractTest extends fixture.FunSuite with DruidQueryChecks with
   fixture.TestDataFixture with BeforeAndAfterAll with Logging {
 
-  def zkConnectString : String = DruidTestCluster.zkConnectString
+  def zkConnectString : String = DruidCluster.instance.zkConnectString
 
   def ensureDruidIndex(dataSource: String,
                        indexTask: File)(
                         numTries: Int = Int.MaxValue, start: Int = 200, cap: Int = 5000
                       ): Unit = {
-    if (!DruidTestCluster.indexExists(dataSource)) {
-      val overlordClient = new DruidOverlordClient("localhost", DruidTestCluster.overlordPort)
+    if (!DruidCluster.instance.indexExists(dataSource)) {
+      val overlordClient = new DruidOverlordClient("localhost", DruidCluster.instance.overlordPort)
       val taskId: String = retryOnError(ifException[DruidDataSourceException])(
         "submit indexing task", {
           overlordClient.submitTask(indexTask)
@@ -72,7 +72,8 @@ class AbstractTest extends fixture.FunSuite with DruidQueryChecks with
       overlordClient.waitUntilTaskCompletes(taskId)
     }
 
-    val coordClient = new DruidCoordinatorClient("localhost", DruidTestCluster.coordinatorPort)
+    val coordClient = new DruidCoordinatorClient("localhost",
+      DruidCluster.instance.coordinatorPort)
     retryOnError(ifException[DruidDataSourceException])(
       "index metadata", {
         coordClient.dataSourceInfo(dataSource)
