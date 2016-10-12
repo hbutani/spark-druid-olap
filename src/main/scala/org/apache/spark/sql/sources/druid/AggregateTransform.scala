@@ -407,9 +407,17 @@ trait AggregateTransform {
       val c = t._2
       val a = dqb.nextAlias
       (dqb, c, expandOpProjection, aEExprIdToPos) match {
-        case CountDistinctAggregate(dN) =>
-          Some(dqb.aggregate(new CardinalityAggregationSpec(a, List(dN))).
-            outputAttribute(a, aggExp, aggExp.dataType, DoubleType))
+        case ApproximateCountAggregate(fn, dN) => {
+          fn match {
+            case "cardinality" =>
+              Some(dqb.aggregate(new CardinalityAggregationSpec(a, List(dN))).
+                outputAttribute(a, aggExp, aggExp.dataType, DoubleType))
+            case "hyperUnique" =>
+              Some(dqb.aggregate(new HyperUniqueAggregationSpec(a, dN)).
+                outputAttribute(a, aggExp, aggExp.dataType, DoubleType))
+            case _ => None
+          }
+        }
         case SumMinMaxAvgAggregate(t) => t._1 match {
           case "avg" => {
             val dC: DruidColumn = t._2
@@ -441,9 +449,9 @@ trait AggregateTransform {
     }
   }
 
-  private object CountDistinctAggregate {
+  private object ApproximateCountAggregate {
     def unapply(t: (DruidQueryBuilder, AggregateFunction, Seq[Expression], Map[ExprId, Int])):
-    Option[(String)]
+    Option[(String, String)]
     = {
       val dqb = t._1
       val aggFunc = t._2
@@ -453,11 +461,16 @@ trait AggregateTransform {
       val r = for (c <- aggFunc.children.headOption if (aggFunc.children.size == 1);
                    dNm <- attributeRef(c);
                    dD <-
-                   dqb.druidColumn(dNm) if dD.isDimension()
+                   dqb.druidColumn(dNm) if dD.isDimension(true) || dD.hasHLLMetric
       ) yield (aggFunc, dD)
 
       r flatMap {
-        case (p: HyperLogLogPlusPlus, dD) if dqb.drInfo.options.pushHLLTODruid => Some(dD.name)
+        case (p: HyperLogLogPlusPlus, dD)
+          if dqb.drInfo.options.pushHLLTODruid && dD.hasHLLMetric =>
+          Some(("hyperUnique", dD.hllMetric.get.name))
+        case (p: HyperLogLogPlusPlus, dD)
+          if dqb.drInfo.options.pushHLLTODruid =>
+          Some(("cardinality", dD.name))
         case _ => None
       }
     }

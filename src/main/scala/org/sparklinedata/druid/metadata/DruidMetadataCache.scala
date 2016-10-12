@@ -174,15 +174,16 @@ trait DruidRelationInfoCache {
 
   // scalastyle:off parameter.number
   def druidRelation(sqlContext: SQLContext,
-                             sourceDFName: String,
-                             sourceDF: DataFrame,
-                             dsName: String,
-                             timeDimensionCol: String,
-                             druidHost: String,
-                             columnMapping: Map[String, String],
-                             functionalDeps: List[FunctionalDependency],
-                             starSchema: StarSchema,
-                             options: DruidRelationOptions): DruidRelationInfo = {
+                    sourceDFName: String,
+                    sourceDF: DataFrame,
+                    dsName: String,
+                    timeDimensionCol: String,
+                    druidHost: String,
+                    columnMapping: Map[String, String],
+                    columnInfos: List[DruidRelationColumnInfo],
+                    functionalDeps: List[FunctionalDependency],
+                    starSchema: StarSchema,
+                    options: DruidRelationOptions): DruidRelationInfo = {
 
     val fullName = DruidRelationName(starSchema.factTable.name, druidHost, dsName)
 
@@ -191,7 +192,7 @@ trait DruidRelationInfoCache {
       options)._2
     val sourceToDruidMapping =
       MappingBuilder.buildMapping(sqlContext, sourceDFName,
-        starSchema, columnMapping, List(), timeDimensionCol, druidDS)
+        starSchema, columnMapping, columnInfos, timeDimensionCol, druidDS)
     val fd = new FunctionalDependencies(druidDS, functionalDeps,
       DependencyGraph(druidDS, functionalDeps))
 

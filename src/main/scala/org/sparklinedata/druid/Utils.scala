@@ -87,7 +87,8 @@ object Utils extends Logging {
         classOf[SelectSpecWithIntervals],
         classOf[SelectSpecWithSegmentIntervals],
         classOf[PeriodGranularity],
-        classOf[DurationGranularity]
+        classOf[DurationGranularity],
+        classOf[DruidRelationColumnInfo]
       )
     )
   ) +

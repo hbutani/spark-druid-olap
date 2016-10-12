@@ -137,12 +137,24 @@ object DruidRelationColumn {
         )
         )
       }
-      case (None, Some(sI), None, None)
+      case (odC, Some(sI), None, None)
         if druidDS.columns.contains(sI.druidColumn) &&
           druidDS.columns(sI.druidColumn).isDimension() => {
+
+        val drC = if (odC.isDefined) {
+          apply(druidDS,
+            timeDimensionCol,
+            colInfo.copy(spatialIndex = None)
+          )
+        } else None
+
+        if ( odC.isDefined && !drC.isDefined) {
+          return None
+        }
+
         Some(
         new DruidRelationColumn(colInfo.column,
-          None,
+          drC.flatMap(_.druidColumn),
           Some(
             SpatialDruidDimension(druidDS.columns(sI.druidColumn).asInstanceOf[DruidDimension],
             sI.spatialPosition, sI.minValue, sI.maxValue)
@@ -152,8 +164,19 @@ object DruidRelationColumn {
         )
         )
       }
-      case (None, None, hllMetric, sketchMetric)
+      case (odC, None, hllMetric, sketchMetric)
         if hllMetric.isDefined || sketchMetric.isDefined => {
+
+        val drC = if (odC.isDefined) {
+          apply(druidDS,
+            timeDimensionCol,
+            colInfo.copy(hllMetric = None, sketchMetric = None)
+          )
+        } else None
+
+        if ( odC.isDefined && !drC.isDefined) {
+          return None
+        }
 
         var hllM : Option[DruidMetric] = None
         var sketchM : Option[DruidMetric] = None
@@ -176,7 +199,7 @@ object DruidRelationColumn {
 
         if (hllM.isDefined || sketchM.isDefined) {
           Some(new DruidRelationColumn(colInfo.column,
-            None,
+            drC.flatMap(_.druidColumn),
             None,
             hllM, sketchM,
             colInfo.cardinalityEstimate

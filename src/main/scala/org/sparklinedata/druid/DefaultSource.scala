@@ -68,6 +68,11 @@ class DefaultSource extends RelationProvider with Logging {
         o.obj.map(t => (t._1, t._2.values.toString)).toMap
       }.getOrElse(Map())
 
+    val columnInfos: List[DruidRelationColumnInfo] =
+      parameters.get(SOURCE_TO_DRUID_INFO).map { s =>
+        parse(s).extract[List[DruidRelationColumnInfo]]
+      }.getOrElse(List())
+
     val fds: List[FunctionalDependency] = parameters.get(FUNCTIONAL_DEPENDENCIES_PARAM).map { s =>
       parse(s).extract[List[FunctionalDependency]]
     }.getOrElse(List())
@@ -174,6 +179,7 @@ class DefaultSource extends RelationProvider with Logging {
       timeDimensionCol,
       druidHost,
       columnMapping,
+      columnInfos,
       fds,
       ss.right.get,
       options)
@@ -219,6 +225,12 @@ object DefaultSource {
     * Specified as a json string.
     */
   val SOURCE_TO_DRUID_NAME_MAP_PARAM = "columnMapping"
+
+  /**
+    * List of [[DruidRelationColumnInfo]] that provide details about the source column
+    * to Druid linkages.
+    */
+  val SOURCE_TO_DRUID_INFO = "columnInfos"
 
   /**
     * Specify how columns are related, see

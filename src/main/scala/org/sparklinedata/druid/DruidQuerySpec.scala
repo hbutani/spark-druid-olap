@@ -277,6 +277,17 @@ case class CardinalityAggregationSpec(val `type`: String,
   def sparkDataType(dDS : DruidDataSource) : DataType = DoubleType
 }
 
+case class HyperUniqueAggregationSpec(val `type`: String,
+                                      val name: String,
+                                      val fieldName : String) extends AggregationSpec {
+
+  def this(name: String,
+           fieldName: String) = this("hyperUnique", name, fieldName)
+
+  def sparkDataType(dDS : DruidDataSource) : DataType = DoubleType
+
+}
+
 /**
  * In SQL this is an invocation on a special JSAgg function. Its signature is
  * JSAggLong(metricCol, aggFnCode, combineFnCode, resetFnCode). Similar kind of

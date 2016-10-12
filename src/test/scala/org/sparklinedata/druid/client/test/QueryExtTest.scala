@@ -22,12 +22,26 @@ import java.io.File
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
+import org.json4s.Extraction
 import org.sparklinedata.druid._
+import org.sparklinedata.druid.metadata.{DruidRelationColumnInfo, SpatialDruidDimensionInfo}
 
 import scala.language.reflectiveCalls
+import scala.reflect.ClassTag
 
-class QueryExtTest extends AbstractTest {
+abstract class QueryExtTest extends AbstractTest {
 
+  def hasAgg[T <: AggregationSpec : ClassTag](dq : DruidQuery) : Boolean = {
+    if ( !dq.q.isInstanceOf[AggQuerySpec]) return false
+    val aggQ = dq.q.asInstanceOf[AggQuerySpec]
+    aggQ.aggregations.find {
+      case a:T => true
+      case _ => false
+    }.isDefined
+  }
+
+  def hasHLLAgg(dq : DruidQuery) : Boolean = hasAgg[HyperUniqueAggregationSpec](dq)
+  def hasCardinalityAgg(dq : DruidQuery) : Boolean = hasAgg[CardinalityAggregationSpec](dq)
 
   override def beforeAll() = {
 
@@ -73,18 +87,49 @@ class QueryExtTest extends AbstractTest {
       OPTIONS (path "src/test/resources/zipCodes/sample/zip_codes_states.csv",
       header "false", delimiter ",")""".stripMargin
 
-    def zcDruidDS(db : String = "default",
+    def zcDruidDSColInfos(isFull : Boolean) = {
+      val l = List(
+        DruidRelationColumnInfo(
+          "city",
+          if (isFull) Some("city") else None,
+          None,
+          Some("unique_city"),
+          Some("city_sketch")
+        ),
+        DruidRelationColumnInfo(
+          "latitude",
+          // should be if (isFull) Some("latitude") else None, but Druid doesn't expose latitude
+          if (isFull) None else None,
+          Some(SpatialDruidDimensionInfo("coordinates", 0, Some(-90.0), Some(90.0)))
+        ),
+        DruidRelationColumnInfo(
+          "longitude",
+          // should be if (isFull) Some("longitude") else None, but Druid doesn't expose longitude
+          if (isFull) None else None,
+          Some(SpatialDruidDimensionInfo("coordinates", 1, Some(-180.0), Some(180.0)))
+        )
+      )
+      import Utils._
+      import org.json4s.jackson.JsonMethods._
+
+      val jR = render(Extraction.decompose(l))
+      pretty(jR).stripMargin.replace('\n', ' ')
+    }
+
+    def zcDruidDS(isFull : Boolean = false,
+                  db : String = "default",
                   table : String = "zipCodesBase",
                   dsName : String = "zipCodes"
                  ) =
-      s"""CREATE TABLE if not exists $dsName
+      s"""CREATE TABLE if not exists ${if (isFull) dsName + "Full" else dsName}
       USING org.sparklinedata.druid
       OPTIONS (sourceDataframe "$db.$table",
       timeDimensionColumn "record_date",
-      druidDatasource "zipCodes",
+      druidDatasource "${if (isFull) "zipCodesAll" else "zipCodes"}",
       druidHost '$zkConnectString',
       zkQualifyDiscoveryNames "true",
       numProcessingThreadsPerHistorical '1',
+      columnInfos '${zcDruidDSColInfos(isFull)}',
       allowTopNRewrite "true")""".stripMargin
 
     val cT = zipCodesTable
@@ -99,20 +144,13 @@ class QueryExtTest extends AbstractTest {
 
     // sql("select * from orderLineItemPartSupplierBase limit 10").show(10)
 
-    val cTOlap = zcDruidDS()
-
+    var cTOlap = zcDruidDS()
     println(cTOlap)
     sql(cTOlap)
 
-  }
-
-  test("1") { td =>
-
-    // Thread.sleep(120 * 60 * 1000)
-    sql("select count(*) from zipCodesBase").show()
-    sql("select count(*) from zipCodes").show()
-    println("done")
-
+    cTOlap = zcDruidDS(true)
+    println(cTOlap)
+    sql(cTOlap)
 
   }
 
