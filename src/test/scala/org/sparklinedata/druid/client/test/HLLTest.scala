@@ -72,4 +72,13 @@ class HLLTest extends QueryExtTest {
     Seq(hasHLLAgg _)
   )
 
+  test("hllSelect",
+    "select city  " +
+      "from zipCodes where substring(state,1,1) = 'N'",
+    1,
+    true,
+    true,
+    false
+  )
+
 }

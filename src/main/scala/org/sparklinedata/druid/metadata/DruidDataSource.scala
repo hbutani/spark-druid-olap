@@ -19,7 +19,7 @@ package org.sparklinedata.druid.metadata
 
 import org.joda.time.Interval
 import org.sparklinedata.druid.client.{ColumnDetails, MetadataResponse}
-import org.apache.spark.sql.types.{DoubleType, LongType, StringType, DataType}
+import org.apache.spark.sql.types._
 
 object DruidDataType extends Enumeration {
   val String = Value("STRING")
@@ -34,8 +34,8 @@ object DruidDataType extends Enumeration {
     case String => StringType
     case Long => LongType
     case Float => DoubleType
-    case HyperUnique => DoubleType
-    case ThetaSketch => DoubleType
+    case HyperUnique => BinaryType
+    case ThetaSketch => BinaryType
   }
 }
 

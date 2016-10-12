@@ -37,6 +37,7 @@ import scala.collection._
 import scala.collection.convert.decorateAsScala._
 import java.util.concurrent.ConcurrentHashMap
 
+import com.fasterxml.jackson.core.Base64Variants
 import org.apache.http.concurrent.Cancellable
 
 import scala.util.Random
@@ -108,8 +109,8 @@ class DruidRDD(sqlContext: SQLContext,
     null
   }
   val numSegmentsPerQuery = dQuery.numSegmentsPerQuery
-  val useSmile = dQuery.useSmile
   val schema = dQuery.schema(drInfo)
+  val useSmile = dQuery.useSmile && smileCompatible(schema)
   val drOptions = drInfo.options
   val drFullName = drInfo.fullName
   val drDSIntervals = drInfo.druidDS.intervals
@@ -130,6 +131,18 @@ class DruidRDD(sqlContext: SQLContext,
   // scalastyle:on line.size.limit
 
   def druidColName(n : String) = sparkToDruidColName.getOrElse(n, n)
+
+  /*
+   * for now if there is a binary field don't use Smile.
+   */
+  def smileCompatible(typ : StructType) : Boolean = {
+    typ.fields.foldLeft(true) {
+      case (false, _) => false
+      case (_, StructField(_, BinaryType, _, _)) => false
+      case (_, StructField(_, st:StructType, _,_)) => smileCompatible(st)
+      case _  => true
+    }
+  }
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
@@ -337,6 +350,9 @@ object DruidValTransform {
       druidVal.asInstanceOf[BigInt].longValue()
     case LongType if druidVal.isInstanceOf[Double] =>
       druidVal.asInstanceOf[Double].longValue()
+    case BinaryType if druidVal.isInstanceOf[String] => {
+      Base64Variants.getDefaultVariant.decode(druidVal.asInstanceOf[String])
+    }
     case _ => druidVal
   }
 

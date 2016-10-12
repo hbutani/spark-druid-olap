@@ -130,6 +130,7 @@ abstract class QueryExtTest extends AbstractTest {
       zkQualifyDiscoveryNames "true",
       numProcessingThreadsPerHistorical '1',
       columnInfos '${zcDruidDSColInfos(isFull)}',
+      nonAggregateQueryHandling "push_project_and_filters",
       allowTopNRewrite "true")""".stripMargin
 
     val cT = zipCodesTable
@@ -151,6 +152,7 @@ abstract class QueryExtTest extends AbstractTest {
     cTOlap = zcDruidDS(true)
     println(cTOlap)
     sql(cTOlap)
+
 
   }
 

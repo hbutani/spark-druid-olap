@@ -14,7 +14,6 @@ val json4sVersion = "3.2.10"
 val sparkdateTimeVersion = "0.0.2"
 val scoptVersion = "3.3.0"
 val druidVersion = "0.9.1"
-val derbyVersion = "10.11.1.1"
 
 val coreDependencies = Seq(
   "com.github.nscala-time" %% "nscala-time" % nscalaVersion,
