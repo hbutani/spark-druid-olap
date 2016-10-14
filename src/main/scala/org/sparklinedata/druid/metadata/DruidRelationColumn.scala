@@ -84,7 +84,7 @@ case class DruidRelationColumn(
 
   def name = druidColumnToUse.name
 
-  def dataType = druidColumnToUse.dataType
+  def dataType = if (hasSpatialIndex) DruidDataType.Float else druidColumnToUse.dataType
 
   def size = druidColumnToUse.size
 

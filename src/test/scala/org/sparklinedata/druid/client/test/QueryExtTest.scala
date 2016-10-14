@@ -31,6 +31,17 @@ import scala.reflect.ClassTag
 
 abstract class QueryExtTest extends AbstractTest {
 
+  def hasSpatialFilterSpec(f : FilterSpec) : Boolean = f match {
+    case f : SpatialFilterSpec => true
+    case lf : LogicalFilterSpec => lf.fields.foldLeft(false)((b,f) => b || hasSpatialFilterSpec(f))
+    case nf : NotFilterSpec => hasSpatialFilterSpec(nf.field)
+    case _ => false
+  }
+
+  def hasSpatialFilter(dq : DruidQuery) : Boolean = {
+    dq.q.filter.map(hasSpatialFilterSpec(_)).getOrElse(false)
+  }
+
   def hasAgg[T <: AggregationSpec : ClassTag](dq : DruidQuery) : Boolean = {
     if ( !dq.q.isInstanceOf[AggQuerySpec]) return false
     val aggQ = dq.q.asInstanceOf[AggQuerySpec]

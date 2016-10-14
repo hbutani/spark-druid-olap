@@ -81,4 +81,27 @@ class HLLTest extends QueryExtTest {
     false
   )
 
+  test("spatialSelect",
+    "select latitude, longitude  " +
+      "from zipCodes " +
+      "where latitude > 42.5 and longitude is not null " +
+      "limit 10000",
+    1,
+    true,
+    true,
+    false,
+    Seq(hasSpatialFilter _)
+  )
+
+  test("spatialFilOnAgg",
+    "select approx_count_distinct(city)  " +
+      "from zipCodes " +
+      "where latitude > 42.5 and longitude is not null ",
+    1,
+    true,
+    true,
+    false,
+    Seq(hasHLLAgg _, hasSpatialFilter _)
+  )
+
 }

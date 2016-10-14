@@ -233,6 +233,16 @@ case class BoundFilterSpec(`type`: String,
     this("bound", dimension, lower, lowerStrict, upper, upperStrict, alphaNumeric)
 }
 
+case class RectangularBound(minCoords : Array[Double],
+                            maxCoords : Array[Double],
+                           `type` : String = "rectangular")
+
+case class SpatialFilterSpec(
+                            dimension : String,
+                            bound : RectangularBound,
+                            `type` : String = "spatial"
+                            ) extends FilterSpec
+
 sealed trait AggregationSpec {
   val `type`: String
   val name : String

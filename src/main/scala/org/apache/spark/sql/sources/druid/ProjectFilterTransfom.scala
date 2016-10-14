@@ -21,7 +21,7 @@ import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.types.{BooleanType, DataType, LongType}
+import org.apache.spark.sql.types.{BooleanType, DataType, DoubleType, LongType}
 import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid.Debugging._
 import org.sparklinedata.druid._
@@ -264,6 +264,60 @@ trait ProjectFilterTransfom {
     }
   }
 
+  object CompDetails {
+    def unapply(e : Expression) : Option[(String, Any, DataType, String, DataType)] = e match {
+      case GreaterThan(AttributeReference(nm, dT, _, _), Literal(value, lDT)) =>
+        Some((">", value, lDT, nm, dT))
+      case LessThan(Literal(value, lDT), AttributeReference(nm, dT, _, _)) =>
+        Some((">", value, lDT, nm, dT))
+      case GreaterThan(Literal(value, lDT), AttributeReference(nm, dT, _, _)) =>
+        Some(("<", value, lDT, nm, dT))
+      case LessThan(AttributeReference(nm, dT, _, _), Literal(value, lDT)) =>
+        Some(("<", value, lDT, nm, dT))
+      case GreaterThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, lDT)) =>
+        Some((">=", value, lDT, nm, dT))
+      case LessThanOrEqual(Literal(value, lDT), AttributeReference(nm, dT, _, _)) =>
+        Some((">=", value, lDT, nm, dT))
+      case GreaterThanOrEqual(Literal(value, lDT), AttributeReference(nm, dT, _, _)) =>
+        Some(("<=", value, lDT, nm, dT))
+      case LessThanOrEqual(AttributeReference(nm, dT, _, _), Literal(value, lDT)) =>
+        Some(("<=", value, lDT, nm, dT))
+      case _ => None
+    }
+  }
+
+  object SpatialComparison {
+
+    private def spatialBound(dRInfo : DruidRelationInfo,
+                             dC : DruidRelationColumn,
+                             value : Any,
+                             sparkDT : DataType,
+                             compOp : String) : FilterSpec = {
+
+      val bound = value.toString.toDouble
+      val spatialIndex = dRInfo.spatialIndexMap(dC.spatialIndex.get.druidColumn.name)
+      val dim = dC.spatialIndex.get.spatialPosition
+      val isMin = compOp == ">" || compOp == "<"
+      val includeVal = compOp == ">=" || compOp == "<="
+      SpatialFilterSpec(dC.name, spatialIndex.getBounds(dim, bound, isMin, includeVal))
+    }
+
+    def unapply(t: (DruidQueryBuilder, Expression)): Option[FilterSpec] = {
+      val dqb = t._1
+      val e = t._2
+      e match {
+        case CompDetails(compOp, value, lDT, nm, dT) => {
+          for (dD <- dqb.druidColumn(nm)
+               if dD.hasSpatialIndex && DoubleType.acceptsType(lDT) &&
+                 DruidDataType.sparkDataType(dD.dataType) == dT)
+            yield spatialBound(dqb.drInfo, dD, value, dT, compOp)
+        }
+        case _ => None
+      }
+
+    }
+  }
+
   def dimFilterExpression(dqb: DruidQueryBuilder, fe: Expression):
   Option[FilterSpec] = {
 
@@ -272,6 +326,7 @@ trait ProjectFilterTransfom {
 
     (dqb, fe) match {
       case ValidDruidNativeComparison(filSpec) => Some(filSpec)
+      case SpatialComparison(filSpec) => Some(filSpec)
       case (dqb, fe) => fe match {
         case dtTimeCond((dCol, op, value)) =>
           Some(JavascriptFilterSpec.create(dCol, op, value))

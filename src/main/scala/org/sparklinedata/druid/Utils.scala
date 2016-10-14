@@ -88,7 +88,9 @@ object Utils extends Logging {
         classOf[SelectSpecWithSegmentIntervals],
         classOf[PeriodGranularity],
         classOf[DurationGranularity],
-        classOf[DruidRelationColumnInfo]
+        classOf[DruidRelationColumnInfo],
+        classOf[SpatialFilterSpec],
+        classOf[RectangularBound]
       )
     )
   ) +

@@ -20,9 +20,9 @@ package org.sparklinedata.druid.metadata
 import org.apache.spark.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types._
-import org.sparklinedata.druid.DruidQueryGranularity
+import org.sparklinedata.druid.{DruidQueryGranularity, RectangularBound}
 
-import scala.collection.mutable.{Map => MMap}
+import scala.collection.mutable.{ArrayBuffer, Map => MMap}
 
 object NonAggregateQueryHandling extends Enumeration {
   val PUSH_FILTERS = Value("push_filters")
@@ -55,6 +55,26 @@ case class DruidRelationInfo(val fullName : DruidRelationName,
     s"""DruidRelationInfo(fullName = $fullName, sourceDFName = $sourceDFName,
        |timeDimensionCol = $timeDimensionCol,
        |options = $options)""".stripMargin
+  }
+
+  lazy val spatialIndexMap : Map[String, SpatialIndex] = {
+
+    val m : MMap[String, ArrayBuffer[DruidRelationColumn]] = MMap()
+
+    val spatialColumns = sourceToDruidMapping.values.filter(_.hasSpatialIndex)
+
+    spatialColumns.foreach { c =>
+      val sI = c.spatialIndex.get
+      if (!m.contains(sI.druidColumn.name)) {
+        m(sI.druidColumn.name) = ArrayBuffer()
+      }
+      m(sI.druidColumn.name) += c
+    }
+
+    m.map{
+      case(k, v) => (k -> SpatialIndex(k, v.toArray))
+
+    }.toMap
   }
 
 
@@ -117,6 +137,40 @@ case class DruidRelationOptions(val maxCardinality : Long,
   }
 
 }
+
+case class SpatialIndex(name : String,
+                         dimColumns : Array[DruidRelationColumn]) {
+
+  private lazy val minArray : Array[Double] =
+    dimColumns.map(_.spatialIndex.get.minValue.getOrElse(-Double.MaxValue))
+  private lazy val maxArray : Array[Double] =
+    dimColumns.map(_.spatialIndex.get.maxValue.getOrElse(Double.MaxValue))
+
+  def getBounds(dim : Int,
+                value : Double,
+                isMin : Boolean,
+                includeVal : Boolean) : RectangularBound = {
+
+    val boundValue = {
+      if (!includeVal) {
+        if (isMin) {
+          value + Double.MinPositiveValue
+        } else {
+          value - Double.MinPositiveValue
+        }
+      } else {
+        value
+      }
+    }
+
+    val minBounds = minArray.clone()
+    val maxBounds = maxArray.clone()
+    val boundToChange = if (isMin) minBounds else maxBounds
+    boundToChange(dim) = boundValue
+    RectangularBound(minBounds, maxBounds)
+  }
+}
+
 
 private[druid] object MappingBuilder extends Logging {
 

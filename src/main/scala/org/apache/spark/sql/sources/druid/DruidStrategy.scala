@@ -121,8 +121,12 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
       a <- p.references;
       dc <- dqb1.referencedDruidColumns.get(a.name)
     ) {
+      var tfN : String = null
+      if (dc.hasSpatialIndex) {
+        tfN = DruidValTransform.dimConversion(dc.spatialIndex.get.spatialPosition)
+      }
       dqb1 =
-        dqb1.outputAttribute(a.name, a, a.dataType, DruidDataType.sparkDataType(dc.dataType), null)
+        dqb1.outputAttribute(a.name, a, a.dataType, DruidDataType.sparkDataType(dc.dataType), tfN)
     }
 
     /*
@@ -133,13 +137,18 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
       a <- of.references;
       dc <- dqb1.referencedDruidColumns.get(a.name)
     ) {
+      var tfN : String = null
+      if (dc.hasSpatialIndex) {
+        tfN = DruidValTransform.dimConversion(dc.spatialIndex.get.spatialPosition)
+      }
       dqb1 =
-        dqb1.outputAttribute(a.name, a, a.dataType, DruidDataType.sparkDataType(dc.dataType), null)
+        dqb1.outputAttribute(a.name, a, a.dataType, DruidDataType.sparkDataType(dc.dataType), tfN)
     }
 
     val druidOpSchema = new DruidOperatorSchema(dqb1)
 
-    var (dims, metrics) = dqb1.referencedDruidColumns.values.partition(_.isDimension())
+    var (dims, metrics) = dqb1.referencedDruidColumns.values.partition(
+      c => c.isDimension() || c.hasSpatialIndex)
 
     /*
      * Remove 'timestamp' from the dimension list, this is returned by druid with every ResultRow.

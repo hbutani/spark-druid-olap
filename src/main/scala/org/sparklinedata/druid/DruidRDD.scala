@@ -215,11 +215,24 @@ class DruidRDD(sqlContext: SQLContext,
 
     val r = new InterruptibleIterator[ResultRow](context, dr)
     val nameToTF = dQuery.getValTFMap
+
+    /*
+     * multiple output fields may project on the same druid column with different
+     * transformations. True for the dimensions of a spatialIndex point.
+     */
+    def tfName(f : StructField) : Option[String] = {
+      if (nameToTF.contains(f.name)) {
+        nameToTF.get(f.name)
+      } else {
+        nameToTF.get(druidColName(f.name))
+      }
+    }
+
     r.map { r =>
       numRows += 1
       val row = new GenericInternalRowWithSchema(schema.fields.map
       (f => DruidValTransform.sparkValue(
-        f, r.event(druidColName(f.name)), nameToTF.get(druidColName(f.name)))), schema)
+        f, r.event(druidColName(f.name)), tfName(f))), schema)
       row
     }
   }
@@ -333,6 +346,18 @@ object DruidValTransform {
     }
   }
 
+  private[this] def pointToDouble(dim : Int)(druidVal : Any) : Any = {
+    if (druidVal == null) return null
+    val point : Array[Double] = druidVal.toString.split(",").map(_.toDouble)
+    if ( dim >= 0 && dim < point.length ) {
+      point(dim)
+    } else null
+  }
+
+  def dimConversion(i : Int) : String = {
+    s"dim$i"
+  }
+
   /**
     * conversion from Druid values to Spark values. Most of the conversion cases are handled by
     * cast expressions in the [[org.apache.spark.sql.execution.Project]] operator above the
@@ -357,14 +382,18 @@ object DruidValTransform {
   }
 
   // TODO: create an enum of TFs
-  private[this] val tfMap: Map[String, Any => Any] = Map[String, Any => Any](
-    "toTSWithTZAdj" -> toTSWithTZAdj,
-    "toTS" -> toTS,
-    "toString" -> toString,
-    "toInt" -> toInt,
-    "toLong" -> toLong,
-    "toFloat" -> toFloat
-  )
+  private[this] val tfMap: Map[String, Any => Any] = {
+    Map[String, Any => Any](
+      "toTSWithTZAdj" -> toTSWithTZAdj,
+      "toTS" -> toTS,
+      "toString" -> toString,
+      "toInt" -> toInt,
+      "toLong" -> toLong,
+      "toFloat" -> toFloat
+    ) ++ (0 to 20).map { i =>
+      s"dim$i" -> pointToDouble(i) _
+    }
+  }
 
   def sparkValue(f : StructField, druidVal: Any, tfName: Option[String]): Any = {
     tfName match {
