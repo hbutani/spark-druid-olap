@@ -22,6 +22,8 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.sources.druid.DruidQueryCostModel
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata.{DruidDataType, DruidRelationInfo}
+import scala.collection.mutable.{Map => MMap}
+import scala.collection.mutable.ArrayBuffer
 
 
 abstract class Transform extends Logging {
@@ -175,6 +177,51 @@ object BetweenFilterSpec extends Transform {
 
 }
 
+object CombineSpatialFilters extends Transform {
+
+  protected def reduceSpatialConjuncts(logFilter : LogicalFilterSpec) : LogicalFilterSpec = {
+    assert(logFilter.`type` == "and")
+    val lF = logFilter.flatten
+    val spatialFilters: MMap[String, SpatialFilterSpec] = MMap()
+    val remainingFilters = ArrayBuffer[FilterSpec]()
+
+    lF.fields.foreach { f =>
+      f match {
+        case sf@SpatialFilterSpec(d, _, _) => {
+          if (!spatialFilters.contains(d)) {
+            spatialFilters(d) = sf
+          } else {
+            spatialFilters(d) = spatialFilters(d).combine(sf)
+          }
+        }
+        case _ => remainingFilters += f
+      }
+    }
+
+    LogicalFilterSpec("and",
+      (spatialFilters.values ++ remainingFilters).toList
+    )
+  }
+
+  def reduceSpatialFilters(fSpec: FilterSpec): FilterSpec = fSpec match {
+    case af@LogicalFilterSpec("and", _) => reduceSpatialConjuncts(af)
+    case LogicalFilterSpec(typ, fields) => LogicalFilterSpec(typ, fields.map(reduceSpatialFilters))
+    case NotFilterSpec(typ, field) => NotFilterSpec(typ, reduceSpatialFilters(field))
+    case _ => fSpec
+  }
+
+  override def apply(sqlContext : SQLContext,
+                     drInfo: DruidRelationInfo, qSpec: QuerySpec): QuerySpec = {
+    if (!qSpec.filter.isDefined) {
+      qSpec
+    } else {
+      val fSpec = qSpec.filter.get
+      qSpec.setFilter(reduceSpatialFilters(fSpec))
+    }
+  }
+
+}
+
 object SearchQuerySpecTransform extends Transform {
 
   override def apply(sqlContext : SQLContext,
@@ -289,6 +336,7 @@ object QuerySpecTransforms extends TransformExecutor {
   override protected val batches: Seq[Batch] = Seq(
     Batch("dimensionQueries", FixedPoint(100),
       SearchQuerySpecTransform, AddCountAggregateForNoMetricsGroupByQuerySpec, BetweenFilterSpec),
+    Batch("combineSpatialFilters", Once, CombineSpatialFilters),
     Batch("timeseries", Once, AllGroupingGroupByQuerySpecToTimeSeriesSpec),
     Batch("topN", Once, TopNQueryTransform)
   )

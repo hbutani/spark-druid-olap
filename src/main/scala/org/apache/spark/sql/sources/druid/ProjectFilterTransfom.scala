@@ -297,7 +297,7 @@ trait ProjectFilterTransfom {
       val bound = value.toString.toDouble
       val spatialIndex = dRInfo.spatialIndexMap(dC.spatialIndex.get.druidColumn.name)
       val dim = dC.spatialIndex.get.spatialPosition
-      val isMin = compOp == ">" || compOp == "<"
+      val isMin = compOp == ">" || compOp == ">="
       val includeVal = compOp == ">=" || compOp == "<="
       SpatialFilterSpec(dC.name, spatialIndex.getBounds(dim, bound, isMin, includeVal))
     }

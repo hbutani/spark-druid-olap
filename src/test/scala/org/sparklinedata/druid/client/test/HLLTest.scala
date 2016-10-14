@@ -104,4 +104,52 @@ class HLLTest extends QueryExtTest {
     Seq(hasHLLAgg _, hasSpatialFilter _)
   )
 
+  test("combineSpatialFilter1",
+    "select approx_count_distinct(city)  " +
+      "from zipCodes " +
+      "where latitude > 0 and longitude is not null " +
+      "and latitude < 18 and longitude > -80 and longitude < 10",
+    1,
+    true,
+    true,
+    false,
+    Seq(hasHLLAgg _, hasSpatialFilter _)
+  )
+
+  test("combineSpatialFilter2",
+    "select approx_count_distinct(city)  " +
+      "from zipCodes " +
+      "where latitude > 0 and longitude is not null " +
+      "and latitude < 18 or (longitude > -80 and longitude < 10)",
+    1,
+    true,
+    true,
+    false,
+    Seq(hasHLLAgg _, hasSpatialFilter _)
+  )
+
+  test("combineSpatialFilter3",
+    "select approx_count_distinct(city)  " +
+      "from zipCodes " +
+      "where latitude > 0 and substring(state,1,1) = 'N' " +
+      "and latitude < 18 and (longitude > -80 and longitude < 10)",
+    1,
+    true,
+    true,
+    false,
+    Seq(hasHLLAgg _, hasSpatialFilter _)
+  )
+
+  test("combineSpatialFilter4",
+    "select approx_count_distinct(city)  " +
+      "from zipCodes " +
+      "where latitude > 0 and substring(state,1,1) = 'N' " +
+      "and latitude < 18 or (longitude > -80 and longitude < 10)",
+    1,
+    true,
+    true,
+    false,
+    Seq(hasHLLAgg _, hasSpatialFilter _)
+  )
+
 }

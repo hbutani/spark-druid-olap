@@ -175,7 +175,18 @@ case class StringContainsSpec(`type`: String,
 }
 
 case class LogicalFilterSpec(`type`: String,
-                             fields: List[FilterSpec]) extends FilterSpec
+                             fields: List[FilterSpec]) extends FilterSpec {
+
+  def flatten : LogicalFilterSpec = {
+    LogicalFilterSpec(`type`,
+      fields.flatten {
+      case ac@LogicalFilterSpec(t, c) if t == `type`=> ac.flatten.fields
+      case c => Seq(c)
+    }
+    )
+  }
+
+}
 
 case class NotFilterSpec(`type`: String,
                          field: FilterSpec) extends FilterSpec
@@ -235,13 +246,31 @@ case class BoundFilterSpec(`type`: String,
 
 case class RectangularBound(minCoords : Array[Double],
                             maxCoords : Array[Double],
-                           `type` : String = "rectangular")
+                           `type` : String = "rectangular") {
+
+  def combine(other: RectangularBound): RectangularBound = {
+    minCoords.zip(other.minCoords).map(t => Math.max(t._1, t._2))
+
+    RectangularBound(
+      minCoords.zip(other.minCoords).map(t => Math.max(t._1, t._2)),
+      maxCoords.zip(other.maxCoords).map(t => Math.min(t._1, t._2))
+    )
+  }
+
+}
 
 case class SpatialFilterSpec(
                             dimension : String,
                             bound : RectangularBound,
                             `type` : String = "spatial"
-                            ) extends FilterSpec
+                            ) extends FilterSpec {
+
+  def combine(other : SpatialFilterSpec) : SpatialFilterSpec = {
+    assert(other.dimension == dimension)
+    SpatialFilterSpec(dimension, bound.combine(other.bound))
+  }
+
+}
 
 sealed trait AggregationSpec {
   val `type`: String
