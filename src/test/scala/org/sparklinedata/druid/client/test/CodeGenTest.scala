@@ -933,5 +933,23 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
         from orderLineItemPartSupplier) r1 group by x, y
     """.stripMargin
     , 0, true, true)
+
+  test("tscomp1",
+    """
+      |select sum(c_acctbal) from orderLineItemPartSupplier
+      |where (CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000Z') AS TIMESTAMP) <
+      |CAST(CONCAT(TO_DATE(l_shipdate), 'T00:00:00.000Z') AS TIMESTAMP))
+      |group by c_name
+    """.stripMargin
+    , 0, true, true)
+
+  test("tscomp2",
+    """
+      |select sum(c_acctbal) from orderLineItemPartSupplier
+      |where (CAST(CONCAT(TO_DATE(o_orderdate), 'T00:00:00.000Z') AS TIMESTAMP) <
+      |CAST('1995-12-31T00:00:00.000Z'  AS TIMESTAMP))
+      |group by c_name
+    """.stripMargin
+    , 1, true, true)
 }
 

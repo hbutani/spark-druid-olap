@@ -79,7 +79,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
       e match {
         case AttributeReference(nm, dT, _, _) =>
           for (dD <- dqb.druidColumn(nm);
-               v = dqb.druidColumn(nm).get.name
+               v = dD.name
                if ((dD.isTimeDimension ||
                  (metricAllowed && dD.isMetric) ||
                  dD.isDimension()) && validInParams(v))) yield {
@@ -123,10 +123,11 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
         case Cast(s, dt) => Some(genCastExprCode(s, dt)).flatten
 
         case Concat(eLst) =>
-          // TODO: If second gencode failed then this should return none
           // TODO: Use FoldLeft
+          var nExprsTrfrm: Int = 0
           var cJSFn: Option[JSExpr] = None
           for (ex <- eLst; exCode <- genExprCode(ex)) {
+            nExprsTrfrm += 1
             if (cJSFn.isEmpty) {
               cJSFn = Some(exCode)
             } else {
@@ -136,7 +137,11 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                 StringType))
             }
           }
-          cJSFn
+          if (nExprsTrfrm == eLst.size) {
+            cJSFn
+          } else {
+            None
+          }
         case Upper(u) =>
           for (exCode <- genExprCode(u) if u.dataType.isInstanceOf[StringType]) yield
             JSExpr(None,
