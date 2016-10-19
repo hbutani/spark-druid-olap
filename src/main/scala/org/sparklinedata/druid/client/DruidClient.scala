@@ -29,7 +29,8 @@ import org.apache.http.entity.{ByteArrayEntity, ContentType, StringEntity}
 import org.apache.http.impl.client.{CloseableHttpClient, HttpClients}
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.util.EntityUtils
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
+
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.jboss.netty.handler.codec.http.HttpHeaders
@@ -128,7 +129,7 @@ class DruidHttpGet(url : String,
  */
 abstract class DruidClient(val host : String,
                            val port : Int,
-                           val useSmile : Boolean = false) extends Logging {
+                           val useSmile : Boolean = false) extends SPLLogging {
 
   private var cancellableHolder : CancellableHolder = null
 
@@ -382,7 +383,7 @@ object DruidClient {
 }
 
 class DruidQueryServerClient(host : String, port : Int, useSmile : Boolean = false)
-  extends DruidClient(host, port, useSmile) with Logging {
+  extends DruidClient(host, port, useSmile) with SPLLogging {
 
   import Utils._
   import org.json4s.JsonDSL._
@@ -451,7 +452,7 @@ class DruidQueryServerClient(host : String, port : Int, useSmile : Boolean = fal
 }
 
 class DruidCoordinatorClient(host : String, port : Int, useSmile : Boolean = false)
-  extends DruidClient(host, port, useSmile) with Logging {
+  extends DruidClient(host, port, useSmile) with SPLLogging {
 
   import Utils._
 

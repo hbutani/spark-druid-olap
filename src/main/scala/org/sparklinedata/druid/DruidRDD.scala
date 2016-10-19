@@ -23,7 +23,9 @@ import org.apache.spark.sql.catalyst.expressions.GenericInternalRowWithSchema
 import org.apache.spark.sql.catalyst.util.DateTimeUtils.SQLTimestamp
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.{InterruptibleIterator, Logging, Partition, TaskContext}
+import org.apache.spark.{InterruptibleIterator, Partition, TaskContext}
+import org.apache.spark.sql.SPLLogging
+
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
@@ -421,7 +423,7 @@ object DruidValTransform {
   * ''Druid Query''
   *
   */
-object TaskCancelHandler extends Logging {
+object TaskCancelHandler extends SPLLogging {
 
   private val taskMap : concurrent.Map[String, (Cancellable, TaskCancelHolder, TaskContext)] =
     new ConcurrentHashMap[String, (Cancellable, TaskCancelHolder, TaskContext)]().asScala
@@ -446,7 +448,7 @@ object TaskCancelHandler extends Logging {
 
   val secs5 : Long = 5 * 1000
 
-  object cancelCheckThread extends Runnable with Logging {
+  object cancelCheckThread extends Runnable with SPLLogging {
 
     def run() : Unit = {
 

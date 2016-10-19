@@ -17,7 +17,8 @@
 
 package org.sparklinedata.druid.jscodegen
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
+
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Cast, Expression, LeafExpression}
 import org.apache.spark.sql.types._
@@ -31,7 +32,7 @@ import scala.language.reflectiveCalls
 // but would fail otherwise. Needs to handle the case where every value is NULL.
 // 2. When every value is null for a dim, how do we encode null in the value to spark.
 case class JSAggGenerator(dqb: DruidQueryBuilder, agg: AggregateFunction,
-                          tz_id: String) extends Logging {
+                          tz_id: String) extends SPLLogging {
 
   private[this] def getAgg(arg: String): Option[String] = agg match {
     case Sum(e) => Some(s"""current + $arg""".stripMargin)

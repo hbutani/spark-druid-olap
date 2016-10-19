@@ -70,8 +70,6 @@ object PlanUtil {
       case j@Join(l, r, _, _) if !maxCardinalityIsOne(l) || !maxCardinalityIsOne(r) => j
       case u: Union => u
       case g: Generate => g
-      case c: Cube => c
-      case r: Rollup => r
       case gs: GroupingSets => gs
     }
   }
@@ -87,8 +85,6 @@ object PlanUtil {
       case Join(l, r, _, _) => true
       case u: Union => true
       case g: Generate => true
-      case c: Cube => true
-      case r: Rollup => true
       case gs: GroupingSets => true
       case _ => false
     }

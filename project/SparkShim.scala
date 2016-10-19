@@ -10,7 +10,7 @@ object SparkShim {
   val sparkVersion = sys.props.getOrElse("sparkVersion", default = "1.6.2")
   val sparkNamExt = if (sparkVersion == "1.6.1") "-onesixone" else ""
   val sparkVersion_161 = "1.6.1"
-  val sparkVersion_162 = "1.6.2"
+  val sparkVersion_162 = "2.0.0"
   val guava_version = "16.0.1"
   val derbyVersion = "10.11.1.1"
 

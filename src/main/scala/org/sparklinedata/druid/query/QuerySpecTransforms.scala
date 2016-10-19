@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.query
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.sources.druid.DruidQueryCostModel
 import org.sparklinedata.druid._
@@ -26,7 +26,7 @@ import scala.collection.mutable.{Map => MMap}
 import scala.collection.mutable.ArrayBuffer
 
 
-abstract class Transform extends Logging {
+abstract class Transform extends SPLLogging {
 
   val transformName: String = {
     val className = getClass.getName
@@ -41,7 +41,7 @@ abstract class Transform extends Logging {
 /**
   * Based on [[org.apache.spark.sql.catalyst.rules.RuleExecutor]]
   */
-abstract class TransformExecutor extends Logging {
+abstract class TransformExecutor extends SPLLogging {
 
   abstract class Strategy { def maxIterations: Int }
 

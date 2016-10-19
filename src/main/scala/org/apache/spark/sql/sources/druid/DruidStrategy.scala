@@ -17,20 +17,21 @@
 
 package org.apache.spark.sql.sources.druid
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project => LProject}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Union, Project => LProject}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.metadata._
 import org.sparklinedata.druid.query.QuerySpecTransforms
+
 import scala.collection.mutable.{Map => MMap}
 
 private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
-  with PredicateHelper with DruidPlannerHelper with Logging {
+  with PredicateHelper with DruidPlannerHelper with SPLLogging {
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case l => {
@@ -197,7 +198,7 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
     )
 
     val (queryHistorical : Boolean, numSegsPerQuery : Int) =
-      if (planner.sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED)) {
+      if (planner.sqlContext.conf.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED)) {
         val dqc = DruidQueryCostModel.computeMethod(
           planner.sqlContext,
           dqb.drInfo,
@@ -234,7 +235,7 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
             }
           }
           )
-          Filter(f, druidPhysicalOp)
+          FilterExec(f, druidPhysicalOp)
         }
         case _ => druidPhysicalOp
       }
@@ -286,7 +287,7 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
     qs = QuerySpecTransforms.transform(planner.sqlContext, dqb.drInfo, qs)
 
     qs.context.foreach{ ctx =>
-      if( planner.sqlContext.getConf(DruidPlanner.DRUID_USE_V2_GBY_ENGINE) ) {
+      if( planner.sqlContext.conf.getConf(DruidPlanner.DRUID_USE_V2_GBY_ENGINE) ) {
         ctx.groupByStrategy = Some("v2")
       }
     }
@@ -294,7 +295,7 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
     val (queryHistorical : Boolean, numSegsPerQuery : Int) =
       if ( !pAgg.canBeExecutedInHistorical ) {
         (false, -1)
-      } else if (planner.sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED)) {
+      } else if (planner.sqlContext.conf.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_ENABLED)) {
         val dqc = DruidQueryCostModel.computeMethod(
           planner.sqlContext,
           dqb.drInfo,
@@ -355,7 +356,7 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
     )
     val dR: DruidRelation = DruidRelation(dqb.drInfo, Some(dq))(planner.sqlContext)
 
-    var druidPhysicalOp : SparkPlan = PhysicalRDD.createFromDataSource(
+    var druidPhysicalOp : SparkPlan = DataSourceScanExec.create(
       druidOpSchema.operatorSchema,
       dR.buildInternalScan,
       dR)
@@ -364,7 +365,7 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
 
     if ( druidPhysicalOp != null ) {
       val projections = buildProjectionList(dqb, druidOpSchema)
-      Project(projections, druidPhysicalOp)
+      ProjectExec(projections, druidPhysicalOp)
     } else null
   }
 

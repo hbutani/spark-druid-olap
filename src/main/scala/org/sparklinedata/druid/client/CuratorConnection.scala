@@ -27,7 +27,8 @@ import org.apache.curator.framework.recipes.cache.{ChildData, PathChildrenCache,
 import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.BoundedExponentialBackoffRetry
 import org.apache.curator.utils.{CloseableUtils, ZKPaths}
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
+
 import org.apache.spark.util.SparklineThreadUtils
 import org.sparklinedata.druid.{DruidDataSourceException, Utils}
 import org.sparklinedata.druid.metadata._
@@ -40,7 +41,7 @@ import scala.util.Try
 class CuratorConnection(val zkHosts : String,
                         val options : DruidRelationOptions,
                         val cache : DruidMetadataCache,
-                        execSvc : ExecutorService) extends Logging {
+                        execSvc : ExecutorService) extends SPLLogging {
 
   val serverSegmentsCache : MMap[String, PathChildrenCache] = MMap()
   val serverSegmentCacheLock = new Object

@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.metadata
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types._
 import org.sparklinedata.druid.{DruidQueryGranularity, RectangularBound}
@@ -172,7 +172,7 @@ case class SpatialIndex(name : String,
 }
 
 
-private[druid] object MappingBuilder extends Logging {
+private[druid] object MappingBuilder extends SPLLogging {
 
   /**
    * Only top level Numeric and String Types are mapped.

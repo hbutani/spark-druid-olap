@@ -91,7 +91,7 @@ trait DruidCluster {
 }
 
 object DruidCluster {
-  lazy val instance : DruidCluster = if (true) {
+  lazy val instance : DruidCluster = if (false) {
     DruidTestCluster
   } else {
     LocalCluster

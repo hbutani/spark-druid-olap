@@ -17,15 +17,14 @@
 
 package org.sparklinedata.druid
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
 import org.apache.spark.sql.sources.{BaseRelation, RelationProvider}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.metadata._
 
-class DefaultSource extends RelationProvider with Logging {
+class DefaultSource extends RelationProvider with SPLLogging {
 
   import DefaultSource._
 
