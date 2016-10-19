@@ -126,4 +126,26 @@ object SPLSessionState {
   def splCatalog(sqlContext : SQLContext) : SPLSessionCatalog = {
     sqlContext.sparkSession.sessionState.catalog.asInstanceOf[SPLSessionCatalog]
   }
+
+  def sessionState(sqlContext: SQLContext) = sqlContext.sessionState
+
+  def parser(sqlContext: SQLContext) = sqlContext.sessionState.sqlParser
+
+  def qualifyWithDefault(sqlContext : SQLContext,
+                         tableName : String) : String = {
+
+    var tId = parser(sqlContext).parseTableIdentifier(tableName)
+    s"${tId.database.getOrElse("default")}.${tId.table}"
+  }
+
+  def qualifiedName(sqlContext : SQLContext,
+                    tableName : String) : String = {
+
+    var tId = parser(sqlContext).parseTableIdentifier(tableName)
+
+    if (!tId.database.isDefined) {
+      tId = tId.copy(database = Some(sessionState(sqlContext).catalog.getCurrentDatabase))
+    }
+    s"${tId.database.get}.${tId.table}"
+  }
 }

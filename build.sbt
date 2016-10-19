@@ -14,7 +14,7 @@ val json4sVersion = "3.2.10"
 val sparkdateTimeVersion = "0.0.3"
 val scoptVersion = "3.3.0"
 val druidVersion = "0.9.1"
-val sparkVersion = "2.0.0"
+val sparkVersion = "2.0.1"
 val guava_version = "16.0.1"
 val derbyVersion = "10.11.1.1"
 

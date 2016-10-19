@@ -33,7 +33,7 @@ object PlanUtil {
   def druidRelationInfo(tableName: String)(implicit sqlContext: SQLContext):
   Option[DruidRelationInfo] = {
     sqlContext.table(tableName).logicalPlan.collectFirst {
-      case LogicalRelation(DruidRelation(drInfo, _), _) => drInfo
+      case LogicalRelation(DruidRelation(drInfo, _), _, _) => drInfo
     }
   }
 

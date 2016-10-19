@@ -19,6 +19,7 @@ package org.sparklinedata.druid
 
 import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.hive.sparklinedata.SPLSessionState
 import org.apache.spark.sql.sources.{BaseRelation, RelationProvider}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
@@ -38,7 +39,7 @@ class DefaultSource extends RelationProvider with SPLLogging {
         s"'$SOURCE_DF_PARAM' must be specified for Druid DataSource")
     )
 
-    sourceDFName = SparklineDataContext.qualifiedName(sqlContext, sourceDFName)
+    sourceDFName = SPLSessionState.qualifiedName(sqlContext, sourceDFName)
 
     val sourceDF = sqlContext.table(sourceDFName)
 
