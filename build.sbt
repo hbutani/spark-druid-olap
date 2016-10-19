@@ -1,48 +1,31 @@
 
 // import SparkShim._
 
-scalaVersion := "2.11.8"
+scalaVersion in ThisBuild := "2.11.8"
 
 crossScalaVersions := Seq("2.10.5", "2.11.8")
 
 parallelExecution in Test := false
 
-val nscalaVersion = "1.6.0"
+val nscalaVersion = "2.12.0"
 val scalatestVersion = "2.2.4"
 val httpclientVersion = "4.5"
 val json4sVersion = "3.2.10"
-val sparkdateTimeVersion = "0.0.2"
+val sparkdateTimeVersion = "0.0.3"
 val scoptVersion = "3.3.0"
 val druidVersion = "0.9.1"
-
-
-val sparkVersion = sys.props.getOrElse("sparkVersion", default = "1.6.2")
-val sparkNamExt = if (sparkVersion == "1.6.1") "-onesixone" else ""
-val sparkVersion_161 = "1.6.1"
-val sparkVersion_162 = "2.0.0"
+val sparkVersion = "2.0.0"
 val guava_version = "16.0.1"
 val derbyVersion = "10.11.1.1"
 
-val spark161Dependencies = Seq(
+val sparkDependencies = Seq(
   "com.google.guava" % "guava" % guava_version % "provided" force(),
   "org.apache.derby" % "derby" % derbyVersion force(),
-  "org.apache.spark" %% "spark-core" % sparkVersion_161 % "provided",
-  "org.apache.spark" %% "spark-sql" % sparkVersion_161 % "provided",
-  "org.apache.spark" %% "spark-hive" % sparkVersion_161 % "provided",
-  "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion_161 % "provided"
+  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion % "provided"
 )
-
-val spark162Dependencies = Seq(
-  "com.google.guava" % "guava" % guava_version % "provided" force(),
-  "org.apache.derby" % "derby" % derbyVersion force(),
-  "org.apache.spark" %% "spark-core" % sparkVersion_162 % "provided",
-  "org.apache.spark" %% "spark-sql" % sparkVersion_162 % "provided",
-  "org.apache.spark" %% "spark-hive" % sparkVersion_162 % "provided",
-  "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion_162 % "provided"
-)
-
-val sparkDependencies =
-  if (sparkVersion == sparkVersion_161 ) spark161Dependencies else spark162Dependencies
 
 val coreDependencies = Seq(
   "com.github.nscala-time" %% "nscala-time" % nscalaVersion,
@@ -51,7 +34,7 @@ val coreDependencies = Seq(
   "org.json4s" %% "json4s-ext" % json4sVersion,
   "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % "2.4.6",
   "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-smile-provider" % "2.4.6",
-  // "com.sparklinedata" %% "spark-datetime" % sparkdateTimeVersion,
+  "com.sparklinedata" %% "spark-datetime" % sparkdateTimeVersion,
   "com.github.scopt" %% "scopt" % scoptVersion,
   "org.scalatest" %% "scalatest" % scalatestVersion % "test"
 )
@@ -86,8 +69,8 @@ lazy val commonSettings = Seq(
     "-XX:MaxPermSize=256M"),
 
   // Target Java 7
-  scalacOptions += "-target:jvm-1.7",
-  javacOptions in compile ++= Seq("-source", "1.7", "-target", "1.7"),
+  scalacOptions += "-target:jvm-1.8",
+  javacOptions in compile ++= Seq("-source", "1.8", "-target", "1.8"),
 
   scalacOptions := Seq("-feature", "-deprecation"),
 
@@ -148,19 +131,6 @@ lazy val commonSettings = Seq(
   ReleaseKeys.publishArtifactsAction := PgpKeys.publishSigned.value
 )
 
-//lazy val spark1_6_1 = project.in(file("shims/spark-1.6.1"))
-//  .settings(
-//    libraryDependencies ++= spark161Dependencies
-//  )
-//
-//lazy val spark1_6_2 = project.in(file("shims/spark-1.6.2"))
-//  .settings(
-//    libraryDependencies ++= spark162Dependencies
-//  )
-//
-//lazy val sparkShimProject =
-//  if (sparkVersion == sparkVersion_161 ) spark1_6_1 else spark1_6_2
-
 lazy val druidTestEnv = project.in(file("druidTestEnv"))
   .settings(
     libraryDependencies ++= (coreTestDependencies ++ druidTestEnvDependencies)
@@ -169,13 +139,13 @@ lazy val druidTestEnv = project.in(file("druidTestEnv"))
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
   .settings(
-    name := s"spl-accel$sparkNamExt",
-    libraryDependencies ++= ( coreDependencies ++ sparkDependencies ++ coreTestDependencies),
+    name := s"spl-accel",
+    libraryDependencies ++= (sparkDependencies ++ coreDependencies ++ coreTestDependencies),
     assemblyOption in assembly :=
       (assemblyOption in assembly).value.copy(includeScala = false),
     publishArtifact in (Compile, packageBin) := false,
     publishArtifact in Test := true
   )
   .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
-//  .dependsOn(druidTestEnv % "test->test")
+  .dependsOn(druidTestEnv % "test->test")
 
