@@ -18,13 +18,13 @@
 package org.apache.spark.sql.hive.thriftserver.sparklinedata.ui
 
 import javax.servlet.http.HttpServletRequest
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.ui.{UIUtils, WebUIPage}
 import org.sparklinedata.druid.metadata.{DruidQueryExecutionView, DruidQueryHistory}
 import scala.xml.Node
 
 
-private[ui] class DruidQueriesPage(parent: DruidQueriesTab) extends WebUIPage("") with Logging {
+private[ui] class DruidQueriesPage(parent: DruidQueriesTab) extends WebUIPage("") with SPLLogging {
 
   def render(request: HttpServletRequest): Seq[Node] = {
     val content = generateDruidStatsTable()

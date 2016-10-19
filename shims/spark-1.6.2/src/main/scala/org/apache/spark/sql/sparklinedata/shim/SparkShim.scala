@@ -17,10 +17,12 @@
 
 package org.apache.spark.sql.sparklinedata.shim
 
-import org.apache.spark.sql.SQLConf
-import org.apache.spark.sql.catalyst.optimizer.{DefaultOptimizer, Optimizer}
+import org.apache.hadoop.hive.ql.optimizer.spark.SparkJoinOptimizer
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.{Rule, RuleExecutor}
+import org.apache.spark.sql.execution.SparkOptimizer
 
 
 trait ShimStrategyToRuleStrategy {
@@ -36,11 +38,11 @@ trait ShimStrategyToRuleStrategy {
 case class ExtendedLogicalOptimizer private[shim](conf : SQLConf,
                                  extraRules :
                                  Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])]
-                                ) extends Optimizer(conf)
+                                ) extends Optimizer(null, conf)
   with ShimStrategyToRuleStrategy {
 
   override val batches =
-    DefaultOptimizer(conf).batches.asInstanceOf[List[Batch]] ++
+    new SparkOptimizer(null, conf, null).batches.asInstanceOf[List[Batch]] ++
       extraRules.map(b => Batch(b._1, b._2, b._3)).toList
 }
 

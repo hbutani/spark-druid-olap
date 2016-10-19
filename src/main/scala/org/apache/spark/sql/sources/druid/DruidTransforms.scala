@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.sources.druid
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.sparklinedata.druid._
@@ -93,7 +93,7 @@ trait LimitTransfom {
 
 abstract class DruidTransforms extends DruidPlannerHelper
 with ProjectFilterTransfom with AggregateTransform with JoinTransform with LimitTransfom
-with PredicateHelper with Logging  {
+with PredicateHelper with SPLLogging  {
   self: DruidPlanner =>
 
   type DruidTransform = Function[(Seq[DruidQueryBuilder], LogicalPlan), Seq[DruidQueryBuilder]]
@@ -119,7 +119,7 @@ with PredicateHelper with Logging  {
       val iDQBs : Seq[DruidQueryBuilder] = i._1
       val lP : LogicalPlan = i._2
       val oDQBs = t(iDQBs, lP)
-      if (sqlContext.getConf(DruidPlanner.DEBUG_TRANSFORMATIONS)) {
+      if (sqlContext.conf.getConf(DruidPlanner.DEBUG_TRANSFORMATIONS)) {
         log.info(s"$transformName transform invoked:\n" +
           s"Input DruidQueryBuilders : $iDQBs \n" +
           s"Input LogicalPlan : $lP" +
@@ -139,7 +139,7 @@ with PredicateHelper with Logging  {
   implicit def transformToHolder(t : DruidTransform) = TransformHolder(t)
 
   def debugTranslation(msg : => String) : Unit = {
-    if (sqlContext.getConf(DruidPlanner.DEBUG_TRANSFORMATIONS)) {
+    if (sqlContext.conf.getConf(DruidPlanner.DEBUG_TRANSFORMATIONS)) {
       logInfo(msg)
     }
   }

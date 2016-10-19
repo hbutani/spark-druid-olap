@@ -19,7 +19,6 @@ package org.sparklinedata.druid.metadata
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
-import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer

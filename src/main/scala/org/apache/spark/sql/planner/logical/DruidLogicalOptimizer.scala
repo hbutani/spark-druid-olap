@@ -16,7 +16,7 @@
  */
 package org.apache.spark.sql.planner.logical
 
-import org.apache.spark.sql.SQLConf
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count, Sum}
 import org.apache.spark.sql.catalyst.optimizer.Optimizer

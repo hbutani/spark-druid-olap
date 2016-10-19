@@ -21,12 +21,11 @@ import java.io.PrintStream
 
 import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars
-import org.apache.hive.service.server.{HiveServer2, HiveServerServerOptionsProcessor}
+import org.apache.hive.service.server.HiveServer2
 import org.apache.spark.scheduler.{SparkListenerJobStart, StatsReportListener}
-import org.apache.spark.sql.SQLConf
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.hive.HiveContext
-import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
-import org.apache.spark.sql.hive.thriftserver.HiveThriftServer2.HiveThriftServer2Listener
+import org.apache.spark.sql.hive.thriftserver.HiveThriftServer2.{log => _, logDebug => _, _}
 import org.apache.spark.sql.hive.thriftserver.ReflectionUtils._
 import org.apache.spark.sql.hive.thriftserver.SparkSQLEnv._
 import org.apache.spark.sql.hive.thriftserver.sparklinedata.ui.DruidQueriesTab
@@ -34,7 +33,9 @@ import org.apache.spark.sql.hive.thriftserver.ui.ThriftServerTab
 import org.apache.spark.sql.hive.thriftserver.{SparkSQLCLIDriver, SparkSQLEnv, HiveThriftServer2 => RealHiveThriftServer2}
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.util.{ShutdownHookManager, Utils}
-import org.apache.spark.{Logging, SparkConf, SparkContext}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.sql.SPLLogging
+import org.apache.spark.sql.hive.sparklinedata.StuffReflect
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -44,113 +45,41 @@ import scala.collection.mutable
   * On start, registers Sparkline dateTime functions and DruidPlanner into the
   * [[org.apache.spark.sql.hive.HiveContext]].
   */
-object HiveThriftServer2 extends Logging {
+object HiveThriftServer2 extends SPLLogging {
   def hs2Listener: HS2Listener =
     RealHiveThriftServer2.listener.asInstanceOf[HS2Listener]
 
+  def hs2 : RealHiveThriftServer2 =
+    RealHiveThriftServer2.listener.server.asInstanceOf[RealHiveThriftServer2]
+
   def main(args: Array[String]) {
-    val optionsProcessor = new HiveServerServerOptionsProcessor("HiveThriftServer2")
-    if (!optionsProcessor.process(args)) {
-      System.exit(-1)
-    }
-    logInfo("Starting SparkContext")
-    SparklineSQLEnv.init()
+    StuffReflect.changeSessionStateClass
 
-    ShutdownHookManager.addShutdownHook { () =>
-      SparkSQLEnv.stop()
-      RealHiveThriftServer2.uiTab.foreach(_.detach())
-    }
+    RealHiveThriftServer2.main(args)
+    // FIXME above causes long listener to be registered.
 
-    try {
-      startWithContext(SparkSQLEnv.hiveContext)
-      if (SparkSQLEnv.sparkContext.stopped.get()) {
-        logError("SparkContext has stopped even if HiveServer2 has started, so exit")
-        System.exit(-1)
-      }
-    } catch {
-      case e: Exception =>
-        logError("Error starting HiveThriftServer2", e)
-        System.exit(-1)
-    }
-  }
-
-  def startWithContext(sqlContext: HiveContext): Unit = {
-    /*
-     * RealHiveThriftServer2.startWithContext copied here, so we can register
-     * our listener.
-     */
-    val server = new RealHiveThriftServer2(sqlContext)
-    server.init(sqlContext.hiveconf)
-    server.start()
-    if (SparkSQLEnv.hiveContext.hiveconf.getBoolVar(
-            ConfVars.HIVE_SERVER2_SUPPORT_DYNAMIC_SERVICE_DISCOVERY)) {
-            invoke(classOf[HiveServer2], server, "addServerInstanceToZooKeeper",
-                classOf[HiveConf] -> SparkSQLEnv.hiveContext.hiveconf)
-      ShutdownHookManager.addShutdownHook { () =>
-        invoke(classOf[HiveServer2], server, "removeServerInstanceFromZooKeeper")
-      }
-    }
     RealHiveThriftServer2.listener =
-      new HS2Listener(server, sqlContext.conf)
-    sqlContext.sparkContext.addSparkListener(hs2Listener)
-    RealHiveThriftServer2.uiTab =
-      if (sqlContext.sparkContext.getConf.getBoolean("spark.ui.enabled", true)) {
-        if (DruidPlanner.getConfValue(sqlContext, DruidPlanner.DRUID_RECORD_QUERY_EXECUTION)) {
-          Some(new DruidQueriesTab(sqlContext.sparkContext))
-        }
-        Some(new ThriftServerTab(sqlContext.sparkContext))
-      } else {
-        None
+      new HS2Listener(hs2, sqlContext.conf)
+
+    if (hs2.getHiveConf.getBoolVar(
+      ConfVars.HIVE_SERVER2_SUPPORT_DYNAMIC_SERVICE_DISCOVERY)) {
+      invoke(classOf[HiveServer2], hs2, "addServerInstanceToZooKeeper",
+        classOf[HiveConf] -> hs2.getHiveConf)
+      ShutdownHookManager.addShutdownHook { () =>
+        invoke(classOf[HiveServer2], hs2, "removeServerInstanceFromZooKeeper")
       }
+    }
+
+    if (SparkSQLEnv.sparkContext.getConf.getBoolean("spark.ui.enabled", true)) {
+      if (DruidPlanner.getConfValue(sqlContext, DruidPlanner.DRUID_RECORD_QUERY_EXECUTION)) {
+        Some(new DruidQueriesTab(sqlContext.sparkContext))
+      }
+    }
+
   }
 
   def getSqlStmt(stageId: Int): Option[String] = {
     if (hs2Listener != null) hs2Listener.getSqlStmt(stageId) else None
-  }
-}
-
-object SparklineSQLEnv extends Logging {
-  logDebug("Initializing SparkSQLEnv")
-
-  var sparkLineContext : SparklineDataContext = _
-
-  def init() {
-    if (hiveContext == null) {
-      val sparkConf = new SparkConf(loadDefaults = true)
-      val maybeSerializer = sparkConf.getOption("spark.serializer")
-      val maybeKryoReferenceTracking = sparkConf.getOption("spark.kryo.referenceTracking")
-      // If user doesn't specify the appName, we want to get [SparkSQL::localHostName] instead of
-      // the default appName [SparkSQLCLIDriver] in cli or beeline.
-      val maybeAppName = sparkConf
-        .getOption("spark.app.name")
-        .filterNot(_ == classOf[SparkSQLCLIDriver].getName)
-
-      sparkConf
-        .setAppName(maybeAppName.getOrElse(s"SparkSQL::${Utils.localHostName()}"))
-        .set(
-          "spark.serializer",
-          maybeSerializer.getOrElse("org.apache.spark.serializer.KryoSerializer"))
-        .set(
-          "spark.kryo.referenceTracking",
-          maybeKryoReferenceTracking.getOrElse("false"))
-
-      sparkContext = new SparkContext(sparkConf)
-      sparkContext.addSparkListener(new StatsReportListener())
-      sparkLineContext = new SparklineDataContext(sparkContext)
-      hiveContext = sparkLineContext
-
-      hiveContext.metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
-      hiveContext.metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
-      hiveContext.metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
-
-      hiveContext.setConf("spark.sql.hive.version", HiveContext.hiveExecutionVersion)
-
-      if (log.isDebugEnabled) {
-        hiveContext.hiveconf.getAllProperties.asScala.toSeq.sorted.foreach { case (k, v) =>
-          logDebug(s"HiveConf var: $k=$v")
-        }
-      }
-    }
   }
 }
 

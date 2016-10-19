@@ -17,39 +17,44 @@
 
 package org.apache.spark.sql.hive.sparklinedata
 
-import org.apache.spark.sql.catalyst.AbstractSparkSQLParser
+import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.parser.ParserInterface
+import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
-import org.apache.spark.sql.hive.{HiveContext, HiveQLDialect, HiveQl}
 import org.apache.spark.sql.sparklinedata.commands.{ClearMetadata, ExplainDruidRewrite}
 import org.apache.spark.sql.util.PlanUtil
 
-class SparklineDataDialect(
-                            sqlContext: HiveContext,
-                            moduleParserExtensions : Seq[SparklineDataParser] = Nil,
-                            moduleParserTransforms : Seq[RuleExecutor[LogicalPlan]] = Nil
-                          ) extends HiveQLDialect(sqlContext) {
+class SPLParser(sparkSession: SparkSession,
+                baseParser : ParserInterface,
+                moduleParserExtensions : Seq[SparklineDataParser] = Nil,
+                moduleParserTransforms : Seq[RuleExecutor[LogicalPlan]] = Nil
+                          ) extends ParserInterface {
   val parsers = {
     if (moduleParserExtensions.isEmpty) {
-      Seq(new SparklineDruidCommandsParser(sqlContext))
+      Seq(new SparklineDruidCommandsParser(sparkSession))
     } else {
       moduleParserExtensions
     }
   }
 
-  override def parse(sqlText: String): LogicalPlan = {
-    sqlContext.executionHive.withHiveState {
+  override def parsePlan(sqlText: String): LogicalPlan = {
+    val parsedPlan = parsers.foldRight(None:Option[LogicalPlan]) {
+      case (p, None) => p.parse2(sqlText)
+      case (_, Some(lP)) => Some(lP)
+    }.getOrElse(baseParser.parsePlan(sqlText))
 
-      val parsedPlan = parsers.foldRight(None:Option[LogicalPlan]) {
-        case (p, None) => p.parse2(sqlText)
-        case (_, Some(lP)) => Some(lP)
-      }.getOrElse(HiveQl.parseSql(sqlText))
-
-      moduleParserTransforms.foldRight(parsedPlan){
-        case (rE, lP) => rE.execute(lP)
-      }
+    moduleParserTransforms.foldRight(parsedPlan){
+      case (rE, lP) => rE.execute(lP)
     }
   }
+
+  def parseExpression(sqlText: String): Expression =
+    baseParser.parseExpression(sqlText)
+
+  def parseTableIdentifier(sqlText: String): TableIdentifier =
+  baseParser.parseTableIdentifier(sqlText)
 }
 
 abstract class SparklineDataParser extends AbstractSparkSQLParser {
@@ -57,7 +62,7 @@ abstract class SparklineDataParser extends AbstractSparkSQLParser {
   def parse2(input: String): Option[LogicalPlan]
 }
 
-class SparklineDruidCommandsParser(sqlContext: HiveContext) extends SparklineDataParser {
+class SparklineDruidCommandsParser(sparkSession: SparkSession) extends SparklineDataParser {
 
   protected val CLEAR = Keyword("CLEAR")
   protected val DRUID = Keyword("DRUID")
@@ -92,7 +97,7 @@ class SparklineDruidCommandsParser(sqlContext: HiveContext) extends SparklineDat
     (ON ~> DRUIDDATASOURCE ~> ident) ~ (USING ~> HISTORICAL).? ~
       (EXECUTE ~> opt(QUERY) ~> restInput) ^^ {
       case ds ~ hs ~ query => {
-        PlanUtil.logicalPlan(ds, query, hs.isDefined)(sqlContext)
+        PlanUtil.logicalPlan(ds, query, hs.isDefined)(sparkSession.sqlContext)
       }
     }
 

@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.metadata
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.util.SparklineThreadUtils
 import org.joda.time.Interval
@@ -231,7 +231,7 @@ trait DruidRelationInfoCache {
 case class HistoricalServerAssignment(server: HistoricalServerInfo,
                                       segmentIntervals: List[(DruidSegmentInfo, Interval)])
 
-object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache with Logging {
+object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache with SPLLogging {
 
   private[metadata] val cache: MMap[String, DruidClusterInfo] = MMap()
   private val curatorConnections : MMap[String, CuratorConnection] = MMap()

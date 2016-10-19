@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.jscodegen
 
 import org.apache.commons.lang3.StringEscapeUtils
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.ExprUtil
@@ -36,7 +36,7 @@ import scala.language.reflectiveCalls
 //       using conditional exprs can have NULL values.
 case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAllowed: Boolean,
                            metricAllowed: Boolean, tz_id: String,
-                           retType: DataType = StringType) extends Logging {
+                           retType: DataType = StringType) extends SPLLogging {
   private[this] var uid: Int = 0
 
   private[jscodegen] def makeUniqueVarName: String = {

@@ -18,7 +18,7 @@
 package org.apache.spark.sql.sparklinedata.commands
 
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.execution.RunnableCommand
+import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryCostModel}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.PlanUtil

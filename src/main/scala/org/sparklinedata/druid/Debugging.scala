@@ -17,11 +17,11 @@
 
 package org.sparklinedata.druid
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 
 import scala.language.implicitConversions
 
-object Debugging extends Logging {
+object Debugging extends SPLLogging {
 
   final class Debug[A](val __resultOfDebug: A) extends AnyVal {
     def debug : A = __resultOfDebug

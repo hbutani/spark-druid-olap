@@ -21,7 +21,6 @@ import java.io.{File, InputStreamReader}
 
 import com.google.common.base.Charsets
 import com.google.common.io.{CharStreams, Files}
-import org.apache.spark.Logging
 import org.joda.time.{DateTimeZone, Interval}
 import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.JsonMethods._
@@ -29,10 +28,12 @@ import org.json4s.jackson.Serialization
 import org.json4s.{Extraction, ShortTypeHints}
 import org.sparklinedata.druid.client.{OverlordTaskStatus, QueryResultRowSerializer, SelectResultRowSerializer, TopNResultRowSerializer}
 import org.sparklinedata.druid.metadata._
+import org.apache.spark.sql.SPLLogging
+
 
 import scala.util.Random
 
-object Utils extends Logging {
+object Utils extends SPLLogging {
 
   implicit val jsonFormat = Serialization.formats(
     ShortTypeHints(

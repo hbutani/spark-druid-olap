@@ -84,7 +84,7 @@ trait AggregateTransform {
       }
       case _ => {
         val codeGen = JSCodeGenerator(dqb, expandOpExp, false, false,
-          sqlContext.getConf(DruidPlanner.TZ_ID).toString)
+          sqlContext.conf.getConf(DruidPlanner.TZ_ID).toString)
         for (fn <- codeGen.fnCode) yield {
           val outDName = dqb.nextAlias(codeGen.fnParams.last)
           dqb.dimension(new ExtractionDimensionSpec(codeGen.fnParams.last, outDName,
@@ -365,16 +365,16 @@ trait AggregateTransform {
         val sumAgg = new Sum(c.children.head)
         val countAgg = new Count(c.children)
         for (jsSumInf <- JSAggGenerator.jsAgg(dqb, new AggregateExpression(sumAgg, Partial, false),
-          sumAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString);
+          sumAgg, sqlContext.conf.getConf(DruidPlanner.TZ_ID).toString);
              jsCountInf <- JSAggGenerator.jsAgg(jsSumInf._1,
                new AggregateExpression(countAgg, Partial, false),
-               countAgg, sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
+               countAgg, sqlContext.conf.getConf(DruidPlanner.TZ_ID).toString)) yield
           jsCountInf._1.avgExpression(aggExp, jsSumInf._2, jsCountInf._2)
       }
       case nativeAgg(dqbT) => Some(dqbT)
       case (_, c) => {
         for (jsADQB <- JSAggGenerator.jsAgg(dqb, aggExp, c,
-          sqlContext.getConf(DruidPlanner.TZ_ID).toString)) yield
+          sqlContext.conf.getConf(DruidPlanner.TZ_ID).toString)) yield
           jsADQB._1
       }
 

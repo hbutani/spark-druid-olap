@@ -19,7 +19,7 @@ package org.apache.spark.sql.sources.druid
 
 import java.text.DecimalFormat
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.SQLContext
 import org.joda.time.Interval
 import org.sparklinedata.druid._
@@ -280,7 +280,7 @@ case class CostInput(
   // scalastyle:on
 }
 
-sealed trait QueryCost extends Logging {
+sealed trait QueryCost extends SPLLogging {
   val cI: CostInput
 
   import cI._
@@ -615,7 +615,7 @@ class TopNQueryCost(i : CostInput) extends GroupByQueryCost(i) {
   }
 }
 
-object DruidQueryCostModel extends Logging {
+object DruidQueryCostModel extends SPLLogging {
 
   def intervalsMillis(intervals : List[Interval]) : Long = Utils.intervalsMillis(intervals)
 
@@ -734,28 +734,28 @@ object DruidQueryCostModel extends Logging {
 
     val shuffleCostPerRow: Double = 1.0
 
-    val histMergeFactor = sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_HIST_MERGE_COST)
+    val histMergeFactor = sqlContext.conf.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_HIST_MERGE_COST)
     val histMergeCostPerRow = shuffleCostPerRow * histMergeFactor
 
     val histSegsPerQueryLimit =
-      sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_HIST_SEGMENTS_PERQUERY_LIMIT)
+      sqlContext.conf.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_HIST_SEGMENTS_PERQUERY_LIMIT)
 
     val queryIntervalRatioScaleFactor =
-      sqlContext.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_INTERVAL_SCALING_NDV)
+      sqlContext.conf.getConf(DruidPlanner.DRUID_QUERY_COST_MODEL_INTERVAL_SCALING_NDV)
 
-    val historicalTimeSeriesProcessingCostPerRow = sqlContext.getConf(
+    val historicalTimeSeriesProcessingCostPerRow = sqlContext.conf.getConf(
       DruidPlanner.DRUID_QUERY_COST_MODEL_HISTORICAL_TIMESERIES_PROCESSING_COST)
 
-    val historicalGByProcessigCostPerRow = sqlContext.getConf(
+    val historicalGByProcessigCostPerRow = sqlContext.conf.getConf(
       DruidPlanner.DRUID_QUERY_COST_MODEL_HISTORICAL_PROCESSING_COST)
 
-    val sparkScheulingCostPerTask = sqlContext.getConf(
+    val sparkScheulingCostPerTask = sqlContext.conf.getConf(
       DruidPlanner.DRUID_QUERY_COST_MODEL_SPARK_SCHEDULING_COST)
 
-    val sparkAggregationCostPerRow = sqlContext.getConf(
+    val sparkAggregationCostPerRow = sqlContext.conf.getConf(
       DruidPlanner.DRUID_QUERY_COST_MODEL_SPARK_AGGREGATING_COST)
 
-    val druidOutputTransportCostPerRow = sqlContext.getConf(
+    val druidOutputTransportCostPerRow = sqlContext.conf.getConf(
       DruidPlanner.DRUID_QUERY_COST_MODEL_OUTPUT_TRANSPORT_COST)
 
     val indexIntervalMillis = intervalsMillis(druidDSIntervals)

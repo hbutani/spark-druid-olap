@@ -20,11 +20,12 @@ package org.sparklinedata.druid
 import java.util.concurrent.{Callable, TimeUnit}
 
 import com.google.common.base.Throwables
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
+
 
 import scala.reflect._
 
-object RetryUtils extends Logging {
+object RetryUtils extends SPLLogging {
 
   var DEFAULT_RETRY_COUNT: Int = 10
   var DEFAULT_RETRY_SLEEP: Long = TimeUnit.SECONDS.toMillis(30)
