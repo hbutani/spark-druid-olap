@@ -19,6 +19,7 @@ package org.sparklinedata.druid.metadata
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.hive.sparklinedata.SPLSessionState
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -37,7 +38,7 @@ object StarSchemaInfo {
   def qualifyTableNames(sqlContext : SQLContext,
                         sSI : StarSchemaInfo) : StarSchemaInfo = {
     StarSchemaInfo(
-      SparklineDataContext.qualifiedName(sqlContext, sSI.factTable),
+      SPLSessionState.qualifiedName(sqlContext, sSI.factTable),
       sSI.relations.map(StarRelationInfo.qualifyTableNames(sqlContext, _)):_*
     )
   }
@@ -77,8 +78,8 @@ object StarRelationInfo {
   def qualifyTableNames(sqlContext : SQLContext,
                         sRI : StarRelationInfo) : StarRelationInfo = {
     sRI.copy(
-      leftTable = SparklineDataContext.qualifiedName(sqlContext, sRI.leftTable),
-      rightTable = SparklineDataContext.qualifiedName(sqlContext, sRI.rightTable)
+      leftTable = SPLSessionState.qualifiedName(sqlContext, sRI.leftTable),
+      rightTable = SPLSessionState.qualifiedName(sqlContext, sRI.rightTable)
     )
   }
 

@@ -27,7 +27,6 @@ import org.apache.spark.sql.hive.sparklinedata.{SparklineDataParser, SparklineDr
 import org.apache.spark.sql.internal.SQLConf.SQLConfigBuilder
 import org.apache.spark.sql.planner.logical.DruidLogicalOptimizer
 import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidStrategy}
-import org.apache.spark.sql.sparklinedata.shim.SparkShim
 import org.sparklinedata.spark.dateTime.Functions
 
 trait SparklineDataModule {
@@ -43,7 +42,7 @@ trait SparklineDataModule {
     * Any extra rules that should be added to the Logical Optimizer.
     * @return
     */
-  def logicalRules : Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])] = Nil
+  def logicalRules : Seq[(String, Rule[LogicalPlan])] = Nil
 
   /**
     * An optinal parser extension
@@ -74,7 +73,7 @@ object BaseModule extends SparklineDataModule {
     Functions.register(sparkSession.sqlContext)
   }
 
-  override def logicalRules : Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])] =
+  override def logicalRules : Seq[(String, Rule[LogicalPlan])] =
     DruidLogicalOptimizer.batches
 
   override def parser(sparkSession: SparkSession) : Option[SparklineDataParser] =
@@ -97,7 +96,7 @@ class ModuleLoader(sparkSession: SparkSession,
   }
 
   def addLogicalRules : Unit = {
-    val batches = modules.flatMap(_.logicalRules).map(_._3)
+    val batches = modules.flatMap(_.logicalRules).map(_._2)
     sparkSession.experimental.extraOptimizations =
       batches ++ sparkSession.experimental.extraOptimizations
   }

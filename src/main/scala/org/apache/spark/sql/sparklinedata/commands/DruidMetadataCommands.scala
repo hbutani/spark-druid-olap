@@ -19,10 +19,11 @@ package org.apache.spark.sql.sparklinedata.commands
 
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.command.RunnableCommand
+import org.apache.spark.sql.hive.sparklinedata.SPLSessionState
 import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryCostModel}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.PlanUtil
-import org.apache.spark.sql.{Row, SQLContext}
+import org.apache.spark.sql.{Row, SQLContext, SparkSession}
 import org.joda.time.Interval
 import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationName, DruidRelationOptions}
 
@@ -54,8 +55,8 @@ case class ExplainDruidRewrite(sql: String) extends RunnableCommand {
     schema.toAttributes
   }
 
-  override def run(sqlContext: SQLContext): Seq[Row] = {
-    val qe = sqlContext.executeSql(sql)
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    val qe = sparkSession.sessionState.executeSql(sql)
 
     qe.sparkPlan.toString().split("\n").map(Row(_)).toSeq ++
     Seq(Row("")) ++
@@ -68,7 +69,7 @@ case class ExplainDruidRewrite(sql: String) extends RunnableCommand {
 
       s"""DruidQuery(${System.identityHashCode(dR.dQuery)}) details ::
          |${DruidQueryCostModel.computeMethod(
-        sqlContext, druidDSIntervals, druidDSFullName, druidDSOptions,
+        sparkSession.sqlContext, druidDSIntervals, druidDSFullName, druidDSOptions,
         inputEstimate, outputEstimate, dR.dQuery.q)
       }
        """.stripMargin.split("\n").map(Row(_))

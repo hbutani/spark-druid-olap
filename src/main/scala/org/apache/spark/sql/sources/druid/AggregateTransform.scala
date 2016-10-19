@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.sources.druid
 
-import org.apache.spark.sql.catalyst.analysis.HiveTypeCoercion
+import org.apache.spark.sql.catalyst.analysis.TypeCoercion
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Expand, LogicalPlan, Project}
@@ -496,7 +496,7 @@ trait AggregateTransform {
                    mNm <- attributeRef(c);
                    dM <- dqb.druidColumn(mNm) if dM.isMetric;
                    mDT <- Some(DruidDataType.sparkDataType(dM.dataType));
-                   commonType <- HiveTypeCoercion.findTightestCommonTypeOfTwo(
+                   commonType <- TypeCoercion.findTightestCommonTypeOfTwo(
                      aggFunc.dataType, mDT) if (commonType == mDT || aggFunc.isInstanceOf[Average])
       ) yield (aggFunc, commonType, dM)
 

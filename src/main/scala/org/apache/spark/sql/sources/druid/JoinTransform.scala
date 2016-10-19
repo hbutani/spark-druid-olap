@@ -309,7 +309,7 @@ trait JoinTransform {
     rightExpressions,
     otherJoinPredicate,
     JoinGraphDruidQuery(jdqb),
-    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _))
+    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _, _))
     )
       ) => {
       translateJoin(leftExpressions,
@@ -326,7 +326,7 @@ trait JoinTransform {
     leftExpressions,
     rightExpressions,
     otherJoinPredicate,
-    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _)),
+    cacheTablePatternMatch(projectList, filters, l@LogicalRelation(dimRelation, _,_)),
     JoinGraphDruidQuery(jdqb)
     )
       ) => {
@@ -392,8 +392,9 @@ trait JoinTransform {
       leftExpressions,
       rightExpressions,
       otherJoinPredicate,
-      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation, _)),
-      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation, _))) =>
+      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation, _, _)),
+      cacheTablePatternMatch(
+      rightProjectList, rightFilters, LogicalRelation(rightRelation, _, _))) =>
         Some(LeafJoinNode(leftExpressions,
           DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),
           rightExpressions,
@@ -406,7 +407,8 @@ trait JoinTransform {
       rightExpressions,
       otherJoinPredicate,
       JoinNode(lJT),
-      cacheTablePatternMatch(rightProjectList, rightFilters, LogicalRelation(rightRelation, _))) =>
+      cacheTablePatternMatch(
+      rightProjectList, rightFilters, LogicalRelation(rightRelation, _, _))) =>
         Some(LeftJoinNode(lJT, leftExpressions,
           rightExpressions,
           DimTableInfo(rightProjectList, rightFilters, rightRelation, rightExpressions),
@@ -417,7 +419,7 @@ trait JoinTransform {
       leftExpressions,
       rightExpressions,
       otherJoinPredicate,
-      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation, _)),
+      cacheTablePatternMatch(leftProjectList, leftFilters, LogicalRelation(leftRelation, _, _)),
       JoinNode(rJT)
       ) => Some(RightJoinNode(rJT,
         leftExpressions, DimTableInfo(leftProjectList, leftFilters, leftRelation, leftExpressions),

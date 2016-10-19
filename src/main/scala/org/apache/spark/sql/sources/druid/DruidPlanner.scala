@@ -20,7 +20,7 @@ package org.apache.spark.sql.sources.druid
 import org.apache.spark.internal.config.ConfigEntry
 import org.apache.spark.sql.internal.SQLConf.SQLConfigBuilder
 import org.apache.spark.sql.internal.SQLConf.SQLConfigBuilder._
-import org.apache.spark.sql.execution.{PhysicalRDD, SparkPlan}
+import org.apache.spark.sql.execution.{RowDataSourceScanExec, SparkPlan}
 import org.apache.spark.sql.{CachedTablePattern, SQLContext}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.sparklinedata.druid._
@@ -75,11 +75,13 @@ object DruidPlanner {
       "used by Druid for Date/TimeStamp transformations.").
     stringConf.createWithDefault(org.joda.time.DateTimeZone.getDefault.getID)
 
-  val DRUID_SELECT_QUERY_PAGESIZE = SQLConfigBuilder("spark.sparklinedata.druid.selectquery.pagesize").
+  val DRUID_SELECT_QUERY_PAGESIZE =
+    SQLConfigBuilder("spark.sparklinedata.druid.selectquery.pagesize").
   doc("Num. of rows fetched on each invocation of Druid Select Query").
     intConf.createWithDefault(10000)
 
-  val DRUID_CONN_POOL_MAX_CONNECTIONS = SQLConfigBuilder("spark.sparklinedata.druid.max.connections").
+  val DRUID_CONN_POOL_MAX_CONNECTIONS =
+    SQLConfigBuilder("spark.sparklinedata.druid.max.connections").
     doc("Max. number of Http Connections to Druid Cluster").intConf.createWithDefault(100)
 
   val DRUID_CONN_POOL_MAX_CONNECTIONS_PER_ROUTE = SQLConfigBuilder(
@@ -168,13 +170,13 @@ object DruidPlanner {
 
   def getDruidQuerySpecs(plan : SparkPlan) : Seq[DruidQuery] = {
     plan.collect {
-      case PhysicalRDD(_, r : DruidRDD, _, _, _) => r.dQuery
+      case RowDataSourceScanExec(_, r : DruidRDD, _, _, _, _) => r.dQuery
     }
   }
 
   def getDruidRDDs(plan : SparkPlan) : Seq[DruidRDD] = {
     plan.collect {
-      case PhysicalRDD(_, r : DruidRDD, _, _, _) => r
+      case RowDataSourceScanExec(_, r : DruidRDD, _, _, _, _) => r
     }
   }
 

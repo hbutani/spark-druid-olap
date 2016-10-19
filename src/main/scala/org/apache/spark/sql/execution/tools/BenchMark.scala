@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.tools
 
 import com.github.nscala_time.time.Imports._
 import org.apache.spark.sql.catalyst.dsl.expressions._
-import org.apache.spark.sql.execution.{PhysicalRDD, SparkPlan}
+import org.apache.spark.sql.execution.{RowDataSourceScanExec, SparkPlan}
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
@@ -382,7 +382,8 @@ class BenchMark private(val sqlCtx: SQLContext,
     """)
 
     private def getDruidRDD(p : SparkPlan) : Option[DruidRDD] = p match {
-      case PhysicalRDD(_, r, _, _, _) if r.isInstanceOf[DruidRDD] => Some(r.asInstanceOf[DruidRDD])
+      case RowDataSourceScanExec(_, r, _, _, _, _)
+        if r.isInstanceOf[DruidRDD] => Some(r.asInstanceOf[DruidRDD])
       case _ if p.children.size == 1 => getDruidRDD(p.children(0))
     }
 

@@ -20,11 +20,11 @@ package org.apache.spark.sql
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, Subquery}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project, SubqueryAlias}
 import org.apache.spark.sql.execution.columnar.InMemoryRelation
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation.ReturnType
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.hive.sparklinedata.SparklineDataContext
+import org.apache.spark.sql.hive.sparklinedata.SPLSessionState
 import org.apache.spark.sql.sources.druid.DruidPlanner
 
 import scala.collection.mutable.{Map => mMap}
@@ -77,7 +77,7 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
     l match {
       case l if l.isEmpty => Array()
       case l if l.size == 1 && l(0).trim == "" => Array()
-      case _ => l.map(SparklineDataContext.qualifyWithDefault(sqlContext, _)).toArray
+      case _ => l.map(SPLSessionState.qualifyWithDefault(sqlContext, _)).toArray
     }
   }
 
@@ -107,7 +107,7 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
 
   private def collectInMemoryRelation(iP :InMemoryRelation) : Option[CollectProjectFilterType] =
     logicalPlan(iP).map {
-      case Subquery(name, child) => child
+      case SubqueryAlias(name, child) => child
       case x => x
      }.map { lP =>
       (
@@ -149,10 +149,10 @@ class CachedTablePattern(val sqlContext : SQLContext)  extends PredicateHelper {
   private def substitute(aliases: Map[Attribute, Expression])(expr: Expression): Expression = {
     expr.transform {
       case a @ Alias(ref: AttributeReference, name) =>
-        aliases.get(ref).map(Alias(_, name)(a.exprId, a.qualifiers)).getOrElse(a)
+        aliases.get(ref).map(Alias(_, name)(a.exprId, a.qualifier)).getOrElse(a)
 
       case a: AttributeReference =>
-        aliases.get(a).map(Alias(_, a.name)(a.exprId, a.qualifiers)).getOrElse(a)
+        aliases.get(a).map(Alias(_, a.name)(a.exprId, a.qualifier)).getOrElse(a)
     }
   }
 }

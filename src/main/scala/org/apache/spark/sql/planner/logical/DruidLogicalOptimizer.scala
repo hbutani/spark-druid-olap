@@ -23,21 +23,16 @@ import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.sparklinedata.shim.SparkShim
 import org.apache.spark.sql.util.PlanUtil.maxCardinalityIsOne
 import org.apache.spark.sql.util.{ExprUtil, PlanUtil}
 
 object DruidLogicalOptimizer {
 
-  val batches: Seq[(String, SparkShim.RuleStrategy, Rule[LogicalPlan])] = Seq(
-    ("Rewrite Sum(Literal) as Count(1)*Literal", SparkShim.fixedPoint(100), SumOfLiteralRewrite),
-    ("Push GB through Project, Join", SparkShim.fixedPoint(100), PushGB),
-    ("Pull true VC up in to Agg", SparkShim.fixedPoint(100), PullVColsIntoAgg)
+  val batches: Seq[(String, Rule[LogicalPlan])] = Seq(
+    ("Rewrite Sum(Literal) as Count(1)*Literal", SumOfLiteralRewrite),
+    ("Push GB through Project, Join", PushGB),
+    ("Pull true VC up in to Agg", PullVColsIntoAgg)
   )
-
-  def apply(conf : SQLConf) : Optimizer = {
-    SparkShim.extendedlogicalOptimizer(conf, batches)
-  }
 }
 
 /**
@@ -260,7 +255,7 @@ object SumOfLiteralRewrite extends Rule[LogicalPlan] with PredicateHelper {
           val sMap = newAgg.aggregateExpressions.foldLeft(Map[String, Expression]()) { (m, e) =>
             if (sli._2.contains(e.name)) {
               m + (e.name -> Multiply(AttributeReference(e.name, e.dataType, e.nullable,
-                e.metadata)(e.exprId, e.qualifiers), sli._2.get(e.name).get._1))
+                e.metadata)(e.exprId, e.qualifier), sli._2.get(e.name).get._1))
             } else {
               m
             }
@@ -275,10 +270,10 @@ object SumOfLiteralRewrite extends Rule[LogicalPlan] with PredicateHelper {
             case ne: NamedExpression if (sli._2.contains(ne.name)) =>
               val ale = sli._2.get(ne.name).get
               Alias(Multiply(AttributeReference(ne.name, ne.dataType, ne.nullable, ne.metadata)
-              (ne.exprId, ne.qualifiers), ale._1), ne.name)(ale._2.exprId,
-                ale._2.qualifiers, ale._2.explicitMetadata)
+              (ne.exprId, ne.qualifier), ale._1), ne.name)(ale._2.exprId,
+                ale._2.qualifier, ale._2.explicitMetadata)
             case ne: NamedExpression => AttributeReference(ne.name, ne.dataType, ne.nullable,
-              ne.metadata)(ne.exprId, ne.qualifiers)
+              ne.metadata)(ne.exprId, ne.qualifier)
           }
           Project(pl.asInstanceOf[Seq[NamedExpression]], newAgg)
         }

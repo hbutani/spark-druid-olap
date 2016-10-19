@@ -327,10 +327,10 @@ object ExprUtil {
       e match {
         case a@Alias(c, n) if preserveAlias => Some(Alias(c.transform {
           case a: Attribute => aliasMap.getOrElse(a, a)
-        }, n)(a.exprId, a.qualifiers, a.explicitMetadata))
+        }, n)(a.exprId, a.qualifier, a.explicitMetadata))
         case atr@AttributeReference(n, dt, nul, m) if preserveAlias => Some(Alias(e.transform {
           case a: Attribute => aliasMap.getOrElse(a, a)
-        }, n)(atr.exprId, atr.qualifiers, Some(atr.metadata)))
+        }, n)(atr.exprId, atr.qualifier, Some(atr.metadata)))
         case _ => Some(e.transform {
           case a: Attribute => aliasMap.getOrElse(a, a)
         })
@@ -355,10 +355,10 @@ object ExprUtil {
       e match {
         case a@Alias(c, n) => Alias(c.transform {
           case at: Attribute => aliasToNewExpr.get(at.name).getOrElse(at)
-        }, n)(a.exprId, a.qualifiers, a.explicitMetadata)
+        }, n)(a.exprId, a.qualifier, a.explicitMetadata)
         case atr@AttributeReference(n, dt, nul, m) => Alias(e.transform {
           case at: Attribute => aliasToNewExpr.get(at.name).getOrElse(at)
-        }, n)(atr.exprId, atr.qualifiers, Some(atr.metadata))
+        }, n)(atr.exprId, atr.qualifier, Some(atr.metadata))
         case _ => e.transform {
           case at: Attribute => aliasToNewExpr.get(at.name).getOrElse(at)
         }

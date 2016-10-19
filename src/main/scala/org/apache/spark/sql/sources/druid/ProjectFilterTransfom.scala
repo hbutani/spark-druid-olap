@@ -90,7 +90,7 @@ trait ProjectFilterTransfom {
 
   val druidRelationTransform: DruidTransform = {
     case (_, PhysicalOperation(projectList, filters,
-    l@LogicalRelation(d@DruidRelation(info, None), _))) => {
+    l@LogicalRelation(d@DruidRelation(info, None), _, _))) => {
       val actualInfo = DruidMetadataCache.druidRelation(
         sqlContext,
         info
@@ -109,7 +109,7 @@ trait ProjectFilterTransfom {
    */
   val druidRelationTransformForJoin: DruidTransform = {
     case (_, cacheTablePatternMatch(projectList, filters,
-    l@LogicalRelation(d@DruidRelation(info, None), _))) => {
+    l@LogicalRelation(d@DruidRelation(info, None), _, _))) => {
       val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
       translateProjectFilter(dqb,
         projectList,

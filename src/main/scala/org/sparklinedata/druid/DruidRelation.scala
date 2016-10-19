@@ -34,7 +34,7 @@ case class DruidOperatorAttribute(exprId : ExprId, name : String, dataType : Dat
  *
  * @param q
  * @param intervalSplits
- * @param outputAttrSpec attributes to be output from the PhysicalRDD. Each output attribute is
+ * @param outputAttrSpec attributes to be output from the RawDataSourceScanExec. Each output attribute is
  *                       based on an Attribute in the originalPlan. The association is based
  *                       on the ExprId.
  */
