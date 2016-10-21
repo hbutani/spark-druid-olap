@@ -18,14 +18,14 @@
 package org.sparklinedata.druid.client.test
 
 import com.github.nscala_time.time.Imports._
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.scalatest.BeforeAndAfterAll
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 
 import scala.language.postfixOps
 
-class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterAll with Logging {
+class StarSchemaTpchQueriesCTest extends StarSchemaBaseTest with BeforeAndAfterAll with SPLLogging {
 
   val q1Predicate = dateTime('l_shipdate) <= (dateTime("1997-12-01") - 3.day)
 

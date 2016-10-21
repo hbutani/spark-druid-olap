@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.client.test
 
 import com.github.nscala_time.time.Imports._
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
@@ -164,7 +164,7 @@ object StarSchemaTpchQueries {
     """.stripMargin
 }
 
-class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with Logging {
+class StarSchemaBaseTest extends BaseTest with BeforeAndAfterAll with SPLLogging {
 
   val TPCH_BASE_DIR = System.getProperty("user.dir") + "/quickstart/tpch/datascale1.sample"
 

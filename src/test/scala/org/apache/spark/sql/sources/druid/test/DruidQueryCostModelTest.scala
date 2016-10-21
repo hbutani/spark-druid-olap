@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.sources.druid.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.sources.druid.{CostInput, DruidQueryCostModel}
 import org.joda.time.{DateTime, Period}
 import org.scalatest.{BeforeAndAfterAll, fixture}
@@ -26,7 +26,7 @@ import org.sparklinedata.druid.{GroupByQuerySpec, SelectSpecWithIntervals}
 import scala.language.implicitConversions
 
 class DruidQueryCostModelTest extends fixture.FunSuite with
-  fixture.TestDataFixture with BeforeAndAfterAll with Logging {
+  fixture.TestDataFixture with BeforeAndAfterAll with SPLLogging {
 
   implicit def toMillis(p : Period) : Long = {
     val s = new DateTime()

@@ -18,6 +18,7 @@ val sparkVersion = "2.0.1"
 val guava_version = "16.0.1"
 val derbyVersion = "10.12.1.1"
 val jettyVersion = "9.2.16.v20160414"
+val jacksonVersion = "2.6.5"
 
 val sparkDependencies = Seq(
   "com.google.guava" % "guava" % guava_version % "provided" force(),
@@ -41,8 +42,8 @@ val coreDependencies = Seq(
   "org.apache.httpcomponents" % "httpclient" % httpclientVersion,
   // "org.json4s" %% "json4s-native" % json4sVersion,
   "org.json4s" %% "json4s-ext" % json4sVersion,
-  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % "2.4.6",
-  "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-smile-provider" % "2.4.6",
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % jacksonVersion,
+  "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-smile-provider" % jacksonVersion,
   "com.sparklinedata" %% "spark-datetime" % sparkdateTimeVersion,
   "com.github.scopt" %% "scopt" % scoptVersion,
   "org.scalatest" %% "scalatest" % scalatestVersion % "test"
@@ -64,7 +65,15 @@ val druidTestEnvDependencies =Seq(
   "io.druid" % "druid-server" % druidVersion,
   "io.druid" % "druid-services" % druidVersion,
   "org.apache.curator" % "curator-test" % "2.4.0" % "test" exclude("log4j", "log4j")  force(),
-  "io.druid.extensions" % "druid-datasketches" % druidVersion
+  "io.druid.extensions" % "druid-datasketches" % druidVersion,
+
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % jacksonVersion force(),
+  "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion force(),
+  "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-smile-provider" % jacksonVersion force(),
+  "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-base" % jacksonVersion force(),
+  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion force(),
+  "com.fasterxml.jackson.core" % "jackson-annotations" % jacksonVersion force(),
+  "com.fasterxml.jackson.module" % "jackson-module-jaxb-annotations" % jacksonVersion force()
 )
 
 lazy val commonSettings = Seq(

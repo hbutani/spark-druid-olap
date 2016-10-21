@@ -18,14 +18,14 @@
 package org.sparklinedata.druid.client.test
 
 import org.apache.http.concurrent.Cancellable
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.sources.druid.JsonOperations
 import org.json4s._
 import org.scalatest.{BeforeAndAfterAll, fixture}
 import org.sparklinedata.druid._
 import org.sparklinedata.druid.client.{CancellableHolder, DruidQueryServerClient}
 
-object CancelThread extends CancellableHolder with Logging {
+object CancelThread extends CancellableHolder with SPLLogging {
 
   @volatile
   private var cancellable : Cancellable = null
@@ -55,7 +55,7 @@ object CancelThread extends CancellableHolder with Logging {
 }
 
 class CancelDruidRequestTest extends fixture.FunSuite with
-  fixture.TestDataFixture with BeforeAndAfterAll with Logging with JsonOperations {
+  fixture.TestDataFixture with BeforeAndAfterAll with SPLLogging with JsonOperations {
 
   val useSmile : Boolean = true
 

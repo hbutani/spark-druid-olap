@@ -121,13 +121,11 @@ object ModuleLoader extends SPLLogging {
 
   private var modules : Seq[SparklineDataModule] = _
 
-  private def loadModules(sparkSession : SparkSession) : Unit = synchronized {
+  private def loadModules(modulesToLoad : Seq[String]) : Unit = synchronized {
 
     if (modules == null ) {
 
       val runtimeMirror = ScalaReflection.mirror
-      val modulesToLoad = sparkSession.conf.get(ModuleLoader.SPARKLINE_MODULES)
-
       modules = Seq(BaseModule) ++
         modulesToLoad.map { m =>
 
@@ -145,8 +143,9 @@ object ModuleLoader extends SPLLogging {
     doc("sparkline modules to load.").
     stringConf.toSequence.createWithDefault(Seq())
 
-  def apply(sparkSession : SparkSession) : ModuleLoader = {
-    loadModules(sparkSession)
+  def apply(modulesToLoad : Seq[String],
+            sparkSession : SparkSession) : ModuleLoader = {
+    loadModules(modulesToLoad)
     new ModuleLoader(sparkSession, modules)
   }
 }

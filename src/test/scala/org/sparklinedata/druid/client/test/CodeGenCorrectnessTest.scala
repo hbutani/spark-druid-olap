@@ -17,10 +17,10 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.scalatest.BeforeAndAfterAll
 
-class CodeGenCorrectnessTest extends BaseTest with BeforeAndAfterAll with Logging {
+class CodeGenCorrectnessTest extends BaseTest with BeforeAndAfterAll with SPLLogging {
 
   cTest("gbexprtest1",
     "select sum(c_acctbal) as bal from orderLineItemPartSupplier where l_shipdate >= " +

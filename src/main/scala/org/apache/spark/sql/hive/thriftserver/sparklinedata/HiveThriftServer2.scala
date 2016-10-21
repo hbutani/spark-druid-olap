@@ -56,7 +56,7 @@ object HiveThriftServer2 extends SPLLogging {
     StuffReflect.changeSessionStateClass
 
     RealHiveThriftServer2.main(args)
-    // FIXME above causes long listener to be registered.
+    // FIXME above causes wrong listener to be registered.
 
     RealHiveThriftServer2.listener =
       new HS2Listener(hs2, sqlContext.conf)

@@ -33,6 +33,15 @@ class DruidRewritesTest extends BaseTest {
     true
   )
 
+  test("basicAggB",
+    "select l_returnflag, l_linestatus, " +
+      "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
+      "count(distinct o_orderkey)  " +
+      "from orderLineItemPartSupplierBase group by l_returnflag, l_linestatus",
+    0,
+    true
+  )
+
   test("basicAgg",
       "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a," +
