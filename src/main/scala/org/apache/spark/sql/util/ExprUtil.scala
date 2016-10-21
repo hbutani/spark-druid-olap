@@ -40,7 +40,7 @@ object ExprUtil {
     case Literal(v, _) if v == null => false
     case _ if e.isInstanceOf[LeafExpression] => true
     // TODO: Expand the case below
-    case (Cast(_, _) | BinaryArithmetic(_) | UnaryMinus(_) | UnaryPositive(_) | Abs(_))
+    case (Cast(_, _) | BinaryArithmetic(_, _) | UnaryMinus(_) | UnaryPositive(_) | Abs(_))
     => e.children.filter(_.isInstanceOf[Expression]).foldLeft(true) {
       (s, ce) => val cexp = nullPreserving(ce); if (s && cexp) return true else false
     }
@@ -49,7 +49,7 @@ object ExprUtil {
 
   def conditionalExpr(e: Expression): Boolean = {
     e match {
-      case If(_, _, _) | CaseWhen(_) | CaseKeyWhen(_, _) | Least(_) | Greatest(_)
+      case If(_, _, _) | CaseWhen(_, _) | Least(_) | Greatest(_)
            | Coalesce(_) | NaNvl(_, _) | AtLeastNNonNulls(_, _) => true
       case _ if e.isInstanceOf[LeafExpression] => false
       case _ =>

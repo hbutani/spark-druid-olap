@@ -19,7 +19,8 @@ package org.apache.spark.sql.util
 
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.{AnalysisException, DataFrame, SQLContext}
+import org.apache.spark.sql.hive.sparklinedata.SPLSessionState
+import org.apache.spark.sql.{AnalysisException, DataFrame, Dataset, SQLContext}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.metadata.DruidRelationInfo
@@ -41,7 +42,7 @@ object PlanUtil {
     implicit sqlContext: SQLContext): DataFrame = {
     val dR = DruidRelation(drInfo, Some(dq))(sqlContext)
     val lP = LogicalRelation(dR, None)
-    new DataFrame(sqlContext, lP)
+    Dataset.ofRows(sqlContext.sparkSession, lP)
   }
 
   @throws(classOf[AnalysisException])

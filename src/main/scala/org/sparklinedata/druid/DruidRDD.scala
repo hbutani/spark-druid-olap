@@ -19,7 +19,7 @@ package org.sparklinedata.druid
 
 import org.apache.http.client.methods.{HttpExecutionAware, HttpRequestBase}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.GenericInternalRowWithSchema
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.util.DateTimeUtils.SQLTimestamp
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -232,9 +232,9 @@ class DruidRDD(sqlContext: SQLContext,
 
     r.map { r =>
       numRows += 1
-      val row = new GenericInternalRowWithSchema(schema.fields.map
+      val row = new GenericInternalRow(schema.fields.map
       (f => DruidValTransform.sparkValue(
-        f, r.event(druidColName(f.name)), tfName(f))), schema)
+        f, r.event(druidColName(f.name)), tfName(f))))
       row
     }
   }

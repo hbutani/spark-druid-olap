@@ -85,19 +85,19 @@ class PostAggregate(val druidOpSchema : DruidOperatorSchema) {
 
   lazy val rewrittenResultExpressions = resultExpressions.map { expr =>
     expr.transformDown {
-      case AggregateExpression(aggregateFunction, _, isDistinct) =>
+      case aE@AggregateExpression(aggregateFunction, _, isDistinct, _) =>
         // The final aggregation buffer's attributes will be `finalAggregationAttributes`,
         // so replace each aggregate expression by its corresponding attribute in the set:
-        aggregateFunctionToAttribute(aggregateFunction, isDistinct)
+        // aggregateFunctionToAttribute(aggregateFunction, isDistinct)
+        aE.resultAttribute
       case expression => expression
     }.asInstanceOf[NamedExpression]
   }
 
   def aggOp(child : SparkPlan) : Seq[SparkPlan] = {
-    org.apache.spark.sql.execution.aggregate.Utils.planAggregateWithoutPartial(
+    org.apache.spark.sql.execution.aggregate.AggUtils.planAggregateWithoutPartial(
       namedGroupingExpressions,
         aggregateExpressions,
-        aggregateFunctionToAttribute,
         rewrittenResultExpressions,
       child)
   }

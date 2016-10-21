@@ -364,10 +364,10 @@ trait AggregateTransform {
       case (_, c) if JSAggGenerator.jSAvgCandidate(dqb, c) => {
         val sumAgg = new Sum(c.children.head)
         val countAgg = new Count(c.children)
-        for (jsSumInf <- JSAggGenerator.jsAgg(dqb, new AggregateExpression(sumAgg, Partial, false),
+        for (jsSumInf <- JSAggGenerator.jsAgg(dqb, AggregateExpression(sumAgg, Partial, false),
           sumAgg, sqlContext.conf.getConf(DruidPlanner.TZ_ID).toString);
              jsCountInf <- JSAggGenerator.jsAgg(jsSumInf._1,
-               new AggregateExpression(countAgg, Partial, false),
+               AggregateExpression(countAgg, Partial, false),
                countAgg, sqlContext.conf.getConf(DruidPlanner.TZ_ID).toString)) yield
           jsCountInf._1.avgExpression(aggExp, jsSumInf._2, jsCountInf._2)
       }

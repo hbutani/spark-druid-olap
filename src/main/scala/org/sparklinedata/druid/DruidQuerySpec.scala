@@ -1017,9 +1017,9 @@ case class SelectSpecWithIntervals(queryType: String,
                                    metrics: List[String],
                                    filter: Option[FilterSpec],
                                    pagingSpec : PagingSpec,
-                                   intervals: List[String] = List(),
-                                   descending : Boolean = false,
-                                   granularity : String = "all",
+                                   intervals: List[String],
+                                   descending : Boolean,
+                                   granularity : String,
                                    override val context : Option[QuerySpecContext])
   extends SelectSpec {
 
@@ -1028,9 +1028,9 @@ case class SelectSpecWithIntervals(queryType: String,
            metrics: List[String],
            filter: Option[FilterSpec],
            pagingSpec : PagingSpec,
-           intervals: List[String] = List(),
-           descending : Boolean = false,
-           granularity : String = "all",
+           intervals: List[String],
+           descending : Boolean,
+           granularity : String,
            context : Option[QuerySpecContext]) = this(
     "select", dataSource, dimensions, metrics, filter, pagingSpec,
     intervals, descending, granularity, context
