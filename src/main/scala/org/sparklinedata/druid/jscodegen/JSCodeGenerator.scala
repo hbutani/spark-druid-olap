@@ -102,21 +102,21 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
               )
             }
           }.get
-        case Literal(null, dataType) => Some(new JSExpr("null", dataType))
+        case Literal(null, dataType) => Some(new JSExpr("null", dataType, false))
         case Literal(value, dataType) => {
           dataType match {
             case IntegerType | LongType | ShortType | DoubleType | FloatType =>
-              Some(new JSExpr(value.toString, dataType))
-            case StringType => Some(new JSExpr(s""""${e.toString}"""", dataType))
-            case NullType => Some(new JSExpr("null", dataType))
+              Some(new JSExpr(value.toString, dataType, false))
+            case StringType => Some(new JSExpr(s""""${e.toString}"""", dataType, false))
+            case NullType => Some(new JSExpr("null", dataType, false))
             case DateType if value.isInstanceOf[Int] =>
-              Some(new JSExpr(noDaysToDateCode(value.toString), dataType))
+              Some(new JSExpr(noDaysToDateCode(value.toString), dataType, false))
             case TimestampType if value.isInstanceOf[Long] =>
               // Spark gives values in micro seconds - we convert it to Milli
               Some(new JSExpr(longToISODTCode(value.asInstanceOf[Long]/1000, dateTimeCtx),
-                dataType))
+                dataType, false))
             case _ => JSCast(
-              new JSExpr(value.toString, StringType), dataType, this).castCode
+              new JSExpr(value.toString, StringType, false), dataType, this).castCode
           }
         }
 
@@ -164,7 +164,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
         case Coalesce(le) => {
           val l = le.flatMap(e => genExprCode(e))
           if (le.size == l.size) {
-            val cl = l.foldLeft(new JSExpr("", StringType))((a, j) =>
+            val cl = l.foldLeft(new JSExpr("", StringType, false))((a, j) =>
               JSExpr(None,
                 a.linesSoFar + j.linesSoFar,
                 if (a.getRef.isEmpty) s"(${j.getRef})" else s"${a.getRef} || (${j.getRef})",
@@ -175,7 +175,8 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           }
         }
 
-        case CaseWhen(le) => {
+        case CaseWhen(branches, else_) => {
+          val le = branches.flatMap(c => Seq(c._1, c._2)) ++ else_.toSeq
           val l = le.flatMap(e => genExprCode(e))
           if (l.length == le.length) {
             val v1 = makeUniqueVarName
@@ -191,6 +192,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
               ${v1} = ${res.getRef};
         }""".stripMargin, "", a.fnDT)
             })
+            // TODO: shouldn't there be a check here, if there is an else part?
             val de = l(l.length - 1)
             Some(JSExpr(jv.fnVar, jv.linesSoFar +
               s"""
@@ -232,7 +234,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           val nnVEL = for (nnv <- nnVL; nnve <- genExprCode(nnv)) yield nnve
           if (!nnVL.isEmpty && !nnVEL.isEmpty && nnVEL.size == nnVL.size) {
             for (ce <- genExprCode(c)) yield {
-              val vlJSE = nnVEL.foldLeft[JSExpr](new JSExpr("", IntegerType))((s, nnve) =>
+              val vlJSE = nnVEL.foldLeft[JSExpr](new JSExpr("", IntegerType, false))((s, nnve) =>
                 JSExpr(None, s.linesSoFar + nnve.linesSoFar,
                   if (s.getRef.isEmpty) {
                     s"""${nnve.getRef}:true""".stripMargin
@@ -250,7 +252,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           val nnVES = for (nnv <- nnVS; nnve <- genExprCode(nnv)) yield nnve
           if (!nnVS.isEmpty && !nnVES.isEmpty && nnVES.size == nnVS.size) {
             for (ce <- genExprCode(c)) yield {
-              val vlJSE = nnVES.toList.foldLeft[JSExpr](new JSExpr("", IntegerType))((s, nnve) =>
+              val vlJSE = nnVES.toList.foldLeft[JSExpr](new JSExpr("", IntegerType, false))((s, nnve) =>
                 JSExpr(None, s.linesSoFar + nnve.linesSoFar,
                   if (s.getRef.isEmpty) {
                     s"""${nnve.getRef}:true""".stripMargin
@@ -419,13 +421,13 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
       }
     } else {
       oe match {
-        case _: Short => Some(new JSExpr(s"$oe", ShortType))
-        case _: Integer => Some(new JSExpr(s"$oe", IntegerType))
-        case _: Long => Some(new JSExpr(s"$oe", LongType))
-        case _: Float => Some(new JSExpr(s"$oe", FloatType))
-        case _: Double => Some(new JSExpr(s"$oe", DoubleType))
+        case _: Short => Some(new JSExpr(s"$oe", ShortType, false))
+        case _: Integer => Some(new JSExpr(s"$oe", IntegerType, false))
+        case _: Long => Some(new JSExpr(s"$oe", LongType, false))
+        case _: Float => Some(new JSExpr(s"$oe", FloatType, false))
+        case _: Double => Some(new JSExpr(s"$oe", DoubleType, false))
         // case Short|Integer|Long|Float|Double => Some(new JSExpr(s"Number($oe)", IntegerType))
-        case _: String => Some(new JSExpr(oe.asInstanceOf[String], StringType))
+        case _: String => Some(new JSExpr(oe.asInstanceOf[String], StringType, false))
         case _ => None
       }
     }

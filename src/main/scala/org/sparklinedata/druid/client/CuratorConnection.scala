@@ -110,7 +110,7 @@ class CuratorConnection(val zkHosts : String,
               )
               segmentsCache.getListenable.addListener(listener)
               serverSegmentsCache(key) = segmentsCache
-              log.debug("Starting inventory cache for %s, inventoryPath %s", key, segmentsPath)
+              logDebug(s"Starting inventory cache for $key, inventoryPath $segmentsPath")
               segmentsCache.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT)
             }
           }

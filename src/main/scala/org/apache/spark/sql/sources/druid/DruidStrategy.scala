@@ -52,7 +52,7 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
       }
 
       val pL = p.filter(_ != null).toList
-      if (pL.size < 2) pL else Seq(Union(pL))
+      if (pL.size < 2) pL else Seq(UnionExec(pL))
 
     }
   }

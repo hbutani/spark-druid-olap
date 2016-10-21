@@ -394,7 +394,7 @@ class DruidQueryServerClient(host : String, port : Int, useSmile : Boolean = fal
     this(t._1, t._2, useSmile)
   }
 
-  def this(s : String, useSmile : Boolean = false) = {
+  def this(s : String, useSmile : Boolean) = {
     this(DruidClient.hosPort(s), useSmile)
   }
 

@@ -277,7 +277,7 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
       } else {
         val dc = new DruidCoordinatorClient(dCI.curatorConnection.getCoordinator)
         val r = dc.dataSourceInfo(dRName.druidDataSource)
-        val bC = new DruidQueryServerClient(dCI.curatorConnection.getBroker)
+        val bC = new DruidQueryServerClient(dCI.curatorConnection.getBroker, false)
         var dds: DruidDataSource = bC.metadata(dRName.druidDataSource,
           options.loadMetadataFromAllSegments)
         dds = dds.copy(druidVersion = dCI.coordinatorStatus.version)

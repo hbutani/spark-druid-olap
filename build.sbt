@@ -16,7 +16,8 @@ val scoptVersion = "3.3.0"
 val druidVersion = "0.9.1"
 val sparkVersion = "2.0.1"
 val guava_version = "16.0.1"
-val derbyVersion = "10.11.1.1"
+val derbyVersion = "10.12.1.1"
+val jettyVersion = "9.2.16.v20160414"
 
 val sparkDependencies = Seq(
   "com.google.guava" % "guava" % guava_version % "provided" force(),
@@ -24,7 +25,15 @@ val sparkDependencies = Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion % "provided"
+  "org.apache.spark" %% "spark-hive-thriftserver" % sparkVersion % "provided",
+  "org.eclipse.jetty" % "jetty-http" % jettyVersion % "provided",
+  "org.eclipse.jetty" % "jetty-continuation" % jettyVersion % "provided",
+  "org.eclipse.jetty" % "jetty-servlet" % jettyVersion % "provided",
+  "org.eclipse.jetty" % "jetty-servlets" % jettyVersion % "provided",
+  "org.eclipse.jetty" % "jetty-util" % jettyVersion % "provided",
+  "org.eclipse.jetty" % "jetty-security" % jettyVersion % "provided",
+  "org.eclipse.jetty" % "jetty-plus" % jettyVersion % "provided",
+  "org.eclipse.jetty" % "jetty-server" % jettyVersion % "provided"
 )
 
 val coreDependencies = Seq(
@@ -61,7 +70,7 @@ val druidTestEnvDependencies =Seq(
 lazy val commonSettings = Seq(
   organization := "com.sparklinedata",
 
-  version := "0.4.0-SNAPSHOT",
+  version := "0.5.0-SNAPSHOT",
 
   javaOptions := Seq("-Xms1g", "-Xmx3g",
     "-Duser.timezone=UTC",
@@ -72,7 +81,7 @@ lazy val commonSettings = Seq(
   scalacOptions += "-target:jvm-1.8",
   javacOptions in compile ++= Seq("-source", "1.8", "-target", "1.8"),
 
-  scalacOptions := Seq("-feature", "-deprecation"),
+  scalacOptions := Seq("-feature", "-deprecation", "-Ylog-classpath"),
 
   dependencyOverrides := Set(
     "org.apache.commons" % "commons-lang3" % "3.3.2"

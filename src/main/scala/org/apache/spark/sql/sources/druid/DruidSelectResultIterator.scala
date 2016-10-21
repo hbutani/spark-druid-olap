@@ -175,7 +175,7 @@ private class DruidSelectResultIterator2(val useSmile : Boolean,
       thisRoundHadData = true
       currIt.next
     } else {
-      onDone
+      onDone()
       if (!thisRoundHadData) {
         finished = true
         null
@@ -190,7 +190,7 @@ private class DruidSelectResultIterator2(val useSmile : Boolean,
     }
   }
 
-  override protected def close(): Unit = onDone
+  override protected def close(): Unit = onDone()
 }
 
 object DruidSelectResultIterator {

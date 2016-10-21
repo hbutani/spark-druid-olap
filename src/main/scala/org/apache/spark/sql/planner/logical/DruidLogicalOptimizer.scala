@@ -129,8 +129,8 @@ object PushGB extends Rule[LogicalPlan] with PredicateHelper {
         if (pc.get.aggs.isEmpty ||
           (agFSplit._1.nonEmpty &&
             !agFSplit._2.exists { e => e match {
-              case a@AggregateExpression(_, _, _) => true
-              case al@Alias(a@AggregateExpression(_, _, _), _) =>
+              case a@AggregateExpression(_, _, _, _) => true
+              case al@Alias(a@AggregateExpression(_, _, _, _), _) =>
                 if (c1SideChild.outputSet.contains(a.asInstanceOf[NamedExpression])) false else true
               case _ => false
             }
@@ -281,7 +281,7 @@ object SumOfLiteralRewrite extends Rule[LogicalPlan] with PredicateHelper {
     }
 
     private[this] def rewriteCandidate(ae: Seq[NamedExpression]) = ae.exists {
-      case Alias(AggregateExpression(Sum(Literal(v, _)), _, _), _) if (v != null) => true
+      case Alias(AggregateExpression(Sum(Literal(v, _)), _, _, _), _) if (v != null) => true
       case _ => false
     }
 
@@ -289,7 +289,7 @@ object SumOfLiteralRewrite extends Rule[LogicalPlan] with PredicateHelper {
     Option[(Seq[NamedExpression], Map[String, (Literal, Alias)])] = {
       val sumLitInf =
         ae.foldLeft((Seq[NamedExpression](), Map[String, (Literal, Alias)]()))((t, e) => e match {
-          case al@Alias(ae@AggregateExpression(Sum(l@Literal(lv, _)), _, _), n) if (lv != null) =>
+          case al@Alias(ae@AggregateExpression(Sum(l@Literal(lv, _)), _, _, _), n) if (lv != null) =>
             ((t._1 :+
               new Alias(AggregateExpression(Count(Literal(1)), ae.mode, ae.isDistinct), n)()),
               t._2 + (n ->(l, al)))

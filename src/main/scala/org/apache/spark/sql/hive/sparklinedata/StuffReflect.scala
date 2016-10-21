@@ -27,13 +27,13 @@ object StuffReflect {
 
   def changeSessionStateClass : Unit = {
     val spkSessionCSymbol = mirror.classSymbol(classOf[SparkSession])
-    val spkSessionModSymbol = spkSessionCSymbol.companionSymbol.asModule
+    val spkSessionModSymbol = spkSessionCSymbol.companion.asModule
     val spkSessionModMirror = mirror.reflectModule(spkSessionModSymbol)
     val spkSessionModule = spkSessionModMirror.instance
     val spkSessionModuleMirror = mirror.reflect(spkSessionModMirror)
     val spkSessionModuleTyp = spkSessionModuleMirror.symbol.selfType
-    val termSessionState = spkSessionModuleTyp.declaration(
-      universe.newTermName("HIVE_SESSION_STATE_CLASS_NAME")).asTerm.accessed.asTerm
+    val termSessionState = spkSessionModuleTyp.decl(
+      universe.TermName("HIVE_SESSION_STATE_CLASS_NAME")).asTerm.accessed.asTerm
     val sessionStateField = spkSessionModuleMirror.reflectField(termSessionState)
     sessionStateField.set("org.apache.spark.sql.hive.sparklinedata.SPLSessionState")
   }

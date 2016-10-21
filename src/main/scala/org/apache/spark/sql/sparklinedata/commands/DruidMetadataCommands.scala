@@ -36,7 +36,7 @@ case class ClearMetadata(druidHost: Option[String]) extends RunnableCommand {
     schema.toAttributes
   }
 
-  override def run(sqlContext: SQLContext): Seq[Row] = {
+  override def run(sparkSession: SparkSession): Seq[Row] = {
     if (druidHost.isDefined) {
       DruidMetadataCache.clearCache(druidHost.get)
     } else {
