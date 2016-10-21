@@ -17,10 +17,10 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.scalatest.BeforeAndAfterAll
 
-class OptimizerTest extends BaseTest with BeforeAndAfterAll with Logging {
+class OptimizerTest extends BaseTest with BeforeAndAfterAll with SPLLogging {
   test("gbPush1",
     """select r1.l_linenumber x, sum(r1.l_quantity) y, (mi + 10) as z
        from orderLineItemPartSupplier r1

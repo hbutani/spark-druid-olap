@@ -20,13 +20,12 @@ package org.sparklinedata.druid.client.test
 import java.io.File
 import java.util.TimeZone
 
-import org.apache.spark.Logging
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.sql.types.DataType
 import org.apache.spark.sql.util.ExprUtil
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.{DataFrame, Row, SPLLogging}
 import org.joda.time.DateTimeZone
 import org.scalatest.{BeforeAndAfterAll, fixture}
 import org.sparklinedata.druid.RetryUtils._
@@ -54,7 +53,7 @@ trait DruidQueryChecks {
 }
 
 class AbstractTest extends fixture.FunSuite with DruidQueryChecks with
-  fixture.TestDataFixture with BeforeAndAfterAll with Logging {
+  fixture.TestDataFixture with BeforeAndAfterAll with SPLLogging {
 
   def zkConnectString : String = DruidCluster.instance.zkConnectString
 

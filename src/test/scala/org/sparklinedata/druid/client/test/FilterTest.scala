@@ -17,10 +17,10 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.scalatest.BeforeAndAfterAll
 
-class FilterTest extends BaseTest with BeforeAndAfterAll with Logging {
+class FilterTest extends BaseTest with BeforeAndAfterAll with SPLLogging {
 
   test("inclauseTest1",
     "select c_name, sum(c_acctbal) as bal " +

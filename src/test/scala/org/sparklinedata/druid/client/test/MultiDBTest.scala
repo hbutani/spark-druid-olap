@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.apache.spark.sql.sources.druid.DruidPlanner
@@ -46,7 +46,7 @@ object MultiDBStarSchemaTpchQueries {
       """.stripMargin
 }
 
-class MultiDBTest extends StarSchemaBaseTest with BeforeAndAfterAll with Logging {
+class MultiDBTest extends StarSchemaBaseTest with BeforeAndAfterAll with SPLLogging {
 
   override def beforeAll() = {
     super.beforeAll()

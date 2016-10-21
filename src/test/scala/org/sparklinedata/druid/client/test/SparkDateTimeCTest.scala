@@ -17,11 +17,11 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.scalatest.BeforeAndAfterAll
 
 
-class SparkDateTimeCTest extends StarSchemaBaseTest with BeforeAndAfterAll with Logging{
+class SparkDateTimeCTest extends StarSchemaBaseTest with BeforeAndAfterAll with SPLLogging{
 
   /*
    * tests sdtCT1, sdtCT5-9 commented out because data in quickstart/tpch/datascale1.sample

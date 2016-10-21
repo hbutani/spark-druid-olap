@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.client.test
 
 import com.github.nscala_time.time.Imports._
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.scalatest.BeforeAndAfterAll
@@ -26,7 +26,7 @@ import org.sparklinedata.spark.dateTime.dsl.expressions._
 
 import scala.language.postfixOps
 
-class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll with Logging {
+class HistoricalServerCTest extends StarSchemaBaseTest with BeforeAndAfterAll with SPLLogging {
   val flatStarSchemaHistorical =
     """
       |{

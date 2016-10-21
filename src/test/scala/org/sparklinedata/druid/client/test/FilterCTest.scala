@@ -17,13 +17,13 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.scalatest.BeforeAndAfterAll
 
 import scala.language.postfixOps
 
 // scalastyle:off line.size.limit
-class FilterCTest extends BaseTest with BeforeAndAfterAll with Logging{
+class FilterCTest extends BaseTest with BeforeAndAfterAll with SPLLogging{
 
   cTest("filterT1",
     "select c_name, sum(c_acctbal) as bal " +

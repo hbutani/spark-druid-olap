@@ -17,11 +17,11 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.scalatest.BeforeAndAfterAll
 
 // scalastyle:off line.size.limit
-class DruidReWriteOrderCTest extends BaseTest with BeforeAndAfterAll with Logging {
+class DruidReWriteOrderCTest extends BaseTest with BeforeAndAfterAll with SPLLogging {
   cTest("druidRewriteOrderT1",
     "select l_returnflag, l_linestatus, " +
       "count(*), sum(l_extendedprice) as s, max(ps_supplycost) as m, avg(ps_availqty) as a  " +

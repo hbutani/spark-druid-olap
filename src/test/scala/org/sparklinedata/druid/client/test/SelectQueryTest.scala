@@ -17,11 +17,11 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 import org.scalatest.BeforeAndAfterAll
 
-class SelectQueryTest extends StarSchemaBaseTest with BeforeAndAfterAll with Logging {
+class SelectQueryTest extends StarSchemaBaseTest with BeforeAndAfterAll with SPLLogging {
 
   override def beforeAll() = {
     super.beforeAll()

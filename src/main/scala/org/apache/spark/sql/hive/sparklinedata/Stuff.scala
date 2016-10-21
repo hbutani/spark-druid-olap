@@ -18,21 +18,23 @@
 package org.apache.spark.sql.hive.sparklinedata
 
 import java.util.Properties
+import java.util.concurrent.atomic.AtomicBoolean
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.analysis.FunctionRegistry
-import org.apache.spark.sql.catalyst.catalog.{FunctionResourceLoader, SessionCatalog}
+import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
+import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.SparkSqlParser
+import org.apache.spark.sql.execution.{SparkOptimizer, SparkSqlParser}
+import org.apache.spark.sql.execution.datasources.{DataSourceAnalysis, PreWriteCheck, PreprocessTableInsertion, ResolveDataSource}
 import org.apache.spark.sql.hive.client.HiveClient
 import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveSessionCatalog, HiveSessionState, HiveSharedState}
 import org.apache.spark.sql.internal.{SQLConf, SessionState, SharedState}
 import org.apache.spark.sql.sparklinedata.ModuleLoader
 import org.sparklinedata.druid.metadata.{DruidMetadataViews, DruidRelationInfo}
-
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 
 class SPLSessionCatalog(
                           externalCatalog: HiveExternalCatalog,
@@ -75,6 +77,16 @@ class SPLSessionCatalog(
 class SPLSessionState(sparkSession: SparkSession)
   extends HiveSessionState(sparkSession) {
 
+  private var initialized = new AtomicBoolean(false)
+
+  private def init : Unit = {
+    if (initialized.compareAndSet(false, true)) {
+      moduleLoader.registerFunctions
+      moduleLoader.addPhysicalRules
+      moduleLoader.addLogicalRules
+    }
+  }
+
   {
     /* Follow same procedure as SQLContext to add sparkline properties
      * to SQLContext.conf
@@ -90,16 +102,16 @@ class SPLSessionState(sparkSession: SparkSession)
     conf.setConf(properties)
   }
 
-  val moduleLoader = ModuleLoader(sparkSession)
-  moduleLoader.registerFunctions
-  moduleLoader.addPhysicalRules
-  moduleLoader.addLogicalRules
+  val modulesToLoad = conf.getConf(ModuleLoader.SPARKLINE_MODULES)
+  val moduleLoader = ModuleLoader(modulesToLoad, sparkSession)
 
   private lazy val splSharedState: HiveSharedState = {
+    init
     sparkSession.sharedState.asInstanceOf[HiveSharedState]
   }
 
   override lazy val catalog = {
+    init
     new SPLSessionCatalog(
       splSharedState.externalCatalog,
       metadataHive,
@@ -111,14 +123,70 @@ class SPLSessionState(sparkSession: SparkSession)
   }
 
   override lazy val sqlParser: ParserInterface = {
+    init
     new SPLParser(sparkSession,
       new SparkSqlParser(conf),
       moduleLoader.parsers,
       moduleLoader.parserTransformers
     )
-
   }
 
+  override lazy val conf: SQLConf = {
+    init
+    // cannot call super on lazy
+    new SQLConf
+  }
+
+  override lazy val experimentalMethods = {
+    init
+    // cannot call super on lazy
+    new ExperimentalMethods
+  }
+
+  override lazy val functionRegistry: FunctionRegistry = {
+    init
+    // cannot call super on lazy
+    FunctionRegistry.builtin.copy()
+  }
+
+  override lazy val functionResourceLoader: FunctionResourceLoader = {
+    init
+    // cannot call super on lazy
+    new FunctionResourceLoader {
+      override def loadResource(resource: FunctionResource): Unit = {
+        resource.resourceType match {
+          case JarResource => addJar(resource.uri)
+          case FileResource => sparkSession.sparkContext.addFile(resource.uri)
+          case ArchiveResource =>
+            throw new AnalysisException(
+              "Archive is not allowed to be loaded. If YARN mode is used, " +
+                "please use --archives options while calling spark-submit.")
+        }
+      }
+    }
+  }
+
+  override lazy val udf : UDFRegistration = {
+    init
+    // cannot call super on lazy
+    new UDFRegistration(functionRegistry)
+  }
+
+  override lazy val analyzer : Analyzer = {
+    init
+    // cannot call super on lazy
+    new Analyzer(catalog, conf) {
+      override val extendedResolutionRules =
+        catalog.ParquetConversions ::
+          catalog.OrcConversions ::
+          catalog.CreateTables ::
+          PreprocessTableInsertion(conf) ::
+          DataSourceAnalysis(conf) ::
+          (if (conf.runSQLonFile) new ResolveDataSource(sparkSession) :: Nil else Nil)
+
+      override val extendedCheckRules = Seq(PreWriteCheck(conf, catalog))
+    }
+  }
 }
 
 object SPLSessionState {

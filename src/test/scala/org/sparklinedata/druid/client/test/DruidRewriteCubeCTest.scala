@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.client.test
 
-import org.apache.spark.Logging
+import org.apache.spark.sql.SPLLogging
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.scalatest.BeforeAndAfterAll
 import org.sparklinedata.spark.dateTime.dsl.expressions._
@@ -25,7 +25,7 @@ import org.sparklinedata.spark.dateTime.dsl.expressions._
 import scala.language.postfixOps
 
 // scalastyle:off line.size.limit
-class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with Logging {
+class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with SPLLogging {
   ignore("ShipDateYearAggCube") { td =>
 
     val shipDtYrGroup = dateTime('l_shipdate) year
