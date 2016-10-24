@@ -106,7 +106,9 @@ class DruidRDD(sqlContext: SQLContext,
     DruidPlanner.DRUID_RECORD_QUERY_EXECUTION
   )
   val druidQueryAcc : DruidQueryExecutionMetric = if (recordDruidQuery) {
-    new DruidQueryExecutionMetric()
+    val m = new DruidQueryExecutionMetric()
+    sqlContext.sparkContext.register(m)
+    m
   } else {
     null
   }

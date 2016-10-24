@@ -17,7 +17,7 @@
 
 package org.sparklinedata.druid.tools
 
-import org.apache.spark.sql.{DataFrame, SQLContext, Row}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.types._
 import com.github.nscala_time.time.Imports._
@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.sparklinedata.spark.dateTime.Functions._
 import org.sparklinedata.spark.dateTime.dsl.expressions._
 import org.apache.spark.sql.sources.druid.DruidPlanner
+
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
@@ -106,7 +107,7 @@ object TpchBenchMark {
       p(48), p(49), p(50), p(51), p(52))
       )
     val df1 = sqlCtx.createDataFrame(rdd1, tpchFlatSchema)
-    df1.registerTempTable(baseFlatTableName)
+    df1.createOrReplaceTempView(baseFlatTableName)
   }
 
   // scalastyle:off line.size.limit
@@ -366,7 +367,8 @@ object TpchBenchMark {
 
     val sc = new SparkContext(new SparkConf().setAppName("TPCHBenchmark").setMaster("local"))
 
-    val sqlCtx = new SQLContext(sc)
+    val sparkSession = SparkSession.builder.config(sc.getConf).enableHiveSupport().getOrCreate()
+    val sqlCtx = sparkSession.sqlContext
 
     init(sqlCtx, c)
 

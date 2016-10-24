@@ -311,7 +311,7 @@ object DruidMetadataCache extends DruidMetadataCache with DruidRelationInfoCache
   def clearCache: Unit = cache.synchronized(cache.clear())
 
   def clearCache(host: String): Unit = cache.synchronized {
-    log.info(s"clearing cache for ${host} at\n ${(new Throwable).getStackTraceString}")
+    log.info(s"clearing cache for ${host} at\n ${(new Throwable).getStackTrace}")
     cache.remove(host)
   }
 

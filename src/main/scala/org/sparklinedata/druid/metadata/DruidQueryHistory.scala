@@ -64,6 +64,12 @@ object DruidQueryHistory {
     )
   }
 
+  def isEmpty = history.isEmpty
+
+  def clear : Unit = synchronized {
+    history = Queue[DruidQueryExecutionView]()
+  }
+
   def getHistory : List[DruidQueryExecutionView] = synchronized {
     history.toList
   }

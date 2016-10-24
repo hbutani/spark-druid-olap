@@ -90,7 +90,9 @@ lazy val commonSettings = Seq(
   scalacOptions += "-target:jvm-1.8",
   javacOptions in compile ++= Seq("-source", "1.8", "-target", "1.8"),
 
-  scalacOptions := Seq("-feature", "-deprecation", "-Ylog-classpath"),
+  scalacOptions := Seq("-feature", "-deprecation"
+    //, "-Ylog-classpath"
+    ),
 
   dependencyOverrides := Set(
     "org.apache.commons" % "commons-lang3" % "3.3.2"

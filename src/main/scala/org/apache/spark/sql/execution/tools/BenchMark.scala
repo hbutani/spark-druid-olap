@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.execution.{RowDataSourceScanExec, SparkPlan}
 import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.sparklinedata.druid.DruidRDD
 import org.sparklinedata.spark.dateTime.Functions._
@@ -436,7 +436,7 @@ class BenchMark private(val sqlCtx: SQLContext,
       "c_region", "shipYear", "shipMonth"
     )
 
-    df.registerTempTable(baseFlatTableName)
+    df.createOrReplaceTempView(baseFlatTableName)
   }
 
   // scalastyle:off line.size.limit
@@ -494,7 +494,8 @@ object Main {
 
     val sc = new SparkContext(new SparkConf().setAppName("TPCHBenchmark").setMaster("local"))
 
-    val sqlCtx = new SQLContext(sc)
+    val sparkSession = SparkSession.builder.config(sc.getConf).enableHiveSupport().getOrCreate()
+    val sqlCtx = sparkSession.sqlContext
 
     val b = BenchMark(sqlCtx, c.nameNode, c.tpchFlatDir, c.druidBroker, c.druidDataSource)
 

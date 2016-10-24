@@ -422,9 +422,8 @@ trait AggregateTransform {
             case _ => None
           }
         }
-        case SumMinMaxAvgAggregate(t) => t._1 match {
+        case SumMinMaxAvgAggregate(aggFuncName, dC) => aggFuncName match {
           case "avg" => {
-            val dC: DruidColumn = t._2
             val aggFunc = dC.dataType match {
               case DruidDataType.Long => "longSum"
               case _ => "doubleSum"
@@ -442,8 +441,7 @@ trait AggregateTransform {
             )
           }
           case _ => {
-            val dC: DruidColumn = t._2
-            Some(dqb.aggregate(FunctionAggregationSpec(t._1, a, dC.name)).
+            Some(dqb.aggregate(FunctionAggregationSpec(aggFuncName, a, dC.name)).
               outputAttribute(a, aggExp, aggExp.dataType, DruidDataType.sparkDataType(dC.dataType))
             )
           }

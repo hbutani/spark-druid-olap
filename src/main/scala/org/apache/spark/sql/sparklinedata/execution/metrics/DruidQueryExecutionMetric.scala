@@ -17,55 +17,66 @@
 
 package org.apache.spark.sql.sparklinedata.execution.metrics
 
-import org.apache.spark.{Accumulable, GrowableAccumulableParam}
+import java.util.{ArrayList, Collections}
+
+import org.apache.spark.util.AccumulatorV2
 import org.sparklinedata.druid.metadata.{DruidQueryExecutionView, DruidQueryHistory}
 
-import scala.collection.mutable.ArrayBuffer
-import scala.util.{Success, Try}
-
-
-class DruidQueryExecutionMetricParam extends
-  GrowableAccumulableParam[ArrayBuffer[DruidQueryExecutionView], DruidQueryExecutionView] {
-}
 
 class DruidQueryExecutionMetric extends
-  Accumulable[ArrayBuffer[DruidQueryExecutionView], DruidQueryExecutionView](
-    ArrayBuffer(),
-    new DruidQueryExecutionMetricParam(),
-    Some("druidQueryMetric"),
-    true) {
+  AccumulatorV2[DruidQueryExecutionView, java.util.List[DruidQueryExecutionView]] {
 
-  private def isInDriver : Boolean = {
-    Try(value) match {
-      case Success(v) => true
-      case _ => false
+  import scala.collection.JavaConverters._
+
+  private val _list: java.util.List[DruidQueryExecutionView] =
+    Collections.synchronizedList(new ArrayList[DruidQueryExecutionView]())
+
+  private def getList : java.util.List[DruidQueryExecutionView] = {
+    if (isAtDriverSide) DruidQueryHistory.getHistory.asJava else _list
+  }
+
+  override def isZero: Boolean = {
+    getList.isEmpty
+  }
+
+  override def copyAndReset() = new DruidQueryExecutionMetric
+
+  override def copy(): DruidQueryExecutionMetric = {
+    val newAcc = new DruidQueryExecutionMetric
+    if (!isAtDriverSide) newAcc._list.addAll(_list)
+    newAcc
+  }
+
+  override def reset(): Unit = {
+    if (isAtDriverSide) DruidQueryHistory.clear else _list.clear()
+  }
+
+  override def add(v: DruidQueryExecutionView): Unit = {
+    if (isAtDriverSide) DruidQueryHistory.add(v) else _list.add(v)
+  }
+
+  private def addAll(v: java.util.List[DruidQueryExecutionView]): Unit = {
+   v.asScala.foreach(add(_))
+  }
+
+  override def merge(other:
+                     AccumulatorV2[DruidQueryExecutionView,
+                       java.util.List[DruidQueryExecutionView]]):
+  Unit = other match {
+    case o: DruidQueryExecutionMetric => {
+      addAll(o.value)
     }
+    case _ => throw new UnsupportedOperationException(
+      s"Cannot merge ${this.getClass.getName} with ${other.getClass.getName}")
   }
 
-  private def addTermToHistory(term: DruidQueryExecutionView) : Unit = {
-    if ( isInDriver ) {
-      DruidQueryHistory.add(term)
-    }
+  override def value = _list.synchronized {
+    java.util.Collections.unmodifiableList(getList)
   }
 
-  override def += (term: DruidQueryExecutionView) {
-    addTermToHistory(term)
-    super.+=(term)
-  }
-
-  override def add(term: DruidQueryExecutionView) {
-    addTermToHistory(term)
-    super.add(term)
-  }
-
-  override def ++= (terms: ArrayBuffer[DruidQueryExecutionView]) {
-    terms.foreach(addTermToHistory(_))
-    super.++=(terms)
-  }
-
-  override def merge(terms: ArrayBuffer[DruidQueryExecutionView]) {
-    terms.foreach(addTermToHistory(_))
-    super.merge(terms)
+  private[spark] def setValue(newValue: java.util.List[DruidQueryExecutionView]): Unit = {
+    reset()
+    addAll(newValue)
   }
 
 }
