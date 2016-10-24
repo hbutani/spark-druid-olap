@@ -99,7 +99,29 @@ case class StarRelation(tableName : String,
  *               of the Star Schema.
  */
 case class StarTable(name : String,
-                      parent : Option[StarRelation])
+                      parent : Option[StarRelation]) {
+
+  /**
+    * Check if the given optionally qualified column represents a ''joining''
+    * column for this Table. This is used to check if a certain ''predicate''
+    * represents a Not-Null check ({{{IsNotNull(column)}}} and if so it can
+    * be safely not pushed to the Druid-Query.
+    *
+    * @param table qualifier for the column to check
+    * @param column the column name.
+    * @return
+    */
+  def isJoiningColumn(table : Option[String], column : String) : Boolean = {
+    parent.map {
+      _.joiningKeys.find {
+        case (c, pC ) => {
+          ((!table.isDefined || table.get == name) && c == column) ||
+            ((!table.isDefined || table.get == parent.get.tableName) && pC == column)
+        }
+      }.isDefined
+    }.isDefined
+  }
+}
 
 /**
  * Represents a StarSchema. The '''Star Schema'''s we support have the following __constraints__:
@@ -250,6 +272,18 @@ case class StarSchema(val info : StarSchemaInfo,
       None
     }
 
+  }
+
+  /**
+    * Check is the given optionally qualified column is a joining column for nay of the
+    * tables in this StarSchema.
+    *
+    * @param table
+    * @param column
+    * @return
+    */
+  def isJoiningColumn(table : Option[String], column : String) : Boolean = {
+    tableMap.values.find(_.isJoiningColumn(table, column)).isDefined
   }
 
   def prettyString : String = {

@@ -175,7 +175,7 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           }
         }
 
-        case CaseWhen(branches, else_) => {
+        case CaseWhenExtract(branches, else_) => {
           val le = branches.flatMap(c => Seq(c._1, c._2)) ++ else_.toSeq
           val l = le.flatMap(e => genExprCode(e))
           if (l.length == le.length) {
@@ -252,7 +252,8 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
           val nnVES = for (nnv <- nnVS; nnve <- genExprCode(nnv)) yield nnve
           if (!nnVS.isEmpty && !nnVES.isEmpty && nnVES.size == nnVS.size) {
             for (ce <- genExprCode(c)) yield {
-              val vlJSE = nnVES.toList.foldLeft[JSExpr](new JSExpr("", IntegerType, false))((s, nnve) =>
+              val vlJSE = nnVES.toList.foldLeft[JSExpr](
+                new JSExpr("", IntegerType, false))((s, nnve) =>
                 JSExpr(None, s.linesSoFar + nnve.linesSoFar,
                   if (s.getRef.isEmpty) {
                     s"""${nnve.getRef}:true""".stripMargin
@@ -501,6 +502,15 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
       case StartsWith(l, r) if r.foldable => Some((l,r, "startsWith"))
       case EndsWith(l, r) if r.foldable => Some((l,r, "endsWith"))
       case Contains(l, r) if r.foldable => Some((l,r, "contains"))
+      case _ => None
+    }
+  }
+
+  object CaseWhenExtract {
+    def unapply(e : Expression) :
+    Option[(Seq[(Expression, Expression)], Option[Expression])] = e match {
+      case CaseWhen(branches, elseValue) => Some((branches, elseValue))
+      case CaseWhenCodegen(branches, elseValue) => Some((branches, elseValue))
       case _ => None
     }
   }

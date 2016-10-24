@@ -49,7 +49,7 @@ object ExprUtil {
 
   def conditionalExpr(e: Expression): Boolean = {
     e match {
-      case If(_, _, _) | CaseWhen(_, _) | Least(_) | Greatest(_)
+      case If(_, _, _) | CaseWhen(_, _) | CaseWhenCodegen(_, _) | Least(_) | Greatest(_)
            | Coalesce(_) | NaNvl(_, _) | AtLeastNNonNulls(_, _) => true
       case _ if e.isInstanceOf[LeafExpression] => false
       case _ =>

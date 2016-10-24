@@ -52,6 +52,7 @@ class JoinTest extends StarSchemaBaseTest {
   test("tpchQ3",StarSchemaTpchQueries.q3,
     1,
     true,
+    true,
     true
   )
 

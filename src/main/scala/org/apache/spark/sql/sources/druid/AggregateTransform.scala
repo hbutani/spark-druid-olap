@@ -167,8 +167,7 @@ trait AggregateTransform {
 
   }
 
-
-  val aggregateTransform: DruidTransform = {
+  val aggregateTransform : DruidTransform = {
     case (dqb,
     AggregateMatch((agg, gEs, aEs, projectList, expandOp, projections, child))) => {
       plan(dqb, child).flatMap { dqb =>
@@ -234,10 +233,15 @@ trait AggregateTransform {
               val literlVals: ArrayBuffer[(Expression, Expression)] = ArrayBuffer()
 
               /*
-               * a list of gE and its corresponding aE. But for grouping___id, it may not
-               * be in aE list, just use the gE.
+               * a list of gE and its corresponding aE.
+               * Used to be in Spark 1.x: for grouping___id, it may not be in aE list,
+               *                          just use the gE.
+               * not true in Spark 2.x, also if we add the gE instead of the aE,
+               * we miss the alias in the aE.
                */
-              val gEsAndaEs = gEs.init.zip(aEs) :+(gEs.last, gEs.last)
+              // val gEsAndaEs = gEs.init.zip(aEs) :+(gEs.last, gEs.last)
+              val gEsAndaEs = gEs.zip(aEs)
+
               val expandOpGExps : ArrayBuffer[Expression] = ArrayBuffer()
 
               gEsAndaEs.foreach { t =>
@@ -350,8 +354,8 @@ trait AggregateTransform {
     val nativeAgg =
       new DruidNativeAggregator(dqb, aggExp, expandOpProjection, aEExprIdToPos, aEToLiteralExpr)
     (aggExp, aggExp.aggregateFunction) match {
-      case (_, Count(Literal(1, IntegerType) :: Nil)) |
-           (_, Count(AttributeReference("1", _, _, _) :: Nil)) => {
+      case (_, Count(Seq(Literal(1,IntegerType)))) |
+           (_, Count(Seq(AttributeReference("1", _, _, _)))) => {
         Some(addCountAgg(aggExp, dqb))
       }
       // TODO:

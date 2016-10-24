@@ -72,6 +72,7 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
                              curId: AtomicLong = new AtomicLong(-1),
                              origProjList : Option[Seq[NamedExpression]] = None,
                              origFilter : Option[Expression] = None,
+                             unpushedIsNotNullJoinFilter : Seq[Expression] = Seq(),
                              hasUnpushedProjections : Boolean = false,
                              hasUnpushedFilters : Boolean = false) {
 
@@ -93,11 +94,31 @@ case class DruidQueryBuilder(val drInfo: DruidRelationInfo,
     this.copy(granularitySpec = Right(g))
   }
 
-  def filter(f: FilterSpec) = filterSpec match {
-    case Some(f1: FilterSpec) =>
+  def filter(f: FilterSpec) = (f, filterSpec) match {
+    /**
+      * [[NoopFilterSpec]] get generated for Not-Null checks on join
+      * columns from the Star Schema, they are not added to the
+      * filter list.
+      */
+    case (NoopFilterSpec, _) => this
+    case (_, Some(f1: FilterSpec)) =>
       this.copy(filterSpec = Some(LogicalFilterSpec("and", List(f1, f))))
-    case None => this.copy(filterSpec = Some(f))
+    case (_, None) => this.copy(filterSpec = Some(f))
   }
+
+  /**
+    * capture original query predicate that are Not-Null checks on 'join'
+    * columns from the StarSchema and are not in the Druid-Index.
+    * These get removed from the ''Filter'' operator on top of the Druid Operator.
+    * @param s
+    * @return
+    */
+  def addUnpushedIsNotNullJoinFilter( s : Seq[Expression]) =
+    if (s.isEmpty ) {
+      this
+    } else {
+      this.copy(unpushedIsNotNullJoinFilter = unpushedIsNotNullJoinFilter ++ s)
+    }
 
   def aggregate(a: AggregationSpec) = {
     this.copy(aggregations = (aggregations :+ a))
