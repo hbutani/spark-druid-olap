@@ -42,7 +42,7 @@ class FilterPlanningTest extends PlanningTest {
   test("timestamp1") { td =>
     validateFilter("Cast(l_shipdate  AS timestamp) >= Cast('1995-12-30' AS timestamp)",
       true,
-      None,
+      Some(NotFilterSpec("not", new SelectorFilterSpec("__time", ""))),
       List(Interval.parse("1995-12-30T00:00:00.000Z/1997-12-31T00:00:01.000Z"))
     )
   }
@@ -68,7 +68,14 @@ class FilterPlanningTest extends PlanningTest {
     validateFilter("o_orderdate >= '1995-12-30'",
       true,
       Some(
-        BoundFilterSpec("bound","o_orderdate",Some("1995-12-30"),Some(false),None,None,false)
+        LogicalFilterSpec("and",
+          List(
+            NotFilterSpec("not", new SelectorFilterSpec("o_orderdate", "")),
+            BoundFilterSpec("bound", "o_orderdate", Some("1995-12-30"),
+              Some(false), None, None, false
+            )
+          )
+        )
       )
     )
   }

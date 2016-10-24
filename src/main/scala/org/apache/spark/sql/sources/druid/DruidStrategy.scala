@@ -22,6 +22,7 @@ import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Union, Project => LProject}
 import org.apache.spark.sql.execution._
+import org.apache.spark.sql.planner.logical.SPLRewriteDistinctAggregates
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.util.ExprUtil
 import org.sparklinedata.druid._
@@ -33,7 +34,26 @@ import scala.collection.mutable.{Map => MMap}
 private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
   with PredicateHelper with DruidPlannerHelper with SPLLogging {
 
-  override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+  /**
+    * A thin wrapper on the actual ''transformation'' function.
+    * For [[Aggregate]] plans the [[SPLRewriteDistinctAggregates]] transformation is
+    * attempted, so that even Aggregate plans with a single distinct function are
+    * converted to using the [[org.apache.spark.sql.catalyst.plans.logical.Expand]] operator.
+    * @param plan
+    * @return
+    */
+  override def apply(plan: LogicalPlan): Seq[SparkPlan] = {
+    val rewritePlan = SPLRewriteDistinctAggregates(plan)
+
+    if (rewritePlan == plan ) {
+      _apply(plan)
+    } else {
+      val p = planner.sqlContext.sessionState.planner.plan(rewritePlan).next()
+      Seq(p)
+    }
+  }
+
+  private def _apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case l => {
 
       val p: Seq[SparkPlan] = for (dqb <- planner.plan(null, l)
@@ -226,6 +246,14 @@ private[sql] class DruidStrategy(val planner: DruidPlanner) extends Strategy
         case true if  dqb1.origFilter.isDefined => {
           val druidPushDownExprMap = druidOpSchema.pushedDownExprToDruidAttr
           val f = ExprUtil.transformReplace(dqb1.origFilter.get, {
+            /**
+              * if the original predicate represents a Not-Null check on a
+              * 'join' column on the StarSchema it is not pushed to the Druid Query;
+              * so for the Filter Operation on top we convert this predicate into
+              * the 'true' predicate.
+              */
+            case e if dqb.unpushedIsNotNullJoinFilter.contains(e) =>
+              Literal(true)
             case ne: AttributeReference if druidPushDownExprMap.contains(ne) &&
               druidPushDownExprMap(ne).dataType != ne.dataType => {
               val dA = druidPushDownExprMap(ne)

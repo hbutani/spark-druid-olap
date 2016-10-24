@@ -16,7 +16,7 @@ val scoptVersion = "3.3.0"
 val druidVersion = "0.9.1"
 val sparkVersion = "2.0.1"
 val guava_version = "16.0.1"
-val derbyVersion = "10.12.1.1"
+val derbyVersion = "10.11.1.1"
 val jettyVersion = "9.2.16.v20160414"
 val jacksonVersion = "2.6.5"
 

@@ -153,6 +153,14 @@ sealed trait FilterSpec {
   val `type`: String
 }
 
+/**
+  * only used during translation.
+  * - currently to capture isNotNull filters on join columns not in the DruidIndex.
+  */
+case object NoopFilterSpec extends  FilterSpec {
+  val `type`: String = "noop"
+}
+
 case class SelectorFilterSpec(`type`: String,
                               dimension: String,
                               value: String) extends FilterSpec {

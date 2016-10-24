@@ -38,6 +38,12 @@ trait LimitTransfom {
    * value is set on the [[LimitSpec]] of the [[GroupByQuerySpec]]
    */
   val limitTransform: DruidTransform = {
+    /**
+      * handle the case of a [[ReturnAnswer]] wrapping a ''Limit'' plan pattern, because
+      * if we don't handle it here it gets transformed by the
+      * [[org.apache.spark.sql.execution.SparkStrategies.SpecialLimits]] strategy.
+      */
+    case (dq, ReturnAnswer(child)) => limitTransform(dq, child)
     case (dqb, sort@Sort(orderExprs, global, child: Aggregate)) => {
       // TODO: handle Having
       // TODO: handle order on Avg expression, avg is pushed down as Sum + Count

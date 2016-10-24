@@ -98,13 +98,13 @@ class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with SPLLogg
   )
 
   cTest("duirdrewriteCubeT5",
-    "select l_returnflag, l_linestatus, grouping__id, " +
+    "select l_returnflag, l_linestatus, grouping_id(), " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplier " +
       "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus with rollup"
     ,
-    "select l_returnflag, l_linestatus, grouping__id, " +
+    "select l_returnflag, l_linestatus, grouping_id(), " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplierBase " +
       "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
@@ -112,13 +112,13 @@ class DruidRewriteCubeCTest extends BaseTest with BeforeAndAfterAll with SPLLogg
   )
 
   cTest("duirdrewriteCubeT6",
-    "select l_returnflag, l_linestatus, grouping__id, " +
+    "select l_returnflag, l_linestatus, grouping_id(), " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplier " +
       "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +
       "group by l_returnflag, l_linestatus grouping sets(l_returnflag, l_linestatus, ())"
     ,
-    "select l_returnflag, l_linestatus, grouping__id, " +
+    "select l_returnflag, l_linestatus, grouping_id(), " +
       "count(*), sum(l_extendedprice) as s " +
       "from orderLineItemPartSupplierBase " +
       "where s_nation = 'ALGERIA' and  l_shipdate  >= '1994-01-01'  and l_shipdate <= '1994-01-07' " +

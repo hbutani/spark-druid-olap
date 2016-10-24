@@ -90,17 +90,18 @@ class DruidRewriteCubeTest extends BaseTest {
   )
 
   test("basicFilterRollup",
-    "select l_returnflag, l_linestatus, grouping__id, " +
+    "select l_returnflag, l_linestatus, grouping_id(), " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
         "where s_nation = 'FRANCE' " +
         "group by l_returnflag, l_linestatus with rollup",
     3,
+    true,
     true
   )
 
   test("basicFilterGroupingSet",
-    "select l_returnflag, l_linestatus, grouping__id, " +
+    "select l_returnflag, l_linestatus, grouping_id(), " +
         "count(*), sum(l_extendedprice) as s " +
         "from orderLineItemPartSupplier " +
         "where s_nation = 'FRANCE' " +

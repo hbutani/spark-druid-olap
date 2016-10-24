@@ -28,6 +28,8 @@ import org.sparklinedata.druid._
 import org.sparklinedata.druid.jscodegen.JSCodeGenerator
 import org.sparklinedata.druid.metadata._
 
+import scala.collection.mutable.ArrayBuffer
+
 trait ProjectFilterTransfom {
   self: DruidPlanner =>
 
@@ -71,11 +73,13 @@ trait ProjectFilterTransfom {
       val iCE2: SparkIntervalConditionExtractor = new SparkIntervalConditionExtractor(dqb.get)
       var odqb = filters.foldLeft(dqb) { (dqB, e) =>
         dqB.flatMap { b =>
-          intervalFilterExpression(b, iCE, iCE2, e).orElse(
-            dimFilterExpression(b, e).map(p => b.filter(p)).orElse(
+          intervalFilterExpression(b, iCE, iCE2, e).orElse {
+            implicit val unpushedIsNotJoinFilters = ArrayBuffer[Expression]()
+            dimFilterExpression(b, e).map(p =>
+              b.filter(p).addUnpushedIsNotNullJoinFilter(unpushedIsNotJoinFilters)).orElse(
               addUnpushedAttributes(b, e, false)
             )
-          )
+          }
         }
       }
       odqb = odqb.map { d =>
@@ -318,7 +322,9 @@ trait ProjectFilterTransfom {
     }
   }
 
-  def dimFilterExpression(dqb: DruidQueryBuilder, fe: Expression):
+  def dimFilterExpression(dqb: DruidQueryBuilder,
+                          fe: Expression)(
+                          implicit unpushedIsNotJoinFilters : ArrayBuffer[Expression]) :
   Option[FilterSpec] = {
 
     val dtTimeCond = new DateTimeConditionExtractor(dqb)
@@ -333,13 +339,27 @@ trait ProjectFilterTransfom {
         case Or(e1, e2) => {
           Utils.sequence(
             List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
-            LogicalFilterSpec("or", args.toList)
+            val filArgs = args.filter( _ != NoopFilterSpec)
+            if ( filArgs.size > 1 ) {
+              LogicalFilterSpec("or", filArgs)
+            } else if ( filArgs.size > 0) {
+              filArgs(0)
+            } else {
+              NoopFilterSpec
+            }
           }
         }
         case And(e1, e2) => {
           Utils.sequence(
             List(dimFilterExpression(dqb, e1), dimFilterExpression(dqb, e2))).map { args =>
-            LogicalFilterSpec("and", args.toList)
+            val filArgs = args.filter( _ != NoopFilterSpec)
+            if ( filArgs.size > 1 ) {
+              LogicalFilterSpec("and", filArgs)
+            } else if ( filArgs.size > 0) {
+              filArgs(0)
+            } else {
+              NoopFilterSpec
+            }
           }
         }
         case In(AttributeReference(nm, dT, _, _), vl: Seq[Expression]) => {
@@ -353,9 +373,26 @@ trait ProjectFilterTransfom {
           for (dD <- dqb.druidColumn(nm) if dD.isDimension() && primitieVals)
             yield new ExtractionFilterSpec(dD.name, (for (e <- vl) yield e.toString()).toList)
         }
+
+        /**
+          * If the condition is a {{{IsNotNull(column)}}} condition on
+          * a ''join'' column on the ''StarSchema'' that was not added to the Druid Index,
+          * then we act as though this is pushed to Druid, but on the DruidQuery we don't
+          * add any predicate.
+          *
+          * This is safe because when forming the ''Druid Index'' the StarSchema
+          * tables are ''inner joined'', so we are guaranteed that join columns
+          * are non-null columns.
+          */
+        case IsNotNull(ar@AttributeReference(nm, _, _, _))
+          if !dqb.druidColumn(nm).isDefined &&
+            dqb.drInfo.starSchema.isJoiningColumn(ar.qualifier, nm) => {
+          unpushedIsNotJoinFilters += fe
+          Some(NoopFilterSpec)
+        }
         case IsNotNull(AttributeReference(nm, _, _, _)) => {
           for (c <- dqb.druidColumn(nm) if c.isDimension()) yield
-            NotFilterSpec("not", new SelectorFilterSpec(nm, ""))
+            NotFilterSpec("not", new SelectorFilterSpec(c.name, ""))
         }
         // TODO: turn isnull(TimeDim/Metric) to NULL SCAN
         case IsNull(AttributeReference(nm, _, _, _)) => {

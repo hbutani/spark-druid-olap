@@ -18,7 +18,7 @@
 package org.sparklinedata.druid.client.test
 
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
-import org.sparklinedata.druid.{DruidQuery, GroupByQuerySpec, JavascriptFilterSpec, SearchQuerySpec}
+import org.sparklinedata.druid._
 
 class DataTypesTest extends BaseTest {
 
@@ -221,7 +221,8 @@ class DataTypesTest extends BaseTest {
     false,
     Seq({ dq : DruidQuery =>
       val sQ = dq.q.asInstanceOf[SearchQuerySpec]
-      sQ.filter.get.isInstanceOf[JavascriptFilterSpec]
+      val f = sQ.filter.get.asInstanceOf[LogicalFilterSpec]
+      f.fields(1).isInstanceOf[JavascriptFilterSpec]
     }))
 
 
