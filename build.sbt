@@ -143,6 +143,11 @@ lazy val root = project.in(file("."))
     libraryDependencies ++= (sparkDependencies ++ coreDependencies ++ coreTestDependencies),
     assemblyOption in assembly :=
       (assemblyOption in assembly).value.copy(includeScala = false),
+    assemblyExcludedJars in assembly := {
+      val cp = (fullClasspath in assembly).value
+      println(cp)
+      cp filter {d => d.data.getName.startsWith("joda") || d.data.getName.startsWith("derby")}
+    },
     publishArtifact in (Compile, packageBin) := false,
     publishArtifact in Test := true
   )
