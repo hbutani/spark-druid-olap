@@ -22,7 +22,7 @@ val jacksonVersion = "2.6.5"
 
 val sparkDependencies = Seq(
   "com.google.guava" % "guava" % guava_version % "provided" force(),
-  "org.apache.derby" % "derby" % derbyVersion force(),
+  "org.apache.derby" % "derby" % derbyVersion %   "provided" force(),
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
@@ -163,6 +163,11 @@ lazy val root = project.in(file("."))
     libraryDependencies ++= (sparkDependencies ++ coreDependencies ++ coreTestDependencies),
     assemblyOption in assembly :=
       (assemblyOption in assembly).value.copy(includeScala = false),
+    assemblyExcludedJars in assembly := {
+      val cp = (fullClasspath in assembly).value
+      println(cp)
+      cp filter {_.data.getName startsWith "joda"}
+    },
     publishArtifact in (Compile, packageBin) := false,
     publishArtifact in Test := true
   )
