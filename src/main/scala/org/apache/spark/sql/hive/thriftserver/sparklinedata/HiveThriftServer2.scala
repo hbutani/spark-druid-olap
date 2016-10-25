@@ -35,7 +35,7 @@ import org.apache.spark.sql.sources.druid.DruidPlanner
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SPLLogging
-import org.apache.spark.sql.hive.sparklinedata.StuffReflect
+import org.apache.spark.sql.hive.sparklinedata.SPLScalaReflection
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -53,7 +53,7 @@ object HiveThriftServer2 extends SPLLogging {
     RealHiveThriftServer2.listener.server.asInstanceOf[RealHiveThriftServer2]
 
   def main(args: Array[String]) {
-    StuffReflect.changeSessionStateClass
+    SPLScalaReflection.changeSessionStateClass
 
     RealHiveThriftServer2.main(args)
     // FIXME above causes wrong listener to be registered.

@@ -20,7 +20,7 @@ package org.apache.spark.sql.hive.sparklinedata
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.ScalaReflection
 
-object StuffReflect {
+object SPLScalaReflection {
 
   import ScalaReflection.universe
   import ScalaReflection.mirror
