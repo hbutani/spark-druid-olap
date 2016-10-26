@@ -916,20 +916,6 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     """.stripMargin
     ,0,true,true)
 
-  test("substr6",
-    """
-      |select (SUBSTRING(c_name, 5)  = 'PROMO') as x from orderLineItemPartSupplier
-      |group by (SUBSTRING(c_name, 5) = 'PROMO')
-    """.stripMargin
-    , 1, true, true)
-
-  test("substr7",
-    """
-      |select (SUBSTRING(SUBSTRING(c_name, 1), 2)  = 'PROMO') as x from orderLineItemPartSupplier
-      |group by (SUBSTRING(SUBSTRING(c_name, 1), 2) = 'PROMO')
-    """.stripMargin
-    , 1, true, true)
-
   test("subquery1",
     """
         select x, sum(z) as z from
@@ -965,6 +951,5 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       |group by c_name
     """.stripMargin
     , 1, true, true)
-
 }
 
