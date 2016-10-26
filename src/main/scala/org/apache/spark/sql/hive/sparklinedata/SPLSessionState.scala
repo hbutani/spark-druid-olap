@@ -80,7 +80,7 @@ class SPLSessionState(sparkSession: SparkSession)
   private var initialized = new AtomicBoolean(false)
 
   private def init : Unit = {
-    if (initialized.compareAndSet(false, true)) {
+    if (initialized != null && initialized.compareAndSet(false, true)) {
       moduleLoader.registerFunctions
       moduleLoader.addPhysicalRules
       moduleLoader.addLogicalRules

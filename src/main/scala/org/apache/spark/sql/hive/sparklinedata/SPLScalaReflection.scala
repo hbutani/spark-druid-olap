@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.hive.sparklinedata
 
+import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.ScalaReflection
 
@@ -28,14 +29,20 @@ object SPLScalaReflection {
   def changeSessionStateClass : Unit = {
     val spkSessionCSymbol = mirror.classSymbol(classOf[SparkSession])
     val spkSessionModSymbol = spkSessionCSymbol.companion.asModule
-    val spkSessionModMirror = mirror.reflectModule(spkSessionModSymbol)
-    val spkSessionModule = spkSessionModMirror.instance
-    val spkSessionModuleMirror = mirror.reflect(spkSessionModMirror)
+    val spkSessionModClassMirror = mirror.reflectModule(spkSessionModSymbol)
+    val spkSessionModule = spkSessionModClassMirror.instance
+    val spkSessionModuleMirror = mirror.reflect(spkSessionModule)
     val spkSessionModuleTyp = spkSessionModuleMirror.symbol.selfType
     val termSessionState = spkSessionModuleTyp.decl(
       universe.TermName("HIVE_SESSION_STATE_CLASS_NAME")).asTerm.accessed.asTerm
     val sessionStateField = spkSessionModuleMirror.reflectField(termSessionState)
     sessionStateField.set("org.apache.spark.sql.hive.sparklinedata.SPLSessionState")
   }
+
+//  def main(args : Array[String]) : Unit = {
+//    changeSessionStateClass
+//
+//    println(new SparkSession(new SparkContext()).sharedState.getClass)
+//  }
 
 }
