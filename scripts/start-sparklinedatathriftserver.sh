@@ -20,11 +20,16 @@
 #
 # Shell script for starting the Spark SQL Thrift server
 
+# to run in debug mode
+# export SPARK_SUBMIT_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,address=5000,server=y,suspend=y"
+
 # Enter posix mode for bash
 set -o posix
 
 # Figure out where Spark is installed
-FWDIR="$(cd "`dirname "$0"`"/..; pwd)"
+if [ -z "${SPARK_HOME}" ]; then
+  export SPARK_HOME="$(cd "`dirname "$0"`"/..; pwd)"
+fi
 
 # NOTE: This exact class name is matched downstream by SparkSubmit.
 # Any changes need to be reflected there.
@@ -40,10 +45,10 @@ function usage {
   pattern+="\|======="
   pattern+="\|--help"
 
-  "$FWDIR"/bin/spark-submit --help 2>&1 | grep -v Usage 1>&2
+  "${SPARK_HOME}"/bin/spark-submit --help 2>&1 | grep -v Usage 1>&2
   echo
   echo "Thrift server options:"
-  "$FWDIR"/bin/spark-class $CLASS --help 2>&1 | grep -v "$pattern" 1>&2
+  "${SPARK_HOME}"/bin/spark-class $CLASS --help 2>&1 | grep -v "$pattern" 1>&2
 }
 
 if [ $# -lt 1 ]; then
@@ -62,4 +67,6 @@ fi
 
 export SUBMIT_USAGE_FUNCTION=usage
 
-exec "$FWDIR"/sbin/spark-daemon.sh submit $CLASS 1 --packages com.databricks:spark-csv_2.10:1.1.0,SparklineData:spark-datetime:0.0.2 --jars $sparklinejar "$@" spark-internal
+echo "${SPARK_HOME}"/sbin/spark-daemon.sh submit $CLASS 1  --jars $sparklinejar "$@" spark-internal
+exec "${SPARK_HOME}"/sbin/spark-daemon.sh submit $CLASS 1  --jars $sparklinejar "$@" spark-internal
+#exec "${SPARK_HOME}"/sbin/spark-daemon.sh submit $CLASS 1 --jars $sparklinejar "$@" spark-internal
