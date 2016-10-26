@@ -36,19 +36,17 @@ class DruidQueryExecutionMetric extends
   }
 
   override def isZero: Boolean = {
-    getList.isEmpty
+    _list.isEmpty
   }
-
-  override def copyAndReset() = new DruidQueryExecutionMetric
 
   override def copy(): DruidQueryExecutionMetric = {
     val newAcc = new DruidQueryExecutionMetric
-    if (!isAtDriverSide) newAcc._list.addAll(_list)
+    newAcc._list.addAll(_list)
     newAcc
   }
 
   override def reset(): Unit = {
-    if (isAtDriverSide) DruidQueryHistory.clear else _list.clear()
+    _list.clear()
   }
 
   override def add(v: DruidQueryExecutionView): Unit = {
@@ -64,7 +62,7 @@ class DruidQueryExecutionMetric extends
                        java.util.List[DruidQueryExecutionView]]):
   Unit = other match {
     case o: DruidQueryExecutionMetric => {
-      addAll(o.value)
+      addAll(o._list)
     }
     case _ => throw new UnsupportedOperationException(
       s"Cannot merge ${this.getClass.getName} with ${other.getClass.getName}")
