@@ -158,9 +158,25 @@ case class JSCodeGenerator(dqb: DruidQueryBuilder, e: Expression, mulInParamsAll
                len = lenL.getRef.toInt; if len > 0;
                start: Int = if (pos > 0) pos - 1 else 0;
                end: Int = if (len == Integer.MAX_VALUE) len else (start + len);
-               if end > start) yield
-            JSExpr(None, s"${cstrCode.linesSoFar} ${posL.linesSoFar} ${lenL.linesSoFar}",
-              s"(${cstrCode.getRef}).substr(${start}, ${end})", StringType, false)
+               if end > start) yield {
+            if (len == Integer.MAX_VALUE) {
+              str match {
+                case AttributeReference(_, _, _, _) => JSExpr(None,
+                  s"""${cstrCode.linesSoFar} ${posL.linesSoFar} ${lenL.linesSoFar}""".stripMargin,
+                  s"${cstrCode.getRef}.substr(${start}, ${cstrCode.getRef}.length - ${start})",
+                  StringType, false)
+                case _ =>
+                  val v1 = makeUniqueVarName
+                  JSExpr(None,
+                    s"""${cstrCode.linesSoFar} ${posL.linesSoFar} ${lenL.linesSoFar}
+                       |var ${v1} = ${cstrCode.getRef};""".stripMargin,
+                    s"${v1}.substr(${start}, ${v1}.length - ${start})", StringType, false)
+              }
+            } else {
+              JSExpr(None, s"${cstrCode.linesSoFar} ${posL.linesSoFar} ${lenL.linesSoFar}",
+                s"(${cstrCode.getRef}).substr(${start}, ${end})", StringType, false)
+            }
+          }
         case Coalesce(le) => {
           val l = le.flatMap(e => genExprCode(e))
           if (le.size == l.size) {

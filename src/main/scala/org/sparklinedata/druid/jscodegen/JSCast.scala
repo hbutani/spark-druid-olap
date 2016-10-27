@@ -77,8 +77,8 @@ case class JSCast(from: JSExpr, toDT: DataType, ctx: JSCodeGenerator) {
   }
 
   private[this] def castToStringCode: Option[JSExpr] = from.fnDT match {
-    case ShortType | IntegerType | LongType | FloatType | DoubleType | DecimalType() =>
-      nullSafeCastToString(from.getRef)
+    case BooleanType | ShortType | IntegerType | LongType | FloatType
+         | DoubleType | DecimalType() => nullSafeCastToString(from.getRef)
     case DateType =>
       nullSafeCastToString(dateToStrCode(from.getRef))
     case TimestampType =>
