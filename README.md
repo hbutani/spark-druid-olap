@@ -1,7 +1,7 @@
 Sparkline BI Accelerator
 ====
 
-**Latest release: [0.3.0](https://github.com/SparklineData/spark-druid-olap/wiki/Release-0.3.0)** <br/>
+**Latest release: [0.4.0](https://github.com/SparklineData/spark-druid-olap/wiki/Release-0.4.0)** <br/>
 **Documentation:** [Overview](https://github.com/SparklineData/spark-druid-olap/wiki/Overview), [Quick Start Guide](https://github.com/SparklineData/spark-druid-olap/wiki/Quick-Start-Guide), [User Guide](https://github.com/SparklineData/spark-druid-olap/wiki/User-Guide), [Dev. Guide](https://github.com/SparklineData/spark-druid-olap/wiki/Dev.-Guide) <br/>
 **Mailing List:** [User Mailing List](http://groups.google.com/group/sparklinedata) <br/>
 **License:** [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0) <br/>
