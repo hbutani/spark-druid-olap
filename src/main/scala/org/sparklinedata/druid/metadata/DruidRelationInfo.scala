@@ -39,7 +39,6 @@ case class DruidRelationName(
 case class DruidRelationInfo(val fullName : DruidRelationName,
                          val sourceDFName : String,
                             val timeDimensionCol : String,
-                         val druidDS : DruidDataSource,
                              val sourceToDruidMapping : Map[String, DruidRelationColumn],
                          val fd : FunctionalDependencies,
                             val starSchema : StarSchema,
@@ -50,6 +49,8 @@ case class DruidRelationInfo(val fullName : DruidRelationName,
   lazy val dimensionNamesSet = druidDS.dimensions.map(_.name).toSet
 
   def sourceDF(sqlContext : SQLContext) = sqlContext.table(sourceDFName)
+
+  def druidDS : DruidDataSource = DruidMetadataCache.getDataSourceInfo(fullName, options)._2
 
   override def toString : String = {
     s"""DruidRelationInfo(fullName = $fullName, sourceDFName = $sourceDFName,

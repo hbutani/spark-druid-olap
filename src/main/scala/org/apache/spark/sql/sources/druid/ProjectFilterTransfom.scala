@@ -95,11 +95,7 @@ trait ProjectFilterTransfom {
   val druidRelationTransform: DruidTransform = {
     case (_, PhysicalOperation(projectList, filters,
     l@LogicalRelation(d@DruidRelation(info, None), _, _))) => {
-      val actualInfo = DruidMetadataCache.druidRelation(
-        sqlContext,
-        info
-      )
-      val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(actualInfo))
+      val dqb: Option[DruidQueryBuilder] = Some(DruidQueryBuilder(info))
       translateProjectFilter(dqb,
         projectList,
         ExprUtil.simplifyPreds(dqb.get, filters))

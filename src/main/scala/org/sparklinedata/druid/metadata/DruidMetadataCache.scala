@@ -199,7 +199,6 @@ trait DruidRelationInfoCache {
     val dr = DruidRelationInfo(fullName,
       sourceDFName,
       timeDimensionCol,
-      druidDS,
       sourceToDruidMapping,
       fd,
       starSchema,
@@ -207,25 +206,6 @@ trait DruidRelationInfoCache {
     dr
   }
 
-  def druidRelation(sQLContext: SQLContext,
-                    registeredInfo : DruidRelationInfo) : DruidRelationInfo = {
-
-    import registeredInfo._
-
-    val druidDS = getDataSourceInfo(
-      fullName,
-      options)._2
-
-    DruidRelationInfo(fullName,
-      sourceDFName,
-      timeDimensionCol,
-      druidDS,
-      sourceToDruidMapping,
-      fd,
-      starSchema,
-      options)
-
-  }
 }
 
 case class HistoricalServerAssignment(server: HistoricalServerInfo,
