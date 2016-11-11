@@ -17,6 +17,7 @@
 
 package org.sparklinedata.druid.client.test
 
+import org.apache.spark.sql.catalyst.parser.ParseException
 import org.apache.spark.sql.hive.test.sparklinedata.TestHive._
 
 class SparklineSQLTest extends BaseTest {
@@ -49,6 +50,24 @@ class SparklineSQLTest extends BaseTest {
   test("clearCacheAll") { td =>
 
     sql("clear druid cache").show()
+  }
+
+  test("parseException") { td =>
+
+    val thrown = intercept[ParseException] {
+      sql("clear drud cache")
+    }
+
+    assert(thrown.getMessage() ==
+    """
+      |extraneous input 'drud' expecting 'CACHE'
+      |SPL parse attempt message: ``druid'' expected but identifier drud found(line 1, pos 6)
+      |
+      |== SQL ==
+      |clear drud cache
+      |------^^^
+      |""".stripMargin
+    )
   }
 
   test("execQueryHistorical") { td =>

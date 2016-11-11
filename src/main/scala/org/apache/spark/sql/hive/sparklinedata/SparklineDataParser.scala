@@ -19,7 +19,7 @@ package org.apache.spark.sql.hive.sparklinedata
 
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.catalyst.parser.ParserInterface
+import org.apache.spark.sql.catalyst.parser.{ParseException, ParserInterface}
 import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
@@ -40,10 +40,30 @@ class SPLParser(sparkSession: SparkSession,
   }
 
   override def parsePlan(sqlText: String): LogicalPlan = {
-    val parsedPlan = parsers.foldRight(None:Option[LogicalPlan]) {
-      case (p, None) => p.parse2(sqlText)
-      case (_, Some(lP)) => Some(lP)
-    }.getOrElse(baseParser.parsePlan(sqlText))
+
+    val r : SparklineDataParser#ParseResult[LogicalPlan] = null
+
+    val splParsedPlan = parsers.foldRight(r) {
+      case (p, o) if o == null || !o.successful => p.parse2(sqlText)
+      case (_, o)  => o
+    }
+
+    val parsedPlan = if (splParsedPlan.successful ) {
+      splParsedPlan.get
+    } else {
+      try {
+        baseParser.parsePlan(sqlText)
+      } catch {
+        case pe : ParseException => {
+          val splFailureDetails = splParsedPlan.asInstanceOf[SparklineDataParser#NoSuccess].msg
+          throw new ParseException(pe.command,
+            pe.message + s"\nSPL parse attempt message: $splFailureDetails",
+            pe.start,
+            pe.stop
+          )
+        }
+      }
+    }
 
     moduleParserTransforms.foldRight(parsedPlan){
       case (rE, lP) => rE.execute(lP)
@@ -59,7 +79,7 @@ class SPLParser(sparkSession: SparkSession,
 
 abstract class SparklineDataParser extends AbstractSparkSQLParser {
 
-  def parse2(input: String): Option[LogicalPlan]
+  def parse2(input: String): ParseResult[LogicalPlan]
 }
 
 class SparklineDruidCommandsParser(sparkSession: SparkSession) extends SparklineDataParser {
@@ -76,13 +96,10 @@ class SparklineDruidCommandsParser(sparkSession: SparkSession) extends Sparkline
   protected val EXPLAIN = Keyword("EXPLAIN")
   protected val REWRITE = Keyword("REWRITE")
 
-  def parse2(input: String): Option[LogicalPlan] = synchronized {
+  def parse2(input: String): ParseResult[LogicalPlan] = synchronized {
     // Initialize the Keywords.
     initLexical
-    phrase(start)(new lexical.Scanner(input)) match {
-      case Success(plan, _) => Some(plan)
-      case failureOrError => None
-    }
+    phrase(start)(new lexical.Scanner(input))
   }
 
   protected override lazy val start: Parser[LogicalPlan] =
