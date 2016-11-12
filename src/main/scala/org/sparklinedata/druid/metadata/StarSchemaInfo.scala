@@ -17,12 +17,13 @@
 
 package org.sparklinedata.druid.metadata
 
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.hive.sparklinedata.SPLSessionState
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
+import org.json4s.{Extraction, ShortTypeHints}
 
 /**
  * Describes the relations in a Star Schema. Used to build a [[StarSchema]] model.
@@ -35,6 +36,15 @@ case class StarSchemaInfo(factTable : String, relations : StarRelationInfo*)
 
 object StarSchemaInfo {
 
+  import org.json4s.jackson.JsonMethods._
+  import org.sparklinedata.druid.Utils.jsonFormat
+
+  val SPARKLINE_PREFIX = "sparkline.metadata."
+  val SPARKLINE_STARSCHEMA = SPARKLINE_PREFIX + "starschema"
+  val SPARKLINE_STARSCHEMA_PREFIX = SPARKLINE_STARSCHEMA + "."
+  val SPARKLINE_STARSCHEMA_PART_PREFIX = SPARKLINE_STARSCHEMA_PREFIX + "part."
+  val SPARKLINE_STARSCHEMA_NUMPARTS = SPARKLINE_STARSCHEMA_PREFIX + "numParts"
+
   def qualifyTableNames(sqlContext : SQLContext,
                         sSI : StarSchemaInfo) : StarSchemaInfo = {
     StarSchemaInfo(
@@ -42,6 +52,38 @@ object StarSchemaInfo {
       sSI.relations.map(StarRelationInfo.qualifyTableNames(sqlContext, _)):_*
     )
   }
+
+  def toMetadataMap(starSchemaInfo : StarSchemaInfo,
+                    schemaStringLengthThreshold : Int) : Map[String, String] = {
+    val tableProperties = collection.mutable.HashMap[String,String]()
+    val schemaJsonString = toJsonString(starSchemaInfo)
+    val parts = schemaJsonString.grouped(schemaStringLengthThreshold).toSeq
+    tableProperties.put(SPARKLINE_STARSCHEMA_NUMPARTS, parts.size.toString)
+    parts.zipWithIndex.foreach { case (part, index) =>
+      tableProperties.put(s"$SPARKLINE_STARSCHEMA_PART_PREFIX$index", part)
+    }
+    tableProperties.toMap
+  }
+
+  def fromMetadataMap(properties : Map[String, String]) : Option[StarSchemaInfo] = {
+
+    properties.get(SPARKLINE_STARSCHEMA_NUMPARTS).flatMap { numParts =>
+      var valid : Boolean = true
+      val parts = (0 until numParts.toInt).map { index =>
+        val part = properties.get(s"$SPARKLINE_STARSCHEMA_PART_PREFIX$index").orNull
+        if (part == null) {
+          valid = false
+        }
+        part
+      }
+      if ( valid) {
+        Some(parse(parts.mkString).extract[StarSchemaInfo])
+      } else None
+    }
+  }
+
+  def toJsonString(starSchemaInfo : StarSchemaInfo) : String =
+    pretty(render(Extraction.decompose(starSchemaInfo)))
 }
 
 /**
@@ -351,7 +393,9 @@ object StarSchema {
     Right(())
   }
 
-  def apply(sourceDFName : String, info : StarSchemaInfo)(implicit sqlContext : SQLContext) :
+  def apply(sourceDFName : String,
+            info : StarSchemaInfo,
+            validateStarJoinGraph : Boolean)(implicit sqlContext : SQLContext) :
   Either[ErrorInfo, StarSchema] = {
 
     val joinGraph : StarJoinGraph = collection.mutable.Map()
@@ -375,6 +419,35 @@ object StarSchema {
     val tableMap = collection.mutable.Map[String, StarTable]()
     val attrMap = collection.mutable.Map[String, StarTable]()
 
+    def validateJoinColumns(tabNm : String,
+                            joinColumns : Seq[String]) : Either[ErrorInfo, Int] = {
+
+      val s = sqlContext.table(tabNm).schema
+      val columnChecks = joinColumns.map{ j =>
+        try {
+          s(j)
+          ""
+        } catch {
+          case i : IllegalArgumentException => i.getMessage
+        }
+      }
+      val errors = columnChecks.filterNot(_ == "")
+      if ( errors.isEmpty ) Right(0) else Left(errors.mkString("Invalid Columns: ", ",", ""))
+    }
+
+    def validateStarJoin(sj : StarTable) : Either[ErrorInfo, Int] = {
+
+      if (sj.parent.isDefined) {
+        val p = sj.parent.get
+        validateJoinColumns(p.tableName, p.joiningKeys.map(_._2).toSeq).
+          right.flatMap( x => validateJoinColumns(sj.name, p.joiningKeys.map(_._1).toSeq))
+      } else Right(0)
+    }
+
+    /*
+     * make sure column names are unique across StarSchema.
+     * TODO: relax this.
+     */
     def addColumns(tabNm : String, tbl : StarTable) : Either[ErrorInfo, Unit] = {
 
       sqlContext.table(tabNm).schema.fieldNames.foreach { aName =>
@@ -387,9 +460,9 @@ object StarSchema {
       return Right(())
     }
 
-    def addTables(tables : Seq[String]) : Either[ErrorInfo, Unit] = {
+    def addTables(tables : Seq[String]) : Either[ErrorInfo, Int] = {
 
-      if (tables.isEmpty) return Right(())
+      if (tables.isEmpty) return Right((0))
 
       val descendantTables = ArrayBuffer[String]()
 
@@ -405,15 +478,29 @@ object StarSchema {
             }
             val childStarTable = StarTable(childTable,
             Some(StarRelation(tName, jRInfo._1, flipJoinCondition(jRInfo._2))))
-            tableMap(childTable) = childStarTable
-            val r = addColumns(childTable, childStarTable)
+
+            /*
+             * - validate the StarJoin Graph, this controlled by the validateStarJoin flag
+             *   in order to support Druid DataSource creation where the FactTable is the table
+             *   being created, in this case we don't validate the JoinGraph.
+             * - check columns are unique
+             */
+            val r =
+            (if (validateStarJoinGraph) {validateStarJoin(childStarTable)} else  Right(0)).
+              right.flatMap { x =>
+              tableMap(childTable) = childStarTable
+              addColumns(childTable, childStarTable)
+            }.right.map { x =>
+              descendantTables += childTable
+              0
+            }
+            // TODO: return within closure is bad, rewrite to functional expression
             if (r.isLeft) return r
-            descendantTables += childTable
           }
         }
       }
 
-      addTables(descendantTables.toSeq)
+      addTables(descendantTables)
 
     }
 
@@ -440,7 +527,7 @@ object StarSchema {
 
       val errors = (ArrayBuffer[String]() /: tableSet) {
         case (a, t) if (!tableMap.contains(t)) =>
-          a += "Table '${t}' is not part of the join Graph"
+          a += s"Table '${t}' is not part of the join Graph"
         case (a, t) => a
       }
 

@@ -17,7 +17,9 @@
 
 package org.sparklinedata.druid
 
+import org.apache.spark.SparkException
+
 class DruidDataSourceException(message: String, cause: Throwable)
-  extends Exception(message, cause) {
+  extends SparkException(message, cause) {
   def this(message : String) = this(message, null)
 }

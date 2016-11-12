@@ -23,8 +23,9 @@ import org.apache.spark.sql.catalyst.parser.{ParseException, ParserInterface}
 import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
-import org.apache.spark.sql.sparklinedata.commands.{ClearMetadata, ExplainDruidRewrite}
+import org.apache.spark.sql.sparklinedata.commands.{ClearMetadata, CreateStarSchema, ExplainDruidRewrite}
 import org.apache.spark.sql.util.PlanUtil
+import org.sparklinedata.druid.metadata.{EqualityCondition, FunctionalDependencyType, StarRelationInfo, StarSchemaInfo}
 
 class SPLParser(sparkSession: SparkSession,
                 baseParser : ParserInterface,
@@ -95,6 +96,17 @@ class SparklineDruidCommandsParser(sparkSession: SparkSession) extends Sparkline
   protected val HISTORICAL = Keyword("HISTORICAL")
   protected val EXPLAIN = Keyword("EXPLAIN")
   protected val REWRITE = Keyword("REWRITE")
+  protected val ONE_TO_ONE = Keyword("ONE_TO_ONE")
+  protected val MANY_TO_ONE = Keyword("MANY_TO_ONE")
+  protected val JOIN = Keyword("JOIN")
+  protected val OF = Keyword("OF")
+  protected val WITH = Keyword("WITH")
+  protected val AND = Keyword("AND")
+  protected val CREATE = Keyword("CREATE")
+  protected val ALTER = Keyword("ALTER")
+  protected val STAR = Keyword("STAR")
+  protected val SCHEMA = Keyword("SCHEMA")
+  protected val AS = Keyword("AS")
 
   def parse2(input: String): ParseResult[LogicalPlan] = synchronized {
     // Initialize the Keywords.
@@ -103,7 +115,7 @@ class SparklineDruidCommandsParser(sparkSession: SparkSession) extends Sparkline
   }
 
   protected override lazy val start: Parser[LogicalPlan] =
-    clearDruidCache | execDruidQuery | explainDruidRewrite
+    clearDruidCache | execDruidQuery | explainDruidRewrite | starSchema
 
   protected lazy val clearDruidCache: Parser[LogicalPlan] =
     CLEAR ~> DRUID ~> CACHE ~> opt(ident) ^^ {
@@ -121,6 +133,49 @@ class SparklineDruidCommandsParser(sparkSession: SparkSession) extends Sparkline
   protected lazy val explainDruidRewrite: Parser[LogicalPlan] =
     EXPLAIN ~> DRUID ~> REWRITE ~> restInput ^^ {
       case sql => ExplainDruidRewrite(sql)
+    }
+
+  private lazy val starRelationType : Parser[FunctionalDependencyType.Value] =
+    (ONE_TO_ONE | MANY_TO_ONE) ^^ {
+      case s if s == ONE_TO_ONE.normalize => FunctionalDependencyType.OneToOne
+      case s if s == MANY_TO_ONE.normalize => FunctionalDependencyType.ManyToOne
+    }
+
+  private lazy val joinEqualityCond : Parser[EqualityCondition] =
+    (qualifiedId <~ "=") ~ qualifiedId ^^ {
+      case ~(l,r) => EqualityCondition(l,r)
+    }
+
+  private lazy val starRelation : Parser[StarRelationInfo] =
+    starRelationType.? ~ JOIN ~ OF ~ qualifiedId ~
+      WITH ~ qualifiedId ~ ON ~ repsep(joinEqualityCond, AND) ^^ {
+      case srI ~ _ ~ _ ~ leftTable ~ _ ~ rightTable ~ _ ~ joinEqConds => {
+        StarRelationInfo(
+          leftTable,
+          rightTable,
+          srI.getOrElse(FunctionalDependencyType.ManyToOne),
+          joinEqConds
+        )
+      }
+    }
+
+  private lazy val starSchema : Parser[LogicalPlan] =
+    createOrAlter ~ STAR ~ SCHEMA ~ ON ~ qualifiedId ~ opt(AS ~ repsep(starRelation, opt(","))) ^^ {
+      case c ~ _ ~ _ ~ _ ~ factTable ~ Some(_ ~ starRelations)  =>
+        CreateStarSchema(StarSchemaInfo(factTable, starRelations:_*), !c)
+      case c ~ _ ~ _ ~ _ ~ factTable ~ None  => CreateStarSchema(StarSchemaInfo(factTable), !c)
+    }
+
+  private lazy val createOrAlter : Parser[Boolean] =
+    (CREATE | ALTER ) ^^ {
+      case s if s == CREATE.normalize => true
+      case _ => false
+    }
+
+  private lazy val qualifiedId : Parser[String] =
+    (ident ~ ("." ~> ident).?) ^^ {
+      case ~(n, None) => n
+      case ~(q, Some(n)) => s"$q.$n"
     }
 
 }

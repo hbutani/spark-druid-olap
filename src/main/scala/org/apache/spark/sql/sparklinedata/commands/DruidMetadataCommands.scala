@@ -17,15 +17,13 @@
 
 package org.apache.spark.sql.sparklinedata.commands
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.execution.command.RunnableCommand
-import org.apache.spark.sql.hive.sparklinedata.SPLSessionState
+import org.apache.spark.sql.execution.command.{AlterTableSetPropertiesCommand, RunnableCommand}
 import org.apache.spark.sql.sources.druid.{DruidPlanner, DruidQueryCostModel}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.util.PlanUtil
-import org.apache.spark.sql.{Row, SQLContext, SparkSession}
-import org.joda.time.Interval
-import org.sparklinedata.druid.metadata.{DruidMetadataCache, DruidRelationName, DruidRelationOptions}
+import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
+import org.sparklinedata.druid.metadata._
 
 case class ClearMetadata(druidHost: Option[String]) extends RunnableCommand {
 
@@ -75,6 +73,60 @@ case class ExplainDruidRewrite(sql: String) extends RunnableCommand {
        """.stripMargin.split("\n").map(Row(_))
     }
   }
+}
+
+case class CreateStarSchema(starSchemaInfo : StarSchemaInfo,
+                            update : Boolean) extends RunnableCommand with Logging {
+
+  override val output: Seq[Attribute] = {
+    val schema = StructType(
+      StructField("", StringType, nullable = true) :: Nil)
+
+    schema.toAttributes
+  }
+
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+
+    val threshold = sparkSession.sessionState.conf.schemaStringLengthThreshold
+    val catalog = sparkSession.sessionState.catalog
+
+    /*
+     * qualify TableNames
+     */
+    val qInfo = StarSchemaInfo.qualifyTableNames(sparkSession.sqlContext, starSchemaInfo)
+    val tabId = sparkSession.sessionState.sqlParser.parseTableIdentifier(qInfo.factTable)
+
+    /*
+     * validate the Star Schema
+     */
+    StarSchema(qInfo.factTable, qInfo, true)(sparkSession.sqlContext) match {
+      case Left(errMsg) => throw new AnalysisException(errMsg)
+      case _ => ()
+    }
+
+    val existingTableProperties = catalog.getTableMetadata(tabId).properties
+    val existingStarSchema = StarSchemaInfo.fromMetadataMap(existingTableProperties)
+
+    if ( !update && existingStarSchema.isDefined ) {
+      throw new AnalysisException(
+        s"Cannot create starSchema on $tabId, there is already a Star Schema on it, " +
+          s"call alter star schema")
+    }
+
+    val starSchemaProps = StarSchemaInfo.toMetadataMap(starSchemaInfo, threshold)
+    val alterTableCmd = new AlterTableSetPropertiesCommand(
+      tabId,
+      starSchemaProps,
+      false)
+
+    log.info(s"Setting Star Schema for table ${starSchemaInfo.factTable}: \n {}",
+      StarSchemaInfo.toJsonString(qInfo))
+
+    alterTableCmd.run(sparkSession)
+
+  }
+
+
 }
 
 

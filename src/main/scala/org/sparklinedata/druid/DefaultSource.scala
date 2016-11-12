@@ -85,7 +85,7 @@ class DefaultSource extends RelationProvider with SPLLogging {
 
     starSchemaInfo = StarSchemaInfo.qualifyTableNames(sqlContext, starSchemaInfo)
 
-    val ss = StarSchema(sourceDFName, starSchemaInfo)(sqlContext)
+    val ss = StarSchema(sourceDFName, starSchemaInfo, false)(sqlContext)
     if (ss.isLeft) {
       throw new DruidDataSourceException(
         s"Failed to parse StarSchemaInfo: ${ss.left.get}")
