@@ -43,11 +43,11 @@ object DruidQueryGranularity {
     case n if n.toUpperCase().equals("NONE") => NoneGranularity
     case a if a.toUpperCase().equals("ALL") => AllGranularity
     case s if s.toUpperCase().equals("SECOND") => DurationGranularity(1000L)
-    case m if m.toLowerCase().equals("MINUTE") => DurationGranularity(60 * 1000L)
-    case fm if fm.toLowerCase().equals("FIFTEEN_MINUTE") => DurationGranularity(15 * 60 * 1000L)
-    case tm if tm.toLowerCase().equals("THIRTY_MINUTE") => DurationGranularity(15 * 60 * 1000L)
-    case h if h.toLowerCase().equals("HOUR") => DurationGranularity(3600 * 1000L)
-    case d if d.toLowerCase().equals("DAY") => DurationGranularity(24 * 3600 * 1000L)
+    case m if m.toUpperCase().equals("MINUTE") => DurationGranularity(60 * 1000L)
+    case fm if fm.toUpperCase().equals("FIFTEEN_MINUTE") => DurationGranularity(15 * 60 * 1000L)
+    case tm if tm.toUpperCase().equals("THIRTY_MINUTE") => DurationGranularity(30 * 60 * 1000L)
+    case h if h.toUpperCase().equals("HOUR") => DurationGranularity(3600 * 1000L)
+    case d if d.toUpperCase().equals("DAY") => DurationGranularity(24 * 3600 * 1000L)
     case _ => {
       val jv = parse(s)
       Try {
