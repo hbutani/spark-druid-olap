@@ -60,7 +60,7 @@ case class JSCast(from: JSExpr, toDT: DataType, ctx: JSCodeGenerator) {
       case BooleanType | StringType =>
         Some(JSExpr(None, from.linesSoFar, s"Number(${from.getRef})", outDt))
       case (FloatType | DoubleType) if ctx.SPIntegralNumeric(outDt) =>
-        Some (JSExpr(None, from.linesSoFar, s"Math.round(${from.getRef})", outDt))
+        Some (JSExpr(None, from.linesSoFar, s"Math.floor(${from.getRef})", outDt))
       case ShortType | IntegerType | LongType| FloatType | DoubleType  =>
         Some (JSExpr(None, from.linesSoFar, from.getRef, outDt))
       case DateType =>
