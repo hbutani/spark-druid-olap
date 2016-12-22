@@ -966,5 +966,20 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
     """.stripMargin
     , 1, true, true)
 
+  test("tscomp3",
+    """
+      |select sum(c_acctbal), o_orderdate from orderLineItemPartSupplier
+      |where CAST((MONTH(CAST(CONCAT(TO_DATE(o_orderdate),' 00:00:00') AS TIMESTAMP)) - 1) / 3 + 1 AS BIGINT) < 2
+      |group by c_name, o_orderdate
+    """.stripMargin
+    , 1, true, true)
+
+  test("binaryunhex1",
+    """
+      |select sum(c_acctbal), o_orderdate from orderLineItemPartSupplier
+      |where c_nation < concat(CAST(UNHEX('c2a3') AS string), '349- W10_HulfordsOLVPen15Sub_UK_640x480_ISV_V2_x264')
+      |group by c_name, o_orderdate
+    """.stripMargin
+    , 1, true, true)
 }
 
