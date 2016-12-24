@@ -453,6 +453,7 @@ object TaskCancelHandler extends Logging {
       while(true) {
         Thread.sleep(secs5)
         log.debug(s"cancelThread woke up")
+        var canceledTasks : Seq[String] = Seq()
         taskMap.foreach{t =>
           val (queryId, (req, cancellableHolder, taskContext)) = t
           log.debug(s"checking task stageid=${taskContext.stageId()}, " +
@@ -463,12 +464,14 @@ object TaskCancelHandler extends Logging {
               cancellableHolder.wasCancelTriggered = true
               req.cancel()
               log.info("aborted http request for query {}: {}", Array[Any](queryId, req))
+              canceledTasks = canceledTasks :+ queryId
             } catch {
               case e : Throwable => log.warn("failed to abort http request: {}", req)
             }
           }
 
         }
+        canceledTasks.foreach(t => clearQueryId(t))
       }
 
     }
