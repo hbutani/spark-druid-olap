@@ -48,7 +48,7 @@ val druidTestEnvDependencies =Seq(
 lazy val commonSettings = Seq(
   organization := "com.sparklinedata",
 
-  version := "0.4.0",
+  version := "0.4.1",
 
   javaOptions := Seq("-Xms1g", "-Xmx3g",
     "-Duser.timezone=UTC",
