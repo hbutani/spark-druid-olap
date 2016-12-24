@@ -240,4 +240,19 @@ class SelectQueryTest extends StarSchemaBaseTest with BeforeAndAfterAll with Log
     true
   )
 
+  test("selectIterator",
+    """
+      |select count(*)
+      |from (
+      |select sin(o_orderkey/100)
+      |from orderLineItemPartSupplier_select
+      |where l_shipdate <= date '2000-02-01'
+      |group by sin(o_orderkey/100)
+      |) q
+    """.stripMargin,
+    1,
+    true,
+    true
+  )
+
 }

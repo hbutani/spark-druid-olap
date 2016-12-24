@@ -27,7 +27,8 @@ import org.json4s._
 import org.json4s.jackson.Json4sScalaModule
 import org.json4s.jackson.JsonMethods._
 import org.sparklinedata.druid.client._
-import org.sparklinedata.druid.{CloseableIterator, SelectSpec, Utils}
+import org.sparklinedata.druid._
+import scala.collection.mutable.{Map => MMap}
 
 
 private class DruidSelectResultIterator(val useSmile : Boolean,
@@ -52,9 +53,15 @@ private class DruidSelectResultIterator(val useSmile : Boolean,
   private var jValDeser: JsonDeserializer[JValue] = _
   private var t: JsonToken = _
   private var currSelectResultContainerTS: String = _
-  private var nextPagingIdentifiers: Map[String, Int] = _
+  private val nextPagingIdentifiers = MMap[String, Int]()
 
   consumeNextStream(is)
+
+  private def setNextPagingIdentifiers(resultPgIds : Map[String, Int]) = {
+    resultPgIds.foreach {
+      case (k,v) => nextPagingIdentifiers(k) = v
+    }
+  }
 
   private def transferState(nextIt : DruidSelectResultIterator) : Unit = {
     m = nextIt.m
@@ -66,7 +73,7 @@ private class DruidSelectResultIterator(val useSmile : Boolean,
     jValDeser = nextIt.jValDeser
     t = nextIt.t
     currSelectResultContainerTS = nextIt.currSelectResultContainerTS
-    nextPagingIdentifiers = nextIt.nextPagingIdentifiers
+    setNextPagingIdentifiers(nextIt.nextPagingIdentifiers.toMap)
   }
 
   def consumeNextStream(is: InputStream): Unit = {
@@ -92,7 +99,7 @@ private class DruidSelectResultIterator(val useSmile : Boolean,
     t = jp.nextToken() // 1.2.1.v pIds value // START_OBJECT
     // t = jp.nextToken // FIELD_NAME
     val pagingIdentifiersJV: JsonAST.JValue = jValDeser.deserialize(jp, ctxt)
-    nextPagingIdentifiers = pagingIdentifiersJV.extract[Map[String, Int]]
+    setNextPagingIdentifiers(pagingIdentifiersJV.extract[Map[String, Int]])
 
 //    nextPagingIdentifiers = nextPagingIdentifiers.map {
 //      case (s,i) if !selectSpec.descending => (s, i + 1)
@@ -114,12 +121,12 @@ private class DruidSelectResultIterator(val useSmile : Boolean,
         null
       } else {
         thisRoundHadData = false
-        val nextSelectSpec = selectSpec.withPagingIdentifier(nextPagingIdentifiers)
-        transferState(
+        val nextSelectSpec = selectSpec.withPagingIdentifier(nextPagingIdentifiers.toMap)
+          transferState(
           nextSelectSpec.executeQuery(druidQuerySvrConn).asInstanceOf[DruidSelectResultIterator]
-        )
-        getNext
-      }
+          )
+          getNext
+        }
     } else {
       val o: JsonAST.JValue = jValDeser.deserialize(jp, ctxt)
       val r = o.extract[SelectResultRow]
@@ -131,6 +138,10 @@ private class DruidSelectResultIterator(val useSmile : Boolean,
 
   override protected def close(): Unit = {
     onDone()
+  }
+
+  override def toString : String = {
+    s"DruidSelectResultIterator : ${hashCode()}"
   }
 }
 
@@ -146,17 +157,26 @@ private class DruidSelectResultIterator2(val useSmile : Boolean,
   import Utils._
 
   protected var thisRoundHadData: Boolean = false
+  private val nextPagingIdentifiers = MMap[String, Int]()
+
   consumeNextStream(is)
 
   var onDone = initialOnDone
   var currResult: SelectResult = _
   var currIt: Iterator[SelectResultRow] = _
 
+  private def setNextPagingIdentifiers(resultPgIds : Map[String, Int]) = {
+    resultPgIds.foreach {
+      case (k,v) => nextPagingIdentifiers(k) = v
+    }
+  }
+
   private def transferState(nextIt : DruidSelectResultIterator2) : Unit = {
     thisRoundHadData = nextIt.thisRoundHadData
     onDone = nextIt.onDone
     currResult = nextIt.currResult
     currIt = nextIt.currIt
+    setNextPagingIdentifiers(nextIt.currResult.pagingIdentifiers)
   }
 
   private def consumeNextStream(is: InputStream): Unit = {
@@ -168,6 +188,7 @@ private class DruidSelectResultIterator2(val useSmile : Boolean,
     val jV = parse(s)
     currResult = jV.extract[SelectResultContainer].result
     currIt = currResult.events.iterator
+    setNextPagingIdentifiers(currResult.pagingIdentifiers)
   }
 
   override protected def getNext(): SelectResultRow = {
@@ -181,7 +202,7 @@ private class DruidSelectResultIterator2(val useSmile : Boolean,
         null
       } else {
         thisRoundHadData = false
-        val nextSelectSpec = selectSpec.withPagingIdentifier(currResult.pagingIdentifiers)
+        val nextSelectSpec = selectSpec.withPagingIdentifier(nextPagingIdentifiers.toMap)
         transferState(
           nextSelectSpec.executeQuery(druidQuerySvrConn).asInstanceOf[DruidSelectResultIterator2]
         )
@@ -190,7 +211,11 @@ private class DruidSelectResultIterator2(val useSmile : Boolean,
     }
   }
 
-  override protected def close(): Unit = onDone
+  override protected def close(): Unit = onDone()
+
+  override def toString : String = {
+    s"DruidSelectResultIterator2 : ${hashCode()}"
+  }
 }
 
 object DruidSelectResultIterator {
