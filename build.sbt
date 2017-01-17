@@ -51,6 +51,7 @@ val coreDependencies = Seq(
 
 val coreTestDependencies = Seq(
   "org.scalatest" %% "scalatest" % scalatestVersion % "test",
+  "org.pegdown"    %  "pegdown"     % "1.6.0"  % "test",
   "com.databricks" %% "spark-csv" % "1.1.0" % "test"
 )
 
@@ -168,7 +169,8 @@ lazy val root = project.in(file("."))
       cp filter {d => d.data.getName.startsWith("joda") || d.data.getName.startsWith("derby")}
     },
     publishArtifact in (Compile, packageBin) := false,
-    publishArtifact in Test := true
+    publishArtifact in Test := true,
+    testOptions in Test += Tests.Argument("-h", "target/html")
   )
   .settings(addArtifact(artifact in (Compile, assembly), assembly).settings: _*)
   .dependsOn(druidTestEnv % "test->test")
