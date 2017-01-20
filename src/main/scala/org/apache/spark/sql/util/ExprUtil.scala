@@ -18,13 +18,12 @@
 package org.apache.spark.sql.util
 
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.trees.CurrentOrigin
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.joda.time.DateTime
-import org.sparklinedata.druid.DruidQueryBuilder
-import org.sparklinedata.druid.metadata.DruidDimension
+import org.sparklinedata.druid.{DruidQueryBuilder, IntervalCondition, IntervalConditionType}
 
 
 object ExprUtil {
@@ -90,6 +89,47 @@ object ExprUtil {
     }
   }
 
+  object ExpressionVal {
+
+    sealed trait EnumVal
+
+    case object ALWAYSFALSE extends EnumVal
+
+    case object ALWAYSTRUE extends EnumVal
+
+    case object UNKNOWN extends EnumVal
+
+  }
+
+  val alwaysFalseExpr = EqualTo(Literal(1), Literal(2))
+
+  def foldExpr(e: Expression): (Expression, ExpressionVal.EnumVal) = {
+    val fe = e transformUp {
+      // Skip redundant folding of literals. This rule is technically not necessary. Placing this
+      // here avoids running the next rule for Literal values, which would create a new Literal
+      // object and running eval unnecessarily.
+      case l: Literal => l
+      case Or(Literal(false, BooleanType), Literal(false, BooleanType)) => Literal(false)
+      case Or(le, Literal(false, BooleanType)) => le
+      case Or(Literal(false, BooleanType), re) => re
+      // Fold expressions that are foldable.
+      case e if e.foldable => Literal.create(e.eval(EmptyRow), e.dataType)
+    }
+    var eVal: ExpressionVal.EnumVal = ExpressionVal.UNKNOWN
+    if (fe.foldable) {
+      val fev = Literal.create(fe.eval(EmptyRow), fe.dataType)
+      if (fev.dataType == BooleanType) {
+        if (fev.value.asInstanceOf[Boolean]) {
+          eVal = ExpressionVal.ALWAYSTRUE
+        } else {
+          eVal = ExpressionVal.ALWAYSFALSE
+        }
+      }
+    }
+
+    (fe, eVal)
+  }
+
   /**
     * Simplify Cast expression by removing inner most cast if reduendant
     *
@@ -105,19 +145,42 @@ object ExprUtil {
   }
 
   /**
-    * Simplify given predicates
+    * Simplify given predicate elements of a conjunction.
+    * If any conjuctive element can be folded to false then NULLSCAN is assumed
+    * and NULSCAN is set on DruidQueryBuilder by adding an invalid index interval.
     *
-    * @param dqb  DruidQueryBuilder
-    * @param fils Predicates
+    * @param dqb DruidQueryBuilder
+    * @param pl  Predicates elements of a conjunction
     * @return
     */
-  def simplifyPreds(dqb: DruidQueryBuilder, fils: Seq[Expression]): Seq[Expression] =
-    fils.foldLeft[Seq[Expression]](List[Expression]()) { (l, f) =>
+  def simplifyConjPred(dqb: DruidQueryBuilder, pl: Seq[Expression]):
+  (Seq[Expression], DruidQueryBuilder) = {
+    var nullScan = false
+    val spl = pl.foldLeft[Seq[Expression]](List[Expression]()) { (l, pe) =>
       var tpl = l
-      for (tp <- simplifyPred(dqb, f))
-        tpl = l :+ tp
+      for (tpe <- simplifyPred(dqb, pe)) {
+        val fpe = foldExpr(tpe)
+        if (fpe._2 == ExpressionVal.ALWAYSFALSE) nullScan = true
+        tpl = l :+ fpe._1
+      }
       tpl
     }
+
+    var splToRet = spl
+    if (nullScan) {
+      // TODO: remove this nonsense once NULLSCAN is properly supported
+      // Currently we don't push filters that are just literals
+      splToRet = pl.flatMap(e => e.references).map(e => IsNull(e))
+    }
+
+    // if needed set in NULLSCAN by setting invalid index interval
+    (splToRet, if (nullScan) {
+      dqb.interval(IntervalCondition(IntervalConditionType.LT,
+        dqb.drInfo.druidDS.intervals.head.getStart)).get
+    } else {
+      dqb
+    })
+  }
 
   /**
     * Simplify given Predicate. Does rewrites for cast, Conj/Disj, not null expressions.
@@ -151,6 +214,19 @@ object ExprUtil {
           }
         } else {
           nullFil = None
+        }
+        nullFil
+      case fe@IsNull(ce) =>
+        var nullFil: Option[Expression] = Some(fe)
+        if (ce.nullable) {
+          if (ExprUtil.nullPreserving(ce)) {
+            val v1 = nullableAttributes(dqb, ce.references)
+            if (v1._2.isEmpty && v1._1.isEmpty) {
+              nullFil = Some(alwaysFalseExpr)
+            }
+          }
+        } else {
+          nullFil = Some(alwaysFalseExpr)
         }
         nullFil
       case _ => Some(e)

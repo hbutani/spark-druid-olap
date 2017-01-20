@@ -981,5 +981,37 @@ class CodeGenTest extends BaseTest with BeforeAndAfterAll with Logging {
       |group by c_name, o_orderdate
     """.stripMargin
     , 1, true, true)
+
+  test("isNull1",
+    """
+      |select sum(c_acctbal), c_name from orderLineItemPartSupplier
+      |where l_shipdate is null
+      |group by c_name
+    """.stripMargin
+    , 1, true, true)
+
+  test("isNull2",
+    """
+      |select sum(c_acctbal), c_name from orderLineItemPartSupplier
+      |where l_shipdate is null and (cast(l_shipdate as bigint) + 10) is not null
+      |group by c_name
+    """.stripMargin
+    , 1, true, true)
+
+  test("isNull3",
+    """
+      |select sum(c_acctbal), c_name from orderLineItemPartSupplier
+      |where o_orderdate is not null and l_commitdate is null and (cast(l_shipdate as bigint) + 10) is not null
+      |group by c_name
+    """.stripMargin
+    , 1, true, true)
+
+  test("isNull4",
+    """
+      |select sum(c_acctbal), c_name from orderLineItemPartSupplier
+      |where (o_orderdate is not null and l_commitdate is null) or ((cast(l_shipdate as bigint) + 10) is null)
+      |group by c_name
+    """.stripMargin
+    , 1, true, true)
 }
 
