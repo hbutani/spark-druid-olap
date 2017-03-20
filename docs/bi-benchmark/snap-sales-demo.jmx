@@ -1,0 +1,1166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="3.1" jmeter="3.1 r1770033">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="ERA Run " enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <JDBCDataSource guiclass="TestBeanGUI" testclass="JDBCDataSource" testname="snap-standard-salesdemoIndexed-param" enabled="true">
+        <stringProp name="dataSource">tpchConnection</stringProp>
+        <stringProp name="poolMax">0</stringProp>
+        <stringProp name="timeout">1000</stringProp>
+        <stringProp name="trimInterval">6000</stringProp>
+        <boolProp name="autocommit">true</boolProp>
+        <stringProp name="transactionIsolation">DEFAULT</stringProp>
+        <boolProp name="keepAlive">false</boolProp>
+        <stringProp name="connectionAge">5000</stringProp>
+        <stringProp name="checkQuery"></stringProp>
+        <stringProp name="dbUrl">jdbc:hive2://54.236.62.114/:10000/default</stringProp>
+        <stringProp name="driver">org.apache.hive.jdbc.HiveDriver</stringProp>
+        <stringProp name="username">ec2-user</stringProp>
+        <stringProp name="password"></stringProp>
+      </JDBCDataSource>
+      <hashTree/>
+      <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="tpchQueryParamsDate" enabled="true">
+        <stringProp name="filename">/Users/hbutani/sparkline/snap/src/test/resources/jmeter/tpchparams.csv</stringProp>
+        <stringProp name="fileEncoding"></stringProp>
+        <stringProp name="variableNames">startdate, enddate</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="tpchQueryParamsPartitions" enabled="true">
+        <stringProp name="filename">/Users/hbutani/sparkline/snap/src/test/resources/jmeter/tpchparams-pyear.csv</stringProp>
+        <stringProp name="fileEncoding"></stringProp>
+        <stringProp name="variableNames">ccode1,ccode2,ccode3,ccode4,ccode5</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="tpchQueryParamsPartitions" enabled="true">
+        <stringProp name="filename">/Users/hbutani/sparkline/snap/src/test/resources/jmeter/tpchparams-p.csv</stringProp>
+        <stringProp name="fileEncoding"></stringProp>
+        <stringProp name="variableNames">ccode1,ccode2,ccode3,ccode4,nation</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+      </CSVDataSet>
+      <hashTree/>
+      <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="tpchQueryParamsMktSegment" enabled="true">
+        <stringProp name="filename">/Users/hbutani/sparkline/snap/src/test/resources/jmeter/tpchparams-mkt.csv</stringProp>
+        <stringProp name="fileEncoding"></stringProp>
+        <stringProp name="variableNames">mktsegment</stringProp>
+        <stringProp name="delimiter">,</stringProp>
+        <boolProp name="quotedData">true</boolProp>
+        <boolProp name="recycle">true</boolProp>
+        <boolProp name="stopThread">false</boolProp>
+        <stringProp name="shareMode">shareMode.all</stringProp>
+      </CSVDataSet>
+      <hashTree/>
+      <RandomVariableConfig guiclass="TestBeanGUI" testclass="RandomVariableConfig" testname="RunTestRandomVariable" enabled="true">
+        <stringProp name="maximumValue">2</stringProp>
+        <stringProp name="minimumValue">0</stringProp>
+        <stringProp name="outputFormat"></stringProp>
+        <boolProp name="perThread">true</boolProp>
+        <stringProp name="randomSeed"></stringProp>
+        <stringProp name="variableName">runtestrv</stringProp>
+      </RandomVariableConfig>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Workbook A - Low Cardinality " enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">5</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">5</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">100</stringProp>
+        <longProp name="ThreadGroup.start_time">1468185462000</longProp>
+        <longProp name="ThreadGroup.end_time">1468185462000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCPreProcessor guiclass="TestBeanGUI" testclass="JDBCPreProcessor" testname="JDBC PreProcessor" enabled="true">
+          <stringProp name="dataSource">tpchConnection</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">set spark.sql.thriftserver.scheduler.pool=sparkline</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCPreProcessor>
+        <hashTree/>
+        <RandomOrderController guiclass="RandomOrderControllerGui" testclass="RandomOrderController" testname="Random Order Controller" enabled="true"/>
+        <hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">4000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="HavingClause" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT s_nation,
+               p_brand,
+               sum(o_totalprice) TOTPRICE,
+               Sum(l_quantity) TOTQTY
+FROM
+       sales_demo_source
+WHERE 
+cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+GROUP  BY s_nation,
+          p_brand
+HAVING sum(l_quantity) &gt; 30
+ORDER  BY TOTPRICE DESC
+          
+</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">8000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="WindowingMovingAvg" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">select
+    p_mfgr,
+    o_orderdate, 
+    sum(l_extendedprice) as revenue,
+    avg(sum(l_extendedprice)) over (partition by p_mfgr order by o_orderdate rows 10 preceding) as mavg
+FROM
+       sales_demo_source
+WHERE
+       p_brand = &apos;Brand#23&apos;
+       AND p_container = &apos;MED BOX&apos;
+       AND cast(l_shipdate as timestamp) &gt;= date_sub(cast(&apos;${startdate}&apos; as timestamp) , 90) 
+     AND 
+       cast(l_shipdate as timestamp) &lt;= cast(&apos;${startdate}&apos; as timestamp) 
+     AND
+       p_year = &quot;${ccode1}&quot;
+ group by 
+ p_mfgr,
+    o_orderdate
+ </stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="FilterWithInandNotEqual" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT p_brand,
+       p_type,
+       p_size,
+       Count(s_name) AS SUPPLIER_CNT
+FROM
+       sales_demo_source
+WHERE
+       p_brand &lt;&gt; &apos;Brand#45&apos;
+       AND p_type NOT LIKE &apos;MEDIUM POLISHED%%&apos;
+       AND p_size IN ( 49, 14, 23, 45,
+                       19, 3, 36, 9 )
+       AND c_mktsegment = &apos;${mktsegment}&apos;
+       AND ( p_year = &quot;${ccode1}&quot; OR p_year = &quot;${ccode2}&quot; ) 
+       AND cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+GROUP  BY p_brand,
+          p_type,
+          p_size
+ORDER  BY supplier_cnt DESC,
+          p_brand,
+          p_type,
+          p_size
+</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree>
+              <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+                <stringProp name="ConstantTimer.delay">14000</stringProp>
+                <stringProp name="RandomTimer.range">1000</stringProp>
+              </GaussianRandomTimer>
+              <hashTree/>
+            </hashTree>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">14000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="DimsWithCase" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT l_shipmode,
+       Sum(CASE
+             WHEN o_orderpriority = &apos;1-URGENT&apos;
+                   OR o_orderpriority = &apos;2-HIGH&apos; THEN 1
+             ELSE 0
+           END) AS HIGH_LINE_COUNT,
+       Sum(CASE
+             WHEN o_orderpriority &lt;&gt; &apos;1-URGENT&apos;
+                  AND o_orderpriority &lt;&gt; &apos;2-HIGH&apos; THEN 1
+             ELSE 0
+           END) AS LOW_LINE_COUNT,
+          Sum(l_extendedprice * l_discount) AS REVENUE 
+FROM
+       sales_demo_source
+WHERE
+       l_shipmode IN ( &apos;MAIL&apos;, &apos;SHIP&apos; )
+       AND cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+       AND p_year = &quot;${ccode3}&quot;
+GROUP  BY l_shipmode
+ORDER  BY l_shipmode</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">12000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="ManyMetricsWithCalc" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT
+               Sum(l_quantity * 0.5)                                           AS SUM_QTY,
+       Sum(l_extendedprice * 0.987)                                      AS
+       SUM_BASE_PRICE,
+       Sum(l_extendedprice * ( 1 - l_discount*0.765 ))                 AS
+       SUM_DISC_PRICE,
+       Sum(l_extendedprice * ( 1 - l_discount ) * ( 1 + l_tax )) AS SUM_CHARGE,
+       Avg(l_quantity)                                           AS AVG_QTY,
+       Avg(l_extendedprice)                                      AS AVG_PRICE,
+       Avg(l_discount *.965)                                           AS AVG_DISC,
+       Count(*)                                                  AS COUNT_ORDER,
+              Sum(l_extendedprice * ( 1 - l_discount )) AS REVENUE,
+              avg(c_acctbal) ACCTBAL,
+              p_brand
+FROM
+       sales_demo_source
+WHERE
+       cast(l_shipdate as timestamp) &gt;= date_sub(cast(&apos;${startdate}&apos; as timestamp) , 120) AND 
+       cast(l_shipdate as timestamp) &lt;= cast(&apos;${startdate}&apos; as timestamp) AND
+       p_year IN ( &quot;${ccode1}&quot;, &quot;${ccode2}&quot;)
+       AND l_returnflag = &apos;R&apos;
+GROUP  BY
+          p_brand
+ORDER  BY revenue DESC
+</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">14000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="FilterOnRegExBothSides" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT
+        s_nation AS NATION,
+        year( o_orderdate) AS O_YEAR,
+        sum(l_extendedprice * ( 1 - l_discount ) - ps_supplycost * l_quantity ) AS AMOUNT
+     FROM
+               sales_demo_source
+     WHERE
+               p_name LIKE &apos;%green%&apos; AND
+               cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp) AND
+              ( p_year = &quot;${ccode2}&quot; or p_year = &quot;${ccode3}&quot; )
+GROUP  BY s_nation,
+          year( o_orderdate)
+ORDER  BY nation,
+          o_year DESC
+ </stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">8000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="MultiConditionFilters" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT s_nation                            AS supp_nation,
+                       c_nation                             AS cust_nation,
+                       Year(l_shipdate)                     AS l_year,
+                       sum( l_extendedprice * ( 1 - l_discount )) AS volume
+                FROM   sales_demo_source
+                WHERE  ( (
+                                     s_nation = &apos;${nation}&apos;
+                              AND    c_nation = &apos;GERMANY&apos; )
+                       OR     (
+                                     s_nation = &apos;GERMANY&apos;
+                              AND    c_nation = &apos;${nation}&apos; ) )
+                AND    cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+GROUP BY s_nation,
+         c_nation,
+         Year(l_shipdate) 
+ORDER BY supp_nation,
+         cust_nation,
+         l_year</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">7000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="WindowingDeltaFromTopMfgr" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">select
+    p_mfgr,
+    p_brand,
+    sum(l_extendedprice) as revenue,
+    sum(l_extendedprice) - max(sum(l_extendedprice)) over (partition by p_mfgr order by sum(l_extendedprice)  desc ) as Delta,
+    avg(l_discount) as Disc
+FROM
+       sales_demo_source
+WHERE
+       p_brand = &apos;Brand#23&apos;
+       AND p_container = &apos;MED BOX&apos;
+       AND cast(l_shipdate as timestamp) &gt;= date_sub(cast(&apos;${startdate}&apos; as timestamp) , 90) 
+     AND 
+       cast(l_shipdate as timestamp) &lt;= cast(&apos;${startdate}&apos; as timestamp) 
+     AND
+       p_year = &quot;${ccode1}&quot;
+  group by p_mfgr,p_brand 
+ </stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">8000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="FiltersAndManyMetrics" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT s_nation,
+ Avg(l_quantity)                                           AS AVG_QTY,
+       Avg(l_extendedprice)                                      AS AVG_PRICE,
+       Avg(l_discount)                                           AS AVG_DISC,
+       Sum(l_quantity*o_totalprice) AS TOTALPRICE,
+       Sum(l_extendedprice * ( 1 - l_discount )) AS REVENUE
+FROM
+       sales_demo_source
+WHERE
+     cast(l_shipdate as timestamp) &gt;= date_sub(cast(&apos;${startdate}&apos; as timestamp) , 90) 
+     AND 
+       cast(l_shipdate as timestamp) &lt;= cast(&apos;${startdate}&apos; as timestamp) 
+     AND
+       p_year = &quot;${ccode3}&quot;
+GROUP  BY s_nation
+ORDER  BY revenue DESC</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">8000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Windowing-1" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">  select
+    p_mfgr,
+    p_brand,
+    sum(l_extendedprice) as revenue,
+    sum(l_extendedprice) - max(sum(l_extendedprice)) over (partition by p_mfgr order by sum(l_extendedprice)  desc ) as Delta,
+    avg(l_discount) as Disc
+  from sales_demo_source 
+  where cast(l_shipdate as timestamp) &gt;= date_sub(cast(&apos;${startdate}&apos; as timestamp) , 90) 
+     AND 
+       cast(l_shipdate as timestamp) &lt;= cast(&apos;${startdate}&apos; as timestamp) 
+  group by p_mfgr,p_brand </stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">4000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="DimensionFunction" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT
+              Sum(l_extendedprice * ( 1 - l_discount )) AS REVENUE,
+              year(o_orderdate), month(o_orderdate) 
+              
+FROM
+       sales_demo_source
+WHERE  c_mktsegment = &apos;${mktsegment}&apos;
+       AND cast(o_orderdate as timestamp)  &lt; date_add(cast(&apos;${startdate}&apos; AS timestamp),90)
+       AND cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+GROUP  BY
+          year(o_orderdate), month(o_orderdate)
+ORDER  BY revenue DESC
+</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">7000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="FiltersWithRegEx" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT 
+       s_nation,
+       p_mfgr,
+       avg(s_acctbal) accbal
+FROM   sales_demo_source
+WHERE
+      p_size = 15
+      AND p_type LIKE &apos;%BRASS&apos;
+      AND p_year = &quot;${ccode3}&quot;
+      AND cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+GROUP BY 
+       s_nation,
+       p_mfgr
+ORDER  BY accbal DESC,
+          s_nation
+</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+          <GenericController guiclass="LogicControllerGui" testclass="GenericController" testname="Simple Controller" enabled="true"/>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">10000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+            <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="OnlyMetric" enabled="true">
+              <stringProp name="dataSource">tpchConnection</stringProp>
+              <stringProp name="queryType">Select Statement</stringProp>
+              <stringProp name="query">SELECT Sum(l_extendedprice * l_discount) AS REVENUE
+FROM   sales_demo_source
+WHERE  cast(l_shipdate as timestamp) &gt;= date_sub(cast(&apos;${startdate}&apos; as timestamp) , 90) AND 
+       cast(l_shipdate as timestamp) &lt;= cast(&apos;${startdate}&apos; as timestamp) AND
+       p_year = &quot;${ccode2}&quot;</stringProp>
+              <stringProp name="queryArguments"></stringProp>
+              <stringProp name="queryArgumentsTypes"></stringProp>
+              <stringProp name="variableNames"></stringProp>
+              <stringProp name="resultVariable"></stringProp>
+              <stringProp name="queryTimeout"></stringProp>
+              <stringProp name="resultSetHandler">Count Records</stringProp>
+            </JDBCSampler>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Workbook B - Heavy Queries" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">5</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">3</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">100</stringProp>
+        <longProp name="ThreadGroup.start_time">1468185462000</longProp>
+        <longProp name="ThreadGroup.end_time">1468185462000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCPreProcessor guiclass="TestBeanGUI" testclass="JDBCPreProcessor" testname="JDBC PreProcessor" enabled="true">
+          <stringProp name="dataSource">tpchConnection</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">set spark.sql.thriftserver.scheduler.pool=sparkline</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCPreProcessor>
+        <hashTree/>
+        <RandomOrderController guiclass="RandomOrderControllerGui" testclass="RandomOrderController" testname="Random Order Controller" enabled="true"/>
+        <hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="SmallQuantityOrdersRevenue" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">select sum(l_extendedprice) / 7.0 as avg_yearly 
+from   
+       sales_demo_source 
+where  
+       c_nation = &quot;${nation}&quot;
+       and l_quantity &lt; ( select 0.2 * avg(l_quantity) 
+                         from sales_demo_source where cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp) and c_nation = &quot;${nation}&quot; )</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="MultiCountryQuery" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">SELECT l_returnflag,
+       l_linestatus,
+       Sum(l_quantity)                                           AS SUM_QTY,
+       Sum(l_extendedprice)                                      AS
+       SUM_BASE_PRICE,
+       Sum(l_extendedprice * ( 1 - l_discount ))                 AS
+       SUM_DISC_PRICE,
+       Sum(l_extendedprice * ( 1 - l_discount ) * ( 1 + l_tax )) AS SUM_CHARGE,
+       Avg(l_quantity)                                           AS AVG_QTY,
+       Avg(l_extendedprice)                                      AS AVG_PRICE,
+       Avg(l_discount)                                           AS AVG_DISC,
+       Count(*)                                                  AS COUNT_ORDER
+FROM   sales_demo_source
+WHERE  cast(l_shipdate as timestamp) &gt;= date_sub(cast(&apos;${startdate}&apos; as timestamp) , 90) AND 
+       cast(l_shipdate as timestamp) &lt;= cast(&apos;${startdate}&apos; as timestamp) 
+GROUP  BY l_returnflag,
+          l_linestatus
+ORDER  BY l_returnflag,
+          l_linestatus</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="TopNSuppliersCountry - High Card" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">select s_name, 
+       sum(l_extendedprice * ( 1 - l_discount )) rev
+from   sales_demo_source
+where  cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp) and 
+       p_year = &quot;${ccode2}&quot;
+group  by s_name 
+order by rev desc
+limit 10</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="ManyMetrics" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">SELECT c_region,
+       c_nation,
+       Sum(l_quantity)                                           AS SUM_QTY,
+       Sum(l_extendedprice)                                      AS
+       SUM_BASE_PRICE,
+       Sum(l_extendedprice * ( 1 - l_discount ))                 AS
+       SUM_DISC_PRICE,
+       Sum(l_extendedprice * ( 1 - l_discount ) * ( 1 + l_tax )) AS SUM_CHARGE,
+       Avg(l_quantity)                                           AS AVG_QTY,
+       Avg(l_extendedprice)                                      AS AVG_PRICE,
+       Avg(l_discount)                                           AS AVG_DISC,
+       Count(*)                                                  AS COUNT_ORDER
+FROM   sales_demo_source
+WHERE  cast(l_shipdate as timestamp) &lt;= date_add(cast(&apos;${startdate}&apos; as timestamp) , 90) AND 
+       cast(l_shipdate as timestamp) &gt;= cast(&apos;${startdate}&apos; as timestamp) 
+GROUP  BY c_region,
+          c_nation
+</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="Count Distinct" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">select p_brand, 
+       p_type, 
+       p_size, 
+       count(distinct s_name) as supplier_cnt 
+from   
+       sales_demo_source 
+where  
+       p_brand &lt;&gt; &apos;BRAND#45&apos; 
+       and p_type not like &apos;MEDIUM POLISHED%&apos; 
+       and p_size in ( 49, 14, 23, 45, 
+                       19, 3, 36, 9 ) 
+       and cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+       and p_year = &quot;${ccode1}&quot;
+group  by p_brand, 
+          p_type, 
+          p_size 
+order  by supplier_cnt desc, 
+          p_brand, 
+          p_type, 
+          p_size 
+limit 10</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Workbook C - No Partition Filter" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">5</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">2</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">100</stringProp>
+        <longProp name="ThreadGroup.start_time">1468185462000</longProp>
+        <longProp name="ThreadGroup.end_time">1468185462000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCPreProcessor guiclass="TestBeanGUI" testclass="JDBCPreProcessor" testname="JDBC PreProcessor" enabled="true">
+          <stringProp name="dataSource">tpchConnection</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">set spark.sql.thriftserver.scheduler.pool=sparkline</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCPreProcessor>
+        <hashTree/>
+        <RandomOrderController guiclass="RandomOrderControllerGui" testclass="RandomOrderController" testname="Random Order Controller" enabled="true"/>
+        <hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="MinCost Supplier by Part in each Region with Windowing at Part level " enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">select  
+s_name, 
+s_region, 
+p_name, 
+p_mfgr, 
+acctbal
+from 
+     ( select 
+
+s_name, 
+s_nation, 
+s_region,
+p_name, 
+p_mfgr, 
+min(s_acctbal) acctbal,
+dense_rank() over (partition by s_region order by sum(ps_supplycost) ) as rank
+from   sales_demo_source
+where  
+      p_size = 15 and
+      cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+     and p_type like &apos;%BRASS&apos; 
+group by 
+s_name, 
+s_nation,
+s_region, 
+p_name, 
+p_mfgr
+     ) tmp
+where
+        rank = 1
+</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">4000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="TopSellingBrandsinEachRegionTopN" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">  select
+    c_region,
+    c_nation, 
+    p_brand,
+    sum(l_extendedprice) as revenue
+  from sales_demo_source 
+  where cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+group by 
+c_region,
+c_nation,
+p_brand
+order by revenue desc
+limit 10</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="TopSellingBrandsinEachRegionWindowing" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">select c_region, c_nation, p_brand, revenue
+from  
+(select
+    c_region,
+    c_nation, 
+    p_brand,
+    sum(l_extendedprice) as revenue,
+    dense_rank() over (partition by p_brand order by sum(l_extendedprice) desc) as rank
+  from sales_demo_source 
+  where cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+group by 
+c_region,
+c_nation,
+p_brand ) tmp
+where 
+rank &lt; 10</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="TopNSuppliersGlobal" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">select s_name, 
+       sum(l_extendedprice * ( 1 - l_discount )) rev
+from   sales_demo_source 
+where  cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+group  by s_name 
+order by rev desc
+limit 10</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">5000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Workbook D - RunOnce" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">5</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">100</stringProp>
+        <longProp name="ThreadGroup.start_time">1468185462000</longProp>
+        <longProp name="ThreadGroup.end_time">1468185462000</longProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JDBCPreProcessor guiclass="TestBeanGUI" testclass="JDBCPreProcessor" testname="JDBC PreProcessor" enabled="true">
+          <stringProp name="dataSource">tpchConnection</stringProp>
+          <stringProp name="queryType">Select Statement</stringProp>
+          <stringProp name="query">set spark.sql.thriftserver.scheduler.pool=sparkline</stringProp>
+          <stringProp name="queryArguments"></stringProp>
+          <stringProp name="queryArgumentsTypes"></stringProp>
+          <stringProp name="variableNames"></stringProp>
+          <stringProp name="resultVariable"></stringProp>
+          <stringProp name="queryTimeout"></stringProp>
+          <stringProp name="resultSetHandler">Store as String</stringProp>
+        </JDBCPreProcessor>
+        <hashTree/>
+        <RandomOrderController guiclass="RandomOrderControllerGui" testclass="RandomOrderController" testname="Random Order Controller" enabled="true"/>
+        <hashTree>
+          <JDBCSampler guiclass="TestBeanGUI" testclass="JDBCSampler" testname="TopVolumeCustomers" enabled="true">
+            <stringProp name="dataSource">tpchConnection</stringProp>
+            <stringProp name="queryType">Select Statement</stringProp>
+            <stringProp name="query">select c_name, 
+               month(o_orderdate), 
+               sum(o_totalprice) totprice, 
+               sum(l_quantity) totqty
+from   
+       sales_demo_source 
+where cast(l_shipdate AS timestamp) BETWEEN cast(&apos;${startdate}&apos; AS timestamp) AND cast(&apos;${enddate}&apos; AS timestamp)
+group  by c_name, 
+          month(o_orderdate)
+having sum(l_quantity) &gt; 30
+order  by totprice desc
+limit 3</stringProp>
+            <stringProp name="queryArguments"></stringProp>
+            <stringProp name="queryArgumentsTypes"></stringProp>
+            <stringProp name="variableNames"></stringProp>
+            <stringProp name="resultVariable"></stringProp>
+            <stringProp name="queryTimeout"></stringProp>
+            <stringProp name="resultSetHandler">Count Records</stringProp>
+          </JDBCSampler>
+          <hashTree>
+            <GaussianRandomTimer guiclass="GaussianRandomTimerGui" testclass="GaussianRandomTimer" testname="Gaussian Random Timer" enabled="true">
+              <stringProp name="ConstantTimer.delay">15000</stringProp>
+              <stringProp name="RandomTimer.range">1000</stringProp>
+            </GaussianRandomTimer>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ResultCollector guiclass="GraphVisualizer" testclass="ResultCollector" testname="Graph Results" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <hostname>true</hostname>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+          </value>
+        </objProp>
+        <stringProp name="filename">/tmp/tpch_graph</stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+          </value>
+        </objProp>
+        <stringProp name="filename">/tmp/tpch_summary</stringProp>
+        <boolProp name="useGroupName">true</boolProp>
+      </ResultCollector>
+      <hashTree/>
+      <ResultCollector guiclass="TableVisualizer" testclass="ResultCollector" testname="View Results in Table" enabled="true">
+        <boolProp name="ResultCollector.error_logging">true</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+          </value>
+        </objProp>
+        <stringProp name="filename">/tmp/tpchtresults</stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ResultCollector guiclass="RespTimeGraphVisualizer" testclass="ResultCollector" testname="Response Time Graph" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+          </value>
+        </objProp>
+        <stringProp name="filename">/tmp/tpch.csv</stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="Aggregate Report" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>false</responseData>
+            <samplerData>false</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>false</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename">/tmp/tpch_aggr_report</stringProp>
+      </ResultCollector>
+      <hashTree/>
+      <Summariser guiclass="SummariserGui" testclass="Summariser" testname="Generate Summary Results" enabled="true"/>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
